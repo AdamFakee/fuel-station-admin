@@ -141,7 +141,7 @@ export const tankSchema = z.object({
   max_usable_capacity_liters: z.coerce.number().min(100, 'Dung tích khả dụng tối thiểu 100 Lít'),
   low_stock_threshold_liters: z.coerce.number().min(0, 'Ngưỡng cảnh báo không âm'),
   loss_tolerance_pct: z.coerce.number().min(0.01).max(5, 'Độ dung sai hao hụt từ 0.01% đến 5%'),
-  opening_stock_liters: z.coerce.number().min(0, 'Tồn đầu kỳ không âm').optional().default(0),
+  opening_stock_liters: z.coerce.number().min(0, 'Tồn đầu kỳ không âm').optional(),
 });
 export type TankInput = z.infer<typeof tankSchema>;
 
@@ -155,10 +155,10 @@ export const pumpSchema = z.object({
   tank_id: z.string().min(1, 'Vui lòng chọn bể kết nối vòi bơm'),
   edge_pump_id: z.coerce.number().min(0).optional(),
   note: z.string().optional(),
-  sensor_com_port: z.string().default('COM1'),
-  sensor_serial: z.coerce.number().default(1234),
+  sensor_com_port: z.string().min(1, 'Cổng COM không được để trống'),
+  sensor_serial: z.coerce.number().min(0),
   terminal_code: z.string().optional(),
-  terminal_host: z.string().default('192.168.1.100'),
+  terminal_host: z.string().min(1, 'Host không được để trống'),
   terminal_password: z.string().optional(),
 });
 export type PumpInput = z.infer<typeof pumpSchema>;
@@ -174,7 +174,7 @@ export const terminalSchema = z.object({
   terminal_code: z.string().min(1, 'Mã máy không được để trống'),
   host: z.string().min(1, 'IP / Host không được để trống'),
   port: z.coerce.number().min(1).max(65535),
-  https: z.boolean().default(false),
+  https: z.boolean(),
   username: z.string().min(1, 'Username không được để trống'),
   password: z.string().optional(),
 });

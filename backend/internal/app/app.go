@@ -11,10 +11,12 @@ import (
 	"fuel-station-backend/internal/config"
 	"fuel-station-backend/internal/modules/assets"
 	"fuel-station-backend/internal/modules/auth"
+	"fuel-station-backend/internal/modules/dispense"
 	"fuel-station-backend/internal/modules/edge"
 	"fuel-station-backend/internal/modules/iam"
 	"fuel-station-backend/internal/modules/master"
 	"fuel-station-backend/internal/modules/quota"
+	"fuel-station-backend/internal/modules/syncmonitor"
 	"fuel-station-backend/internal/platform/postgres"
 	"fuel-station-backend/internal/shared/httpx"
 	"fuel-station-backend/internal/shared/middleware"
@@ -99,6 +101,13 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	edgeService := edge.NewService(edgeRepo, log)
 	edgeHandler := edge.NewHandler(edgeService, log)
 
+	syncMonitorRepo := syncmonitor.NewRepository(pool)
+	syncMonitorService := syncmonitor.NewService(syncMonitorRepo, log)
+	syncMonitorHandler := syncmonitor.NewHandler(syncMonitorService, log)
+
+	dispenseService := dispense.NewService(pool)
+	dispenseHandler := dispense.NewHandler(dispenseService, log)
+
 	// Edge Agent Dedicated API Mount (/edge/v1)
 	r.Route("/edge/v1", func(er chi.Router) {
 		edgeHandler.RegisterRoutes(er, edge.RequireEdgeApiKey(edgeRepo, log))
@@ -122,6 +131,8 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		assetsHandler.RegisterRoutes(r, authMiddleware)
 		quotaHandler.RegisterRoutes(r, authMiddleware)
 		masterHandler.RegisterRoutes(r, authMiddleware)
+		syncMonitorHandler.RegisterRoutes(r, authMiddleware)
+		dispenseHandler.RegisterRoutes(r, authMiddleware)
 	})
 
 	srv := &http.Server{
