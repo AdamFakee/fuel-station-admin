@@ -14,6 +14,7 @@ import (
 	"fuel-station-backend/internal/modules/dispense"
 	"fuel-station-backend/internal/modules/edge"
 	"fuel-station-backend/internal/modules/iam"
+	"fuel-station-backend/internal/modules/inventory"
 	"fuel-station-backend/internal/modules/master"
 	"fuel-station-backend/internal/modules/quota"
 	"fuel-station-backend/internal/modules/syncmonitor"
@@ -108,6 +109,9 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	dispenseService := dispense.NewService(pool)
 	dispenseHandler := dispense.NewHandler(dispenseService, log)
 
+	inventoryService := inventory.NewService(pool)
+	inventoryHandler := inventory.NewHandler(inventoryService, log)
+
 	// Edge Agent Dedicated API Mount (/edge/v1)
 	r.Route("/edge/v1", func(er chi.Router) {
 		edgeHandler.RegisterRoutes(er, edge.RequireEdgeApiKey(edgeRepo, log))
@@ -133,6 +137,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		masterHandler.RegisterRoutes(r, authMiddleware)
 		syncMonitorHandler.RegisterRoutes(r, authMiddleware)
 		dispenseHandler.RegisterRoutes(r, authMiddleware)
+		inventoryHandler.RegisterRoutes(r, authMiddleware)
 	})
 
 	srv := &http.Server{
