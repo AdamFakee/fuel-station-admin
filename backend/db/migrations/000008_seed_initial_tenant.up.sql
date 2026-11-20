@@ -65,6 +65,15 @@ BEGIN
             (v_tenant_id, v_u_manager, v_branch_id),
             (v_tenant_id, v_u_accountant, v_branch_id),
             (v_tenant_id, v_u_it, v_branch_id);
+
+        -- Khởi tạo trạm Edge Agent cho TRAM-01 (API Key: edge_key_tram01)
+        INSERT INTO station.edge_station (
+            tenant_id, branch_id, code, name, api_key_hash, status, agent_version, last_seen_at
+        ) VALUES (
+            v_tenant_id, v_branch_id, 'EDGE-TRAM-01', 'Edge Agent Trạm 1',
+            'fb5a4b6610d5fdb0d172a2b83c0bf649b24073f8ea03a5e9fa41f46d64f02e71',
+            'active', '1.0.0', now()
+        );
     END IF;
 END;
 $$;

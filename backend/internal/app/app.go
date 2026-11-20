@@ -9,11 +9,16 @@ import (
 	"time"
 
 	"fuel-station-backend/internal/config"
+	"fuel-station-backend/internal/modules/assets"
 	"fuel-station-backend/internal/modules/auth"
+	"fuel-station-backend/internal/modules/edge"
 	"fuel-station-backend/internal/modules/iam"
+	"fuel-station-backend/internal/modules/master"
+	"fuel-station-backend/internal/modules/quota"
 	"fuel-station-backend/internal/platform/postgres"
 	"fuel-station-backend/internal/shared/httpx"
 	"fuel-station-backend/internal/shared/middleware"
+	"fuel-station-backend/internal/shared/storage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -76,6 +81,29 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	iamService := iam.NewService(pool)
 	iamHandler := iam.NewHandler(iamService, log)
 
+	assetsService := assets.NewService(pool)
+	assetsHandler := assets.NewHandler(assetsService, log)
+
+	quotaService := quota.NewService(pool)
+	quotaHandler := quota.NewHandler(quotaService, log)
+
+	diskStorage, err := storage.NewLocalDiskStorage(cfg.Storage.Dir, pool)
+	if err != nil {
+		log.WarnContext(ctx, "failed to initialize local disk storage", "err", err)
+	}
+
+	masterService := master.NewService(pool, diskStorage)
+	masterHandler := master.NewHandler(masterService, log)
+
+	edgeRepo := edge.NewRepository(pool)
+	edgeService := edge.NewService(edgeRepo, log)
+	edgeHandler := edge.NewHandler(edgeService, log)
+
+	// Edge Agent Dedicated API Mount (/edge/v1)
+	r.Route("/edge/v1", func(er chi.Router) {
+		edgeHandler.RegisterRoutes(er, edge.RequireEdgeApiKey(edgeRepo, log))
+	})
+
 	// V1 Protected & Business API Router Mount
 	r.Route("/v1", func(r chi.Router) {
 		// Ping / Status verification endpoint
@@ -91,6 +119,9 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 			authHandler.RegisterRoutes(authRouter, authMiddleware)
 		})
 		iamHandler.RegisterRoutes(r, authMiddleware)
+		assetsHandler.RegisterRoutes(r, authMiddleware)
+		quotaHandler.RegisterRoutes(r, authMiddleware)
+		masterHandler.RegisterRoutes(r, authMiddleware)
 	})
 
 	srv := &http.Server{
