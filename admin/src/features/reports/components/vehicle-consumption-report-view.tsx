@@ -63,9 +63,7 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
             <TableRow className="bg-muted/50">
               <TableHead className="w-[120px]">Mã xe</TableHead>
               <TableHead className="w-[130px]">Biển số</TableHead>
-              <TableHead>Đội / Nhóm xe</TableHead>
               <TableHead>Loại xe</TableHead>
-              <TableHead>Tuyến đường</TableHead>
               <TableHead className="text-right tabular-nums">Số lượt đổ</TableHead>
               <TableHead className="text-right tabular-nums text-indigo-600 font-bold">Tổng tiêu hao (L)</TableHead>
               <TableHead className="text-right tabular-nums">Hạn mức quy định (L)</TableHead>
@@ -76,7 +74,7 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   Không có dữ liệu tiêu hao phương tiện trong khoảng thời gian đã chọn.
                 </TableCell>
               </TableRow>
@@ -85,9 +83,7 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
                 <TableRow key={row.vehicle_id}>
                   <TableCell className="font-mono text-xs font-semibold">{row.vehicle_code}</TableCell>
                   <TableCell className="font-bold text-xs">{row.vehicle_plate}</TableCell>
-                  <TableCell className="text-xs">{row.group_name || '—'}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{row.type_name || '—'}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{row.route_name || '—'}</TableCell>
                   <TableCell className="text-right tabular-nums text-xs">{row.session_count}</TableCell>
                   <TableCell className="text-right tabular-nums text-xs font-extrabold text-indigo-600">
                     {formatNumberVN(row.total_dispensed_liters, 2)}

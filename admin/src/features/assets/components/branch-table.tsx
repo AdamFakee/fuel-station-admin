@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Paginator from '@/components/paginator';
 import {
   Table,
   TableBody,
@@ -8,6 +9,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  ACTION_HEAD_CLASS,
+  ACTION_CELL_CLASS,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,11 +26,17 @@ import { toast } from 'sonner';
 
 export function BranchTable() {
   const { isManager } = useAuth();
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(15);
   const [search, setSearch] = React.useState('');
   const [selectedBranch, setSelectedBranch] = React.useState<Branch | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
-  const { data, isLoading } = useBranches({ q: search || undefined });
+  React.useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const { data, isLoading } = useBranches({ q: search || undefined, page, page_size: pageSize });
   const deleteMutation = useDeleteBranch();
 
   const branches = data?.data || [];
@@ -54,7 +63,7 @@ export function BranchTable() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Action Header */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 max-w-sm flex-1">
@@ -75,7 +84,7 @@ export function BranchTable() {
       </div>
 
       {/* Data Table */}
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border bg-card flex min-h-0 flex-1 flex-col">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -86,7 +95,7 @@ export function BranchTable() {
               <TableHead className="text-right tabular-nums">Số điện thoại</TableHead>
               <TableHead className="text-center w-[110px]">Trạng thái</TableHead>
               <TableHead className="text-right tabular-nums w-[120px]">Ngày tạo</TableHead>
-              {isManager && <TableHead className="text-right w-[90px]">Thao tác</TableHead>}
+              {isManager && <TableHead className={`${ACTION_HEAD_CLASS} w-[90px]`}>Thao tác</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -119,17 +128,8 @@ export function BranchTable() {
                     {formatDateVN(b.created_at)}
                   </TableCell>
                   {isManager && (
-                    <TableCell className="text-right">
+                    <TableCell className={ACTION_CELL_CLASS}>
                       <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(b)}
-                          title="Chỉnh sửa"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        >
-                          <PencilSquareIcon className="h-3.5 w-3.5" />
-                        </Button>
                         {b.status === 'active' && (
                           <Button
                             variant="ghost"
@@ -141,6 +141,15 @@ export function BranchTable() {
                             <NoSymbolIcon className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(b)}
+                          title="Chỉnh sửa"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        >
+                          <PencilSquareIcon className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </TableCell>
                   )}
@@ -150,6 +159,16 @@ export function BranchTable() {
           </TableBody>
         </Table>
       </div>
+
+      <Paginator
+        currentPage={page}
+        pageSize={pageSize}
+        totalItems={data?.total ?? 0}
+        onPageChange={(p, size) => {
+          setPage(p);
+          setPageSize(size);
+        }}
+      />
 
       <BranchDialog open={dialogOpen} onOpenChange={setDialogOpen} branch={selectedBranch} />
     </div>

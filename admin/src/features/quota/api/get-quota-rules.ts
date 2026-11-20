@@ -21,7 +21,7 @@ export const quotaKeys = {
   all: ['quotas'] as const,
   rules: (params?: QuotaRuleFilterParams) => [...quotaKeys.all, 'rules', params] as const,
   ruleDetail: (id: string) => [...quotaKeys.all, 'rule', id] as const,
-  extras: (vehicleId?: string) => [...quotaKeys.all, 'extras', vehicleId] as const,
+  extras: (params?: object) => [...quotaKeys.all, 'extras', params] as const,
   targets: () => [...quotaKeys.all, 'targets'] as const,
 };
 

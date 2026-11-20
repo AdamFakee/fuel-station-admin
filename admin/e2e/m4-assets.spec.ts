@@ -222,7 +222,6 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
     await page.goto('/branches');
 
     // Tiêu đề trang
-    await expect(page.getByRole('heading', { name: 'Nhà máy & Chi nhánh' })).toBeVisible();
 
     // Dữ liệu bảng chi nhánh
     await expect(page.getByText('TRAM-01')).toBeVisible();
@@ -249,7 +248,6 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
   test('2. Màn hình Bể chứa (/tanks) hiển thị số Lít tabular-nums, định mức dung tích và mở modal tạo mới', async ({ page }) => {
     await page.goto('/tanks');
 
-    await expect(page.getByRole('heading', { name: 'Bể chứa nhiên liệu' })).toBeVisible();
 
     // Dữ liệu bảng bể chứa
     await expect(page.getByText('TK-DO-01')).toBeVisible();
@@ -278,14 +276,13 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
   test('3. Màn hình Trụ bơm (/pumps) hiển thị Edge Pump ID, vòi xuất liên kết bể và mở modal khai báo', async ({ page }) => {
     await page.goto('/pumps');
 
-    await expect(page.getByRole('heading', { name: 'Trụ bơm & Vòi xuất' })).toBeVisible();
 
     // Thông tin trụ bơm
     await expect(page.getByText('TRU-01')).toBeVisible();
     await expect(page.getByText('Trụ bơm Dầu DO 01')).toBeVisible();
     await expect(page.getByText('Vòi 1: Bể Dầu DO Số 1')).toBeVisible();
     await expect(page.getByText('COM7 (Serial: 1234)')).toBeVisible();
-    await expect(page.getByText('192.168.1.150:80')).toBeVisible();
+    await expect(page.getByText('192.168.1.150')).toBeVisible();
     await expect(page.getByText('Sẵn sàng')).toBeVisible();
 
     // Mở modal tạo mới trụ bơm
@@ -293,40 +290,35 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
     await expect(addPumpBtn).toBeVisible();
     await addPumpBtn.click();
 
-    await expect(page.getByRole('heading', { name: 'Khai báo Trụ Bơm & Thiết bị Ngoại vi' })).toBeVisible();
-    await expect(page.getByText('Cấu hình Thiết bị Ngoại vi (Bộ số & Máy chấm công)')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Khai báo trụ bơm' })).toBeVisible();
+    // Bộ số và máy chấm công nằm ngay trong form của trụ
+    await expect(page.getByText('Bộ số Montech (RS-485)')).toBeVisible();
+    await expect(page.getByText('Máy chấm công Hikvision (ISAPI)')).toBeVisible();
 
     await page.getByRole('button', { name: 'Hủy' }).click();
   });
 
-  test('4. Màn hình Thiết bị (/devices) hiển thị Montech RS-485, Hikvision ISAPI và bảo mật AES-GCM', async ({ page }) => {
+  test('4. Thiết bị nằm trong form trụ: sửa trụ hiện bộ số Montech RS-485 và máy chấm công Hikvision, /devices chuyển về /pumps', async ({ page }) => {
     await page.goto('/devices');
+    await expect(page).toHaveURL(/\/pumps$/);
 
-    await expect(page.getByRole('heading', { name: 'Thiết bị & Máy chấm công' })).toBeVisible();
+    // Mở form sửa của trụ đầu tiên
+    await page.getByTitle('Chỉnh sửa').first().click();
+    await expect(page.getByRole('heading', { name: /Chỉnh sửa trụ bơm/ })).toBeVisible();
 
-    // Hiển thị thông số kết nối
-    await expect(page.getByText('TRU-01')).toBeVisible();
-    await expect(page.getByText('COM7')).toBeVisible();
-    await expect(page.getByText('1234')).toBeVisible();
-    await expect(page.getByText('9600')).toBeVisible();
-    await expect(page.getByText('192.168.1.150 (T1)')).toBeVisible();
-    await expect(page.getByText('AES-GCM', { exact: true })).toBeVisible();
+    // Bộ số
+    await expect(page.getByText('Bộ số Montech (RS-485)')).toBeVisible();
+    await expect(page.getByLabel('Cổng COM *')).toHaveValue('COM7');
+    await expect(page.getByLabel('Serial của bộ số')).toHaveValue('1234');
+    // Baud và cổng máy chấm công cố định nên không có ô nhập
+    await expect(page.getByLabel('Tốc độ baud')).toHaveCount(0);
 
-    // Nút chỉnh sửa bộ số
-    const editSensorBtn = page.getByRole('button', { name: /Bộ số/i });
-    await expect(editSensorBtn).toBeVisible();
-    await editSensorBtn.click();
+    // Máy chấm công: mật khẩu không bao giờ hiện lại, để trống nghĩa là giữ nguyên
+    await expect(page.getByText('Máy chấm công Hikvision (ISAPI)')).toBeVisible();
+    await expect(page.getByLabel('Địa chỉ IP *')).toHaveValue('192.168.1.150');
+    await expect(page.getByLabel('Mật khẩu')).toHaveValue('');
+    await expect(page.getByPlaceholder('Để trống để giữ nguyên')).toBeVisible();
 
-    await expect(page.getByRole('heading', { name: 'Cấu hình Bộ Số Montech RS-485' })).toBeVisible();
-    await page.getByRole('button', { name: 'Hủy' }).click();
-
-    // Nút chỉnh sửa máy chấm công
-    const editTerminalBtn = page.getByRole('button', { name: /MCC/i });
-    await expect(editTerminalBtn).toBeVisible();
-    await editTerminalBtn.click();
-
-    await expect(page.getByRole('heading', { name: 'Cấu hình Máy Chấm Công Hikvision (ISAPI)' })).toBeVisible();
-    await expect(page.getByText('Mật khẩu máy chấm công được mã hóa tự động bằng thuật toán AES-GCM')).toBeVisible();
     await page.getByRole('button', { name: 'Hủy' }).click();
   });
 
@@ -364,7 +356,6 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
 
     // Truy cập /tanks: Thấy số lít nhưng KHÔNG thấy nút tạo mới hay thao tác
     await page.goto('/tanks');
-    await expect(page.getByRole('heading', { name: 'Bể chứa nhiên liệu' })).toBeVisible();
     await expect(page.getByText('TK-DO-01')).toBeVisible();
     await expect(page.getByText('18.500')).toBeVisible();
 
@@ -374,15 +365,9 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
 
     // Truy cập /pumps: Không có nút khai báo trụ mới
     await page.goto('/pumps');
-    await expect(page.getByRole('heading', { name: 'Trụ bơm & Vòi xuất' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Khai báo trụ mới/i })).not.toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Thao tác' })).not.toBeVisible();
 
-    // Truy cập /devices: Không có nút chỉnh sửa cấu hình thiết bị
-    await page.goto('/devices');
-    await expect(page.getByRole('heading', { name: 'Thiết bị & Máy chấm công' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Bộ số/i })).not.toBeVisible();
-    await expect(page.getByRole('button', { name: /MCC/i })).not.toBeVisible();
   });
 
 });

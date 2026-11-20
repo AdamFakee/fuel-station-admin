@@ -62,6 +62,8 @@ export interface PumpSensor {
   id: string;
   tenant_id: string;
   pump_id: string;
+  /** Tên gợi nhớ của bộ số (mặc định BS-<mã trụ>). */
+  name: string;
   serial: number;
   com_port: string;
   baud: number;
@@ -146,24 +148,28 @@ export const tankSchema = z.object({
 export type TankInput = z.infer<typeof tankSchema>;
 
 export const pumpSchema = z.object({
-  code: z
-    .string()
-    .min(1, 'Mã trụ bơm không được để trống')
-    .regex(/^[A-Za-z0-9_-]{1,32}$/, 'Mã chỉ gồm chữ, số, gạch ngang'),
+  // Mã trụ do hệ thống sinh; chỉ có giá trị khi sửa (hiển thị, không gửi đi).
+  code: z.string().optional(),
   name: z.string().min(1, 'Tên trụ không được để trống'),
   branch_id: z.string().min(1, 'Vui lòng chọn chi nhánh'),
   tank_id: z.string().min(1, 'Vui lòng chọn bể kết nối vòi bơm'),
   edge_pump_id: z.coerce.number().min(0).optional(),
   note: z.string().optional(),
+  sensor_name: z.string().optional(),
   sensor_com_port: z.string().min(1, 'Cổng COM không được để trống'),
   sensor_serial: z.coerce.number().min(0),
+  sensor_baud: z.coerce.number().min(1200),
   terminal_code: z.string().optional(),
-  terminal_host: z.string().min(1, 'Host không được để trống'),
+  terminal_host: z.string().min(1, 'Địa chỉ máy chấm công không được để trống'),
+  terminal_port: z.coerce.number().min(1, 'Cổng từ 1 đến 65535').max(65535, 'Cổng từ 1 đến 65535'),
+  terminal_https: z.boolean(),
+  terminal_username: z.string().min(1, 'Tài khoản không được để trống'),
   terminal_password: z.string().optional(),
 });
 export type PumpInput = z.infer<typeof pumpSchema>;
 
 export const sensorSchema = z.object({
+  name: z.string().optional(),
   serial: z.coerce.number().min(0),
   com_port: z.string().min(1, 'Cổng COM không được để trống'),
   baud: z.coerce.number().min(1200),

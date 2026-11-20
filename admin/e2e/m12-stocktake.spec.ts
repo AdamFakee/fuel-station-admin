@@ -328,7 +328,6 @@ test.describe('Module M12 - Kiểm kê, Tồn kho & Cảnh báo (Stocktake & Ale
     await page.goto('/inventory/stocktake');
 
     // Kiểm tra Header
-    await expect(page.locator('h1')).toContainText('Kiểm kê & Đối chiếu Nhiên liệu');
 
     // Kiểm tra 4 thẻ KPI
     await expect(page.getByText('Tổng tồn kho toàn bể')).toBeVisible();

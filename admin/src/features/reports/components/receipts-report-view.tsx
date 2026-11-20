@@ -80,6 +80,7 @@ export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps)
             <TableRow className="bg-muted/50">
               <TableHead className="w-[130px]">Mã phiếu</TableHead>
               <TableHead className="w-[160px] text-right tabular-nums">Thời gian nhận</TableHead>
+              <TableHead>Người lập / Duyệt</TableHead>
               <TableHead className="w-[120px]">Xe bồn</TableHead>
               <TableHead>Nhà cung cấp</TableHead>
               <TableHead>Bể nhận</TableHead>
@@ -88,7 +89,6 @@ export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps)
               <TableHead className="text-right tabular-nums text-emerald-600 font-semibold">Thực nhận (L)</TableHead>
               <TableHead className="text-right tabular-nums">Chênh lệch (L)</TableHead>
               <TableHead className="w-[110px]">Trạng thái</TableHead>
-              <TableHead>Người lập / Duyệt</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -104,6 +104,12 @@ export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps)
                   <TableCell className="font-mono text-xs font-semibold">{row.receipt_code}</TableCell>
                   <TableCell className="text-right tabular-nums text-xs">
                     {formatDateTimeVN(row.received_at)}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    <div>{row.created_by_name}</div>
+                    {row.decided_by_name && (
+                      <div className="text-[11px] text-emerald-700">Duyệt: {row.decided_by_name}</div>
+                    )}
                   </TableCell>
                   <TableCell className="font-semibold text-xs">{row.tanker_plate || '—'}</TableCell>
                   <TableCell className="text-xs">{row.supplier_name || '—'}</TableCell>
@@ -124,12 +130,6 @@ export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps)
                     {formatNumberVN(row.variance_liters, 2)}
                   </TableCell>
                   <TableCell>{getStatusBadge(row.status)}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    <div>{row.created_by_name}</div>
-                    {row.decided_by_name && (
-                      <div className="text-[11px] text-emerald-700">Duyệt: {row.decided_by_name}</div>
-                    )}
-                  </TableCell>
                 </TableRow>
               ))
             )}

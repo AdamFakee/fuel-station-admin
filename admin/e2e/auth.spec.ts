@@ -1,6 +1,32 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Module M0 & M1 - Auth & Role RBAC E2E Tests', () => {
+  // Trang chủ là dashboard: trả dữ liệu rỗng để không gọi API thật (401 sẽ chuyển về /login giữa chừng test).
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/dashboard', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          kpi: {
+            today_total_liters: 0,
+            today_total_sessions: 0,
+            today_completed_sessions: 0,
+            today_failed_sessions: 0,
+            active_pumps: 0,
+            online_stations: 0,
+            low_stock_tanks: 0,
+          },
+          tanks: [],
+          pumps: [],
+          recent_sessions: [],
+          daily_dispense: [],
+          generated_at: new Date().toISOString(),
+        }),
+      });
+    });
+  });
+
   test('1. Trang đăng nhập hiển thị đầy đủ thông tin nhận diện thương hiệu và form', async ({ page }) => {
     await page.goto('/login');
 
@@ -81,7 +107,7 @@ test.describe('Module M0 & M1 - Auth & Role RBAC E2E Tests', () => {
     await page.goto('/');
 
     await expect(page.getByText('Fuel Station System')).toBeVisible();
-    await expect(page.getByText('Bảng điều khiển (Dashboard)')).toBeVisible();
+    await expect(page.getByText('Dashboard', { exact: true })).toBeVisible();
     await expect(page.getByText('Bể chứa nhiên liệu')).toBeVisible();
     await expect(page.getByText('Tài khoản người dùng')).toBeVisible();
     await expect(page.getByText('Vai trò & Phân quyền')).toBeVisible();

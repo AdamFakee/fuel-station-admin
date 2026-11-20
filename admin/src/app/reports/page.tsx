@@ -1,5 +1,6 @@
 'use client';
 
+import { DetailPageHeader } from '@/components/detail-page-header';
 import React, { useState } from 'react';
 import { ReportFilterState, ReportTemplateType } from '@/features/reports/types';
 import { useStockLedgerReport } from '@/features/reports/api/get-stock-ledger-report';
@@ -18,7 +19,7 @@ import { DriverDispenseReportView } from '@/features/reports/components/driver-d
 import { ReconciliationReportView } from '@/features/reports/components/reconciliation-report-view';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileSpreadsheet, Printer, ShieldCheck } from 'lucide-react';
+import { FileSpreadsheet, Printer } from 'lucide-react';
 import { formatNumberVN, formatDateTimeVN, formatDateVN } from '@/lib/format';
 
 export default function ReportsPage() {
@@ -197,9 +198,7 @@ export default function ReportsPage() {
         const columns = [
           { header: 'Mã xe', key: 'vehicle_code', width: 14 },
           { header: 'Biển số', key: 'vehicle_plate', width: 16 },
-          { header: 'Đội / Nhóm xe', key: 'group_name', width: 20 },
           { header: 'Loại xe', key: 'type_name', width: 16 },
-          { header: 'Tuyến đường', key: 'route_name', width: 18 },
           { header: 'Số lượt đổ', key: 'session_count', width: 14, align: 'right' as const },
           { header: 'Tổng tiêu hao (L)', key: 'total_dispensed_liters', width: 20, align: 'right' as const },
           { header: 'Hạn mức (L)', key: 'quota_liters', width: 16, align: 'right' as const },
@@ -289,34 +288,23 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header & Non-money Badge */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b pb-4 print:border-none">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight">Báo Cáo & Xuất Dữ Liệu</h1>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Chỉ quản lý Lít • Không có cột tiền</span>
-            </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
+      <DetailPageHeader
+        title="Báo cáo & Xuất dữ liệu"
+        className="print:border-none"
+        headerActions={
+          <div className="flex items-center gap-2 print:hidden">
+            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
+              <Printer className="h-4 w-4" />
+              <span>In / PDF</span>
+            </Button>
+            <Button size="sm" onClick={handleExportExcel} className="gap-1.5">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span>Xuất Excel</span>
+            </Button>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            6 mẫu báo cáo tiêu chuẩn theo BRD v1.6 cho Quản lý và Kế toán, hỗ trợ xuất Excel và in/PDF
-          </p>
-        </div>
-
-        {/* Action Export Buttons */}
-        <div className="flex items-center gap-2 print:hidden">
-          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
-            <Printer className="h-4 w-4" />
-            <span>In / PDF</span>
-          </Button>
-          <Button size="sm" onClick={handleExportExcel} className="gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white">
-            <FileSpreadsheet className="h-4 w-4" />
-            <span>Xuất Excel (.xlsx)</span>
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Navigation Tabs for 6 Report Templates */}
       <div className="print:hidden">

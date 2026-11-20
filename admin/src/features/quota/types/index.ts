@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export type QuotaPeriod = 'per_dispense' | 'day' | 'week' | 'month';
-export type QuotaTargetType = 'vehicle' | 'vehicle_group' | 'route';
+export type QuotaTargetType = 'vehicle';
 export type QuotaRuleStatus = 'active' | 'cancelled';
 
 export interface QuotaRule {
@@ -49,13 +49,11 @@ export interface TargetOption {
 
 export interface QuotaTargets {
   vehicles: TargetOption[];
-  vehicle_groups: TargetOption[];
-  routes: TargetOption[];
 }
 
 export const quotaRuleSchema = z.object({
   code: z.string().optional(),
-  target_type: z.enum(['vehicle', 'vehicle_group', 'route'], {
+  target_type: z.enum(['vehicle'], {
     errorMap: () => ({ message: 'Vui lòng chọn đối tượng áp dụng' }),
   }),
   target_id: z.string().min(1, 'Vui lòng chọn đối tượng cụ thể'),

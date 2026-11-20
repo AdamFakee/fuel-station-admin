@@ -23,7 +23,7 @@ export async function getQuotaExtras(params?: QuotaExtraFilterParams): Promise<Q
 
 export function useQuotaExtras(params?: QuotaExtraFilterParams) {
   return useQuery({
-    queryKey: quotaKeys.extras(params?.vehicle_id),
+    queryKey: quotaKeys.extras(params),
     queryFn: () => getQuotaExtras(params),
   });
 }

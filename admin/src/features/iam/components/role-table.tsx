@@ -8,6 +8,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  ACTION_HEAD_CLASS,
+  ACTION_CELL_CLASS,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,7 +76,7 @@ export function RoleTable({ roles, isLoading, onEdit }: RoleTableProps) {
               <TableHead className="text-right tabular-nums w-[110px]">Tài khoản</TableHead>
               <TableHead className="text-right tabular-nums w-[110px]">Số quyền</TableHead>
               <TableHead className="text-right tabular-nums w-[170px]">Cập nhật cuối</TableHead>
-              <TableHead className="text-right w-[80px]">Thao tác</TableHead>
+              <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -117,11 +119,11 @@ export function RoleTable({ roles, isLoading, onEdit }: RoleTableProps) {
                   <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                     {formatDateTimeVN(r.updated_at)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className={ACTION_CELL_CLASS}>
                     <div className="flex justify-end gap-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="outline" size="icon" className="h-8 w-8">
                             <EllipsisHorizontalIcon className="h-4 w-4" />
                             <span className="sr-only">Tùy chọn</span>
                           </Button>

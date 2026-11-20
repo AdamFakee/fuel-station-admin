@@ -5,16 +5,20 @@ import { pumpKeys } from './get-pumps';
 
 export async function createPump(input: PumpInput): Promise<PumpDetail> {
   const payload = {
-    code: input.code,
     name: input.name,
     branch_id: input.branch_id,
     tank_id: input.tank_id,
     edge_pump_id: input.edge_pump_id,
     note: input.note,
+    sensor_name: input.sensor_name || undefined,
     sensor_com_port: input.sensor_com_port,
     sensor_serial: input.sensor_serial,
-    terminal_code: input.terminal_code,
+    sensor_baud: input.sensor_baud,
+    terminal_code: input.terminal_code || undefined,
     terminal_host: input.terminal_host,
+    terminal_port: input.terminal_port,
+    terminal_https: input.terminal_https,
+    terminal_username: input.terminal_username,
     terminal_password: input.terminal_password,
   };
 

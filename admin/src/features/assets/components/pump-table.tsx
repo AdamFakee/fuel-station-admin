@@ -8,6 +8,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  ACTION_HEAD_CLASS,
+  ACTION_CELL_CLASS,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { PlusIcon, PencilSquareIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
 import { PumpDetail } from '../types';
 import { usePumps } from '../api/get-pumps';
+import Paginator from '@/components/paginator';
 import { useDeletePump } from '../api/delete-pump';
 import { useBranches } from '../api/get-branches';
 import { PumpDialog } from './pump-dialog';
@@ -23,13 +26,21 @@ import { toast } from 'sonner';
 
 export function PumpTable() {
   const { isManager } = useAuth();
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(15);
   const [search, setSearch] = React.useState('');
   const [branchFilter, setBranchFilter] = React.useState('');
   const [selectedPump, setSelectedPump] = React.useState<PumpDetail | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, branchFilter]);
+
   const { data: branchData } = useBranches();
   const { data, isLoading } = usePumps({
+    page,
+    page_size: pageSize,
     q: search || undefined,
     branch_id: branchFilter || undefined,
   });
@@ -60,7 +71,7 @@ export function PumpTable() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 max-w-lg flex-1">
@@ -94,7 +105,7 @@ export function PumpTable() {
       </div>
 
       {/* Data Table */}
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border bg-card flex min-h-0 flex-1 flex-col">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -106,7 +117,7 @@ export function PumpTable() {
               <TableHead className="text-left">Bộ số Montech</TableHead>
               <TableHead className="text-left">Máy chấm công</TableHead>
               <TableHead className="text-center w-[110px]">Trạng thái</TableHead>
-              {isManager && <TableHead className="text-right w-[80px]">Thao tác</TableHead>}
+              {isManager && <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -154,7 +165,7 @@ export function PumpTable() {
                     <TableCell className="text-left text-xs font-mono">
                       {p.terminal ? (
                         <span>
-                          {p.terminal.host}:{p.terminal.port}
+                          {p.terminal.host}
                         </span>
                       ) : (
                         '—'
@@ -166,17 +177,8 @@ export function PumpTable() {
                       </Badge>
                     </TableCell>
                     {isManager && (
-                      <TableCell className="text-right">
+                      <TableCell className={ACTION_CELL_CLASS}>
                         <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(p)}
-                            title="Chỉnh sửa"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          >
-                            <PencilSquareIcon className="h-3.5 w-3.5" />
-                          </Button>
                           {p.enabled && (
                             <Button
                               variant="ghost"
@@ -188,6 +190,15 @@ export function PumpTable() {
                               <NoSymbolIcon className="h-3.5 w-3.5" />
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(p)}
+                            title="Chỉnh sửa"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          >
+                            <PencilSquareIcon className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </TableCell>
                     )}
@@ -198,6 +209,16 @@ export function PumpTable() {
           </TableBody>
         </Table>
       </div>
+
+      <Paginator
+        currentPage={page}
+        pageSize={pageSize}
+        totalItems={data?.total ?? 0}
+        onPageChange={(p, size) => {
+          setPage(p);
+          setPageSize(size);
+        }}
+      />
 
       <PumpDialog open={dialogOpen} onOpenChange={setDialogOpen} pump={selectedPump} />
     </div>

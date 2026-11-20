@@ -3,6 +3,7 @@ package assets_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,7 +112,7 @@ func TestFuelTypeAndTankLifecycle(t *testing.T) {
 	defer pool.Close()
 
 	// 1. Ensure Fuel Type exists
-	fuelCode := fmt.Sprintf("DO-%d", time.Now().UnixNano()%10000)
+	fuelCode := fmt.Sprintf("DO-%d", time.Now().UnixNano()%100000000)
 	ft, err := svc.CreateFuelType(ctx, assets.CreateFuelTypeRequest{
 		Code: fuelCode,
 		Name: "Dầu DO M4 Test",
@@ -121,7 +122,7 @@ func TestFuelTypeAndTankLifecycle(t *testing.T) {
 	}
 
 	// 2. Create Tank with opening stock
-	tankCode := fmt.Sprintf("TK-%d", time.Now().UnixNano()%10000)
+	tankCode := fmt.Sprintf("TK-%d", time.Now().UnixNano()%100000000)
 	tank, err := svc.CreateTank(ctx, assets.CreateTankRequest{
 		BranchID:            branch1ID,
 		Code:                tankCode,
@@ -189,7 +190,9 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 
 	// 2. Create Pump
 	pumpCode := fmt.Sprintf("P-%d", time.Now().UnixNano()%100000)
-	comPort := "COM7"
+	// Cổng COM phải duy nhất trong cửa hàng: dùng số ngẫu nhiên theo từng lần chạy, kẻo đụng dữ liệu thật trong DB dùng chung.
+	comSuffix := time.Now().UnixNano() % 800000
+	comPort := fmt.Sprintf("COM%d", 100+comSuffix)
 	var serial uint32 = 4567
 	termHost := "192.168.1.150"
 	termPass := "HikSecure@999"
@@ -207,8 +210,9 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreatePump failed: %v", err)
 	}
-	if pump.Code != pumpCode {
-		t.Fatalf("expected pump code %s, got %s", pumpCode, pump.Code)
+	// Mã trụ do hệ thống sinh (TR-năm-số thứ tự), không lấy từ client.
+	if !strings.HasPrefix(pump.Code, "TR-") || pump.Code == pumpCode {
+		t.Fatalf("expected a generated pump code TR-..., got %s", pump.Code)
 	}
 	if len(pump.Nozzles) == 0 {
 		t.Fatalf("expected at least 1 nozzle attached to pump")
@@ -223,8 +227,8 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 	// 3. Update Sensor and Terminal
 	_, err = svc.UpdateSensor(ctx, pump.ID, assets.UpdateSensorRequest{
 		Serial:  9999,
-		ComPort: "COM8",
-		Baud:    19200,
+		ComPort: fmt.Sprintf("COM%d", 1000+comSuffix),
+		Baud:    19200, // bị bỏ qua: baud luôn cố định 9600
 	})
 	if err != nil {
 		t.Fatalf("UpdateSensor failed: %v", err)
@@ -236,7 +240,7 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 	_, err = svc.UpdateTerminal(ctx, pump.ID, assets.UpdateTerminalRequest{
 		TerminalCode: newTerminalCode,
 		Host:         newHost,
-		Port:         8000,
+		Port:         8000, // bị bỏ qua: cổng luôn cố định 80
 		HTTPS:        false,
 		Username:     "admin",
 		Password:     &newPass,

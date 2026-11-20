@@ -57,7 +57,7 @@ export function QuotaExtraTable({ extras, isLoading }: QuotaExtraTableProps) {
   }
 
   return (
-    <div className="rounded-md border bg-card">
+    <div className="rounded-md border bg-card flex min-h-0 flex-1 flex-col">
       <Table>
         <TableHeader>
           <TableRow>

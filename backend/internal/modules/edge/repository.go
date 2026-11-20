@@ -140,20 +140,21 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 
 	case "pump_sensor":
 		query := `
-			SELECT s.id, s.pump_id, s.serial, s.com_port, s.baud, s.version
+			SELECT s.id, s.pump_id, s.name, s.serial, s.com_port, s.baud, s.version
 			FROM station.pump_sensor s
 			JOIN station.pump p ON p.id = s.pump_id AND p.tenant_id = s.tenant_id
 			WHERE s.tenant_id = $1 AND s.id = $2 AND p.branch_id = $3
 		`
-		var id, pumpID, comPort string
+		var id, pumpID, name, comPort string
 		var serial, version int64
 		var baud int
-		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &pumpID, &serial, &comPort, &baud, &version)
+		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &pumpID, &name, &serial, &comPort, &baud, &version)
 		if err != nil {
 			return nil, err
 		}
 		data["id"] = id
 		data["pump_id"] = pumpID
+		data["name"] = name
 		data["serial"] = serial
 		data["com_port"] = comPort
 		data["baud"] = baud
@@ -184,18 +185,25 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["version"] = version
 
 	case "vehicle":
-		query := `SELECT id, code, plate, fuel_type_id, tank_capacity_ml, status, version FROM station.vehicle WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`
+		// Đẩy MỌI xe của công ty kèm cờ `allowed_here` (xe có được đổ ở cửa hàng của trạm này không). Edge Agent dựa vào cờ để từ chối
+		// với lý do riêng, thay vì coi xe đổ nhầm cửa hàng là "thẻ lạ".
+		query := `
+			SELECT v.id, v.code, v.plate, v.fuel_type_id, v.status, v.version,
+			       EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $3)
+			FROM station.vehicle v
+			WHERE v.tenant_id = $1 AND v.id = $2 AND v.deleted_at IS NULL`
 		var id, code, plate, fuelTypeID, status string
-		var tankCapacity, version int64
-		err := r.pool.QueryRow(ctx, query, tenantID, entityID).Scan(&id, &code, &plate, &fuelTypeID, &tankCapacity, &status, &version)
+		var version int64
+		var allowedHere bool
+		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &code, &plate, &fuelTypeID, &status, &version, &allowedHere)
 		if err != nil {
 			return nil, err
 		}
+		data["allowed_here"] = allowedHere
 		data["id"] = id
 		data["code"] = code
 		data["plate"] = plate
 		data["fuel_type_id"] = fuelTypeID
-		data["tank_capacity_ml"] = tankCapacity
 		data["status"] = status
 		data["version"] = version
 

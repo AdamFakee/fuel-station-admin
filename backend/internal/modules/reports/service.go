@@ -398,48 +398,38 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 
 	query := `
 		SELECT v.id AS vehicle_id, v.code AS vehicle_code, v.plate AS vehicle_plate,
-		       vg.name AS group_name,
 		       vt.name AS type_name,
-		       rt.name AS route_name,
 		       COUNT(ds.id) AS session_count,
 		       COALESCE(SUM(ds.dispensed_ml), 0) AS total_dispensed_ml,
-		       qr.volume_ml AS quota_rule_ml,
+		       qr.max_volume_ml AS quota_rule_ml,
 		       qr.period AS quota_period
 		  FROM station.vehicle v
-		  JOIN station.branch b ON b.id = v.branch_id AND b.tenant_id = v.tenant_id
-		  LEFT JOIN station.vehicle_group vg ON vg.id = v.group_id AND vg.tenant_id = v.tenant_id
 		  LEFT JOIN station.vehicle_type vt ON vt.id = v.vehicle_type_id AND vt.tenant_id = v.tenant_id
-		  LEFT JOIN station.route rt ON rt.id = v.route_id AND rt.tenant_id = v.tenant_id
 		  LEFT JOIN station.dispense_session ds ON ds.vehicle_id = v.id AND ds.tenant_id = v.tenant_id
 		       AND ds.status = 'completed'
-		       AND ($4::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) >= $4)
-		       AND ($5::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) <= $5)
+		       AND ($3::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) >= $3)
+		       AND ($4::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) <= $4)
 		  LEFT JOIN LATERAL (
-		       SELECT volume_ml, period FROM station.quota_rule qr
+		       SELECT max_volume_ml, period FROM station.quota_rule qr
 		        WHERE qr.tenant_id = v.tenant_id
 		          AND qr.status = 'active'
-		          AND (
-		               (qr.target_type = 'vehicle' AND qr.target_id = v.id)
-		            OR (qr.target_type = 'group' AND qr.target_id = v.group_id)
-		            OR (qr.target_type = 'route' AND qr.target_id = v.route_id)
-		          )
-		        ORDER BY qr.priority DESC, qr.created_at DESC LIMIT 1
+		          AND qr.vehicle_id = v.id
+		        ORDER BY qr.created_at DESC LIMIT 1
 		  ) qr ON TRUE
 		 WHERE v.tenant_id = $1
-		   AND ($2::UUID IS NULL OR v.branch_id = $2)
-		   AND ($3::UUID IS NULL OR v.group_id = $3)
-		   AND ($6::UUID IS NULL OR v.id = $6)
-		 GROUP BY v.id, v.code, v.plate, vg.name, vt.name, rt.name, qr.volume_ml, qr.period
+		   AND ($2::UUID IS NULL OR EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $2))
+		   AND ($5::UUID IS NULL OR v.id = $5)
+		 GROUP BY v.id, v.code, v.plate, vt.name, qr.max_volume_ml, qr.period
 		 ORDER BY total_dispensed_ml DESC, v.plate ASC
 	`
 
-	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.VehicleGroupID, q.FromDate, q.ToDate, q.VehicleID)
+	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.FromDate, q.ToDate, q.VehicleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query vehicle consumption report: %w", err)
 	}
 	defer rows.Close()
 
-	var items []VehicleConsumptionItem
+	items := make([]VehicleConsumptionItem, 0)
 	var totalDispensedML int64
 	var totalSessions int
 
@@ -449,7 +439,7 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 		var quotaML *int64
 		if err := rows.Scan(
 			&item.VehicleID, &item.VehicleCode, &item.VehiclePlate,
-			&item.GroupName, &item.TypeName, &item.RouteName,
+			&item.TypeName,
 			&item.SessionCount, &dispML,
 			&quotaML, &item.QuotaPeriod,
 		); err != nil {
@@ -499,14 +489,14 @@ func (s *Service) GetDriverDispenseReport(ctx context.Context, q DriverDispenseQ
 		SELECT d.id AS driver_id, d.code AS driver_code, d.full_name AS driver_name, d.phone,
 		       COUNT(ds.id) AS session_count,
 		       COALESCE(SUM(ds.dispensed_ml), 0) AS total_dispensed_ml,
-		       COALESCE(string_agg(DISTINCT ds.vehicle_plate, ', ' FILTER (WHERE ds.vehicle_plate IS NOT NULL)), '') AS vehicles_used
+		       COALESCE(string_agg(DISTINCT ds.vehicle_plate, ', ') FILTER (WHERE ds.vehicle_plate IS NOT NULL), '') AS vehicles_used
 		  FROM station.driver d
 		  LEFT JOIN station.dispense_session ds ON ds.driver_id = d.id AND ds.tenant_id = d.tenant_id
 		       AND ds.status = 'completed'
+		       AND ($2::UUID IS NULL OR ds.branch_id = $2)
 		       AND ($3::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) >= $3)
 		       AND ($4::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) <= $4)
 		 WHERE d.tenant_id = $1
-		   AND ($2::UUID IS NULL OR d.branch_id = $2)
 		   AND ($5::UUID IS NULL OR d.id = $5)
 		 GROUP BY d.id, d.code, d.full_name, d.phone
 		 ORDER BY total_dispensed_ml DESC, d.full_name ASC
@@ -518,7 +508,7 @@ func (s *Service) GetDriverDispenseReport(ctx context.Context, q DriverDispenseQ
 	}
 	defer rows.Close()
 
-	var items []DriverDispenseItem
+	items := make([]DriverDispenseItem, 0)
 	var totalDispensedML int64
 	var totalSessions int
 

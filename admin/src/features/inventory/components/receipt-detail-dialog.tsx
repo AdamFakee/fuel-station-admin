@@ -152,7 +152,7 @@ export function ReceiptDetailDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {receipt.lines.map((line) => {
+                  {(receipt.lines ?? []).map((line) => {
                     const docL = line.document_volume_ml / 1000;
                     const actL = line.actual_volume_ml / 1000;
                     const varL = line.variance_ml / 1000;

@@ -44,7 +44,7 @@ const MODULE_LABELS: Record<string, string> = {
   'inventory.issue': 'Phiếu xuất điều chỉnh & hao hụt',
   'inventory.stocktake': 'Kiểm kê & Đối chiếu kho',
   'dispense.session': 'Phiên bơm & Giao dịch',
-  dashboard: 'Bảng điều khiển (Dashboard)',
+  dashboard: 'Dashboard',
   report: 'Báo cáo số lít',
 };
 

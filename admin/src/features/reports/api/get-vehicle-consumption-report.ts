@@ -5,7 +5,6 @@ import { reportKeys } from './get-stock-ledger-report';
 
 export interface VehicleConsumptionParams {
   branch_id?: string;
-  group_id?: string;
   vehicle_id?: string;
   from_date?: string;
   to_date?: string;

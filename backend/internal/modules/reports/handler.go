@@ -142,11 +142,10 @@ func (h *Handler) GetDispenses(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetVehicleConsumption(w http.ResponseWriter, r *http.Request) {
 	q := VehicleConsumptionQuery{
-		BranchID:       parseUUID(r.URL.Query().Get("branch_id")),
-		VehicleGroupID: parseUUID(r.URL.Query().Get("group_id")),
-		VehicleID:      parseUUID(r.URL.Query().Get("vehicle_id")),
-		FromDate:       parseDate(r.URL.Query().Get("from_date"), false),
-		ToDate:         parseDate(r.URL.Query().Get("to_date"), true),
+		BranchID:  parseUUID(r.URL.Query().Get("branch_id")),
+		VehicleID: parseUUID(r.URL.Query().Get("vehicle_id")),
+		FromDate:  parseDate(r.URL.Query().Get("from_date"), false),
+		ToDate:    parseDate(r.URL.Query().Get("to_date"), true),
 	}
 
 	resp, err := h.service.GetVehicleConsumptionReport(r.Context(), q)

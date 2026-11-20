@@ -6,29 +6,29 @@ import (
 
 // QuotaRuleListItem represents a quota rule item for listing and detail.
 type QuotaRuleListItem struct {
-	ID                 string     `json:"id"`
-	TenantID           string     `json:"tenant_id"`
-	Code               string     `json:"code"`
-	TargetType         string     `json:"target_type"` // 'vehicle', 'vehicle_group', 'route'
-	TargetID           string     `json:"target_id"`
-	TargetCode         string     `json:"target_code"`
-	TargetName         string     `json:"target_name"`
-	Period             string     `json:"period"` // 'per_dispense', 'day', 'week', 'month'
-	MaxVolumeML        int64      `json:"max_volume_ml"`
-	MaxVolumeLiters    float64    `json:"max_volume_liters"`
-	MinIntervalMinutes int        `json:"min_interval_minutes"`
-	EffectiveFrom      string     `json:"effective_from"` // YYYY-MM-DD
-	EffectiveTo        *string    `json:"effective_to,omitempty"`
-	Status             string     `json:"status"` // 'active', 'cancelled'
-	CreatedBy          *string    `json:"created_by,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 string    `json:"id"`
+	TenantID           string    `json:"tenant_id"`
+	Code               string    `json:"code"`
+	TargetType         string    `json:"target_type"` // luôn là 'vehicle' (định mức chỉ áp theo xe)
+	TargetID           string    `json:"target_id"`
+	TargetCode         string    `json:"target_code"`
+	TargetName         string    `json:"target_name"`
+	Period             string    `json:"period"` // 'per_dispense', 'day', 'week', 'month'
+	MaxVolumeML        int64     `json:"max_volume_ml"`
+	MaxVolumeLiters    float64   `json:"max_volume_liters"`
+	MinIntervalMinutes int       `json:"min_interval_minutes"`
+	EffectiveFrom      string    `json:"effective_from"` // YYYY-MM-DD
+	EffectiveTo        *string   `json:"effective_to,omitempty"`
+	Status             string    `json:"status"` // 'active', 'cancelled'
+	CreatedBy          *string   `json:"created_by,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // CreateQuotaRuleRequest payload for creating a new rule.
 type CreateQuotaRuleRequest struct {
 	Code               string  `json:"code"`
-	TargetType         string  `json:"target_type"` // 'vehicle', 'vehicle_group', 'route'
+	TargetType         string  `json:"target_type"` // luôn là 'vehicle' (định mức chỉ áp theo xe)
 	TargetID           string  `json:"target_id"`
 	Period             string  `json:"period"` // 'per_dispense', 'day', 'week', 'month'
 	MaxVolumeLiters    float64 `json:"max_volume_liters"`
@@ -75,12 +75,10 @@ type TargetOption struct {
 	ID   string `json:"id"`
 	Code string `json:"code"`
 	Name string `json:"name"`
-	Type string `json:"type"` // 'vehicle', 'vehicle_group', 'route'
+	Type string `json:"type"` // luôn là 'vehicle' (định mức chỉ áp theo xe)
 }
 
 // QuotaTargets lists available targets for creating rules.
 type QuotaTargets struct {
-	Vehicles      []TargetOption `json:"vehicles"`
-	VehicleGroups []TargetOption `json:"vehicle_groups"`
-	Routes        []TargetOption `json:"routes"`
+	Vehicles []TargetOption `json:"vehicles"`
 }

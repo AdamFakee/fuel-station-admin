@@ -28,8 +28,6 @@ type CatalogsSummary struct {
 	Branches     []BranchOption `json:"branches"`
 	FuelTypes    []CatalogItem  `json:"fuel_types"`
 	VehicleTypes []CatalogItem  `json:"vehicle_types"`
-	Groups       []CatalogItem  `json:"groups"`
-	Routes       []CatalogItem  `json:"routes"`
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -37,27 +35,22 @@ type CatalogsSummary struct {
 // ------------------------------------------------------------------------------------------------
 
 type VehicleListItem struct {
-	ID               uuid.UUID  `json:"id"`
-	BranchID         uuid.UUID  `json:"branch_id"`
-	BranchName       string     `json:"branch_name"`
-	Code             string     `json:"code"`
-	Plate            string     `json:"plate"`
-	VehicleTypeID    *uuid.UUID `json:"vehicle_type_id,omitempty"`
-	VehicleTypeName  string     `json:"vehicle_type_name,omitempty"`
-	FuelTypeID       uuid.UUID  `json:"fuel_type_id"`
-	FuelTypeName     string     `json:"fuel_type_name"`
-	RouteID          *uuid.UUID `json:"route_id,omitempty"`
-	RouteName        string     `json:"route_name,omitempty"`
-	TankCapacityML   *int64     `json:"tank_capacity_ml,omitempty"`
-	TankCapacityL    *float64   `json:"tank_capacity_liters,omitempty"`
-	Status           string     `json:"status"` // 'active' | 'banned'
-	Note             string     `json:"note,omitempty"`
-	CardNumber       string     `json:"card_number,omitempty"`
-	GroupIDs         []uuid.UUID `json:"group_ids"`
-	GroupNames       []string   `json:"group_names"`
-	Version          int64      `json:"version"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID              uuid.UUID  `json:"id"`
+	Code            string     `json:"code"`
+	Plate           string     `json:"plate"`
+	VehicleTypeID   *uuid.UUID `json:"vehicle_type_id,omitempty"`
+	VehicleTypeName string     `json:"vehicle_type_name,omitempty"`
+	FuelTypeID      uuid.UUID  `json:"fuel_type_id"`
+	FuelTypeName    string     `json:"fuel_type_name"`
+	Status          string     `json:"status"` // 'active' | 'banned'
+	Note            string     `json:"note,omitempty"`
+	CardNumber      string     `json:"card_number,omitempty"`
+	// Cửa hàng mà xe được phép đổ. Rỗng nghĩa là xe chưa được đổ ở cửa hàng nào.
+	BranchIDs   []uuid.UUID `json:"branch_ids"`
+	BranchNames []string    `json:"branch_names"`
+	Version     int64       `json:"version"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
 type VehicleDetail struct {
@@ -66,29 +59,22 @@ type VehicleDetail struct {
 }
 
 type CreateVehicleRequest struct {
-	BranchID        uuid.UUID   `json:"branch_id"`
-	Code            string      `json:"code"`
-	Plate           string      `json:"plate"`
-	VehicleTypeID   *uuid.UUID  `json:"vehicle_type_id"`
-	FuelTypeID      uuid.UUID   `json:"fuel_type_id"`
-	RouteID         *uuid.UUID  `json:"route_id"`
-	TankCapacityML  *int64      `json:"tank_capacity_ml"`
-	TankCapacityL   *float64    `json:"tank_capacity_liters"`
-	Note            string      `json:"note"`
-	CardNumber      string      `json:"card_number"`
-	GroupIDs        []uuid.UUID `json:"group_ids"`
+	// Cửa hàng được phép đổ (tùy chọn; không chọn thì xe chưa đổ được ở đâu).
+	BranchIDs     []uuid.UUID `json:"branch_ids"`
+	Code          string      `json:"code"`
+	Plate         string      `json:"plate"`
+	VehicleTypeID *uuid.UUID  `json:"vehicle_type_id"`
+	FuelTypeID    uuid.UUID   `json:"fuel_type_id"`
+	Note          string      `json:"note"`
+	CardNumber    string      `json:"card_number"`
 }
 
 type UpdateVehicleRequest struct {
-	BranchID       uuid.UUID   `json:"branch_id"`
-	Plate          string      `json:"plate"`
-	VehicleTypeID  *uuid.UUID  `json:"vehicle_type_id"`
-	FuelTypeID     uuid.UUID   `json:"fuel_type_id"`
-	RouteID        *uuid.UUID  `json:"route_id"`
-	TankCapacityML *int64      `json:"tank_capacity_ml"`
-	TankCapacityL  *float64    `json:"tank_capacity_liters"`
-	Note           string      `json:"note"`
-	GroupIDs       []uuid.UUID `json:"group_ids"`
+	BranchIDs     []uuid.UUID `json:"branch_ids"`
+	Plate         string      `json:"plate"`
+	VehicleTypeID *uuid.UUID  `json:"vehicle_type_id"`
+	FuelTypeID    uuid.UUID   `json:"fuel_type_id"`
+	Note          string      `json:"note"`
 }
 
 type UpdateVehicleStatusRequest struct {
@@ -107,8 +93,6 @@ type VehicleListQuery struct {
 	Status        string
 	VehicleTypeID *uuid.UUID
 	FuelTypeID    *uuid.UUID
-	RouteID       *uuid.UUID
-	GroupID       *uuid.UUID
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -117,14 +101,11 @@ type VehicleListQuery struct {
 
 type DriverListItem struct {
 	ID             uuid.UUID  `json:"id"`
-	BranchID       uuid.UUID  `json:"branch_id"`
-	BranchName     string     `json:"branch_name"`
 	Code           string     `json:"code"`
 	FullName       string     `json:"full_name"`
 	Phone          string     `json:"phone,omitempty"`
 	Department     string     `json:"department,omitempty"`
-	Position       string     `json:"position"` // 'driver' | 'guard' | 'operator'
-	Status         string     `json:"status"`   // 'active' | 'blocked' | 'inactive'
+	Status         string     `json:"status"` // 'active' | 'blocked' | 'inactive'
 	ValidFrom      *time.Time `json:"valid_from,omitempty"`
 	ValidTo        *time.Time `json:"valid_to,omitempty"`
 	Note           string     `json:"note,omitempty"`
@@ -143,13 +124,11 @@ type DriverDetail struct {
 }
 
 type CreateDriverRequest struct {
-	BranchID   uuid.UUID  `json:"branch_id"`
 	Code       string     `json:"code"`
 	FullName   string     `json:"full_name"`
 	Phone      string     `json:"phone"`
 	Department string     `json:"department"`
-	Position   string     `json:"position"` // 'driver' | 'guard' | 'operator'
-	Status     string     `json:"status"`   // 'active' | 'blocked' | 'inactive'
+	Status     string     `json:"status"` // 'active' | 'blocked' | 'inactive'
 	ValidFrom  *time.Time `json:"valid_from"`
 	ValidTo    *time.Time `json:"valid_to"`
 	Note       string     `json:"note"`
@@ -157,11 +136,9 @@ type CreateDriverRequest struct {
 }
 
 type UpdateDriverRequest struct {
-	BranchID   uuid.UUID  `json:"branch_id"`
 	FullName   string     `json:"full_name"`
 	Phone      string     `json:"phone"`
 	Department string     `json:"department"`
-	Position   string     `json:"position"`
 	ValidFrom  *time.Time `json:"valid_from"`
 	ValidTo    *time.Time `json:"valid_to"`
 	Note       string     `json:"note"`
@@ -183,9 +160,7 @@ type DriverListQuery struct {
 	Page       int
 	PageSize   int
 	Search     string
-	BranchID   *uuid.UUID
 	Status     string
-	Position   string
 	Department string
 }
 
@@ -203,4 +178,27 @@ type CredentialItem struct {
 	Version             int64      `json:"version"`
 	CreatedAt           time.Time  `json:"created_at"`
 	RevokedAt           *time.Time `json:"revoked_at,omitempty"`
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Nhập tài xế hàng loạt (từ Excel)
+// ---------------------------------------------------------------------------------------------------
+
+// MaxImportRows là số dòng tối đa của một lần nhập.
+const MaxImportRows = 500
+
+type ImportDriversRequest struct {
+	Rows []CreateDriverRequest `json:"rows"`
+}
+
+// ImportRowError là một dòng nhập bị từ chối. Row đếm từ 1 theo thứ tự trong danh sách gửi lên.
+type ImportRowError struct {
+	Row     int    `json:"row"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type ImportDriversResult struct {
+	Created int              `json:"created"`
+	Failed  []ImportRowError `json:"failed"`
 }

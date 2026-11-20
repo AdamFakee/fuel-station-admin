@@ -46,10 +46,17 @@ export interface DashboardKpi {
   low_stock_tanks: number;
 }
 
+export interface DailyDispenseItem {
+  date: string; // yyyy-MM-dd
+  liters: number;
+  sessions: number;
+}
+
 export interface DashboardResponse {
   kpi: DashboardKpi;
   tanks: TankStockItem[];
   pumps: PumpStatusItem[];
   recent_sessions: RecentSessionItem[];
+  daily_dispense: DailyDispenseItem[];
   generated_at: string;
 }

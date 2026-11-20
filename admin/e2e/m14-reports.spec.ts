@@ -197,9 +197,7 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
               vehicle_id: 'v-01',
               vehicle_code: 'XE-001',
               vehicle_plate: '29A-12345',
-              group_name: 'Đội xe vận tải 1',
               type_name: 'Xe tải 10 tấn',
-              route_name: 'Hà Nội - Hải Phòng',
               session_count: 5,
               total_dispensed_liters: 450.0,
               quota_liters: 500.0,
@@ -211,9 +209,7 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
               vehicle_id: 'v-02',
               vehicle_code: 'XE-002',
               vehicle_plate: '29A-67890',
-              group_name: 'Đội xe vận tải 1',
               type_name: 'Xe ben 15 tấn',
-              route_name: 'Hà Nội - Quảng Ninh',
               session_count: 8,
               total_dispensed_liters: 620.0,
               quota_liters: 500.0,
@@ -293,12 +289,9 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
     });
   });
 
-  test('TC-M14-01: Manager can access /reports and view non-money scope notice', async ({ page }) => {
+  test('TC-M14-01: Manager can access /reports and see the export actions', async ({ page }) => {
     await page.goto('/reports');
-    await expect(page.locator('h1')).toContainText('Báo Cáo & Xuất Dữ Liệu');
-
-    // Verify non-money scope banner is present
-    await expect(page.getByText('Chỉ quản lý Lít • Không có cột tiền')).toBeVisible();
+    await expect(page.locator('h1')).toContainText('Báo cáo & Xuất dữ liệu');
 
     // Verify Export Excel and Print buttons exist
     await expect(page.getByRole('button', { name: /Xuất Excel/i })).toBeVisible();
@@ -375,15 +368,16 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
     await page.getByRole('button', { name: '7 ngày qua' }).click();
 
     // Verify date inputs are populated
-    const fromInput = page.locator('input[type="date"]').first();
-    const toInput = page.locator('input[type="date"]').nth(1);
+    const datePattern = /^\d{2}\/\d{2}\/\d{4}$/;
+    const fromInput = page.getByRole('button', { name: datePattern }).first();
+    const toInput = page.getByRole('button', { name: datePattern }).nth(1);
 
-    await expect(fromInput).not.toHaveValue('');
-    await expect(toInput).not.toHaveValue('');
+    await expect(fromInput).toHaveText(datePattern);
+    await expect(toInput).toHaveText(datePattern);
 
     // Click "Đặt lại bộ lọc"
     await page.getByRole('button', { name: 'Đặt lại bộ lọc' }).click();
-    await expect(fromInput).not.toHaveValue('');
+    await expect(fromInput).toHaveText(datePattern);
   });
 
   test('TC-M14-05: Excel export button triggers download successfully', async ({ page }) => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { DatePicker } from '@/components/date-picker';
 import React from 'react';
 import { ReportFilterState, ReportTemplateType } from '../types';
 import { useBranches } from '@/features/assets/api/get-branches';
@@ -73,22 +74,20 @@ export function ReportFilters({ template, filters, onChange, onReset }: ReportFi
         {/* Từ ngày */}
         <div className="space-y-1.5">
           <Label className="text-xs">Từ ngày</Label>
-          <Input
-            type="date"
+          <DatePicker
             className="h-8 text-xs"
             value={filters.fromDate || ''}
-            onChange={(e) => onChange({ ...filters, fromDate: e.target.value })}
+            onChange={(fromDate) => onChange({ ...filters, fromDate })}
           />
         </div>
 
         {/* Đến ngày */}
         <div className="space-y-1.5">
           <Label className="text-xs">Đến ngày</Label>
-          <Input
-            type="date"
+          <DatePicker
             className="h-8 text-xs"
             value={filters.toDate || ''}
-            onChange={(e) => onChange({ ...filters, toDate: e.target.value })}
+            onChange={(toDate) => onChange({ ...filters, toDate })}
           />
         </div>
 

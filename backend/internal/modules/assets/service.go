@@ -41,6 +41,12 @@ func getTenant(ctx context.Context) (string, error) {
 	return tenantID, nil
 }
 
+// sensorBaud là tốc độ baud cố định của bộ số Montech.
+const sensorBaud = 9600
+
+// terminalPort là cổng HTTP cố định của máy chấm công Hikvision.
+const terminalPort = 80
+
 // ------------------------------------------------------------------------------------------------
 // BRANCH SERVICE
 // ------------------------------------------------------------------------------------------------
@@ -725,10 +731,10 @@ func (s *Service) ListPumps(ctx context.Context, q PumpListQuery) ([]PumpDetail,
 		// Sensor
 		var ps PumpSensor
 		err = s.pool.QueryRow(ctx, `
-			SELECT id, tenant_id, pump_id, serial, com_port, baud, version, created_at, updated_at
+			SELECT id, tenant_id, pump_id, name, serial, com_port, baud, version, created_at, updated_at
 			FROM station.pump_sensor
 			WHERE tenant_id = $1 AND pump_id = $2
-		`, tenantID, p.ID).Scan(&ps.ID, &ps.TenantID, &ps.PumpID, &ps.Serial, &ps.ComPort, &ps.Baud, &ps.Version, &ps.CreatedAt, &ps.UpdatedAt)
+		`, tenantID, p.ID).Scan(&ps.ID, &ps.TenantID, &ps.PumpID, &ps.Name, &ps.Serial, &ps.ComPort, &ps.Baud, &ps.Version, &ps.CreatedAt, &ps.UpdatedAt)
 		if err == nil {
 			p.Sensor = &ps
 		}
@@ -755,8 +761,8 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 		return nil, err
 	}
 
-	if strings.TrimSpace(req.Code) == "" || strings.TrimSpace(req.Name) == "" || req.BranchID == "" || req.TankID == "" {
-		return nil, fmt.Errorf("%w: code, name, branch_id and tank_id are required", apperr.ErrInvalidInput)
+	if strings.TrimSpace(req.Name) == "" || req.BranchID == "" || req.TankID == "" {
+		return nil, fmt.Errorf("%w: name, branch_id and tank_id are required", apperr.ErrInvalidInput)
 	}
 
 	// Auto generate edge_pump_id if not provided or <= 0
@@ -777,6 +783,11 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	// Mã trụ do hệ thống sinh (không nhận từ client), dạng TR-2026-0001.
+	if err := tx.QueryRow(ctx, `SELECT station.next_code($1, 'TR')`, tenantID).Scan(&req.Code); err != nil {
+		return nil, fmt.Errorf("generate pump code: %w", err)
+	}
 
 	var p PumpDetail
 	query := `
@@ -807,29 +818,35 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 	}
 	p.Nozzles = append(p.Nozzles, n)
 
-	// Create sensor (default COM1, 9600, serial 1234)
-	comPort := "COM1"
-	if req.SensorComPort != nil && *req.SensorComPort != "" {
-		comPort = *req.SensorComPort
+	// Bộ số: cổng COM bắt buộc (mỗi trụ một cổng riêng trong cửa hàng), serial mặc định 1234, baud mặc định 9600
+	if req.SensorComPort == nil || strings.TrimSpace(*req.SensorComPort) == "" {
+		return nil, fmt.Errorf("%w: sensor_com_port is required (each pump needs its own COM port)", apperr.ErrInvalidInput)
+	}
+	comPort := strings.TrimSpace(*req.SensorComPort)
+	sensorName := "BS-" + req.Code
+	if req.SensorName != nil && strings.TrimSpace(*req.SensorName) != "" {
+		sensorName = strings.TrimSpace(*req.SensorName)
 	}
 	var serial uint32 = 1234
 	if req.SensorSerial != nil {
 		serial = *req.SensorSerial
 	}
-	baud := 9600
-	if req.SensorBaud != nil && *req.SensorBaud > 0 {
-		baud = *req.SensorBaud
-	}
+	// Tốc độ baud của bộ số Montech cố định theo phần cứng, không nhận từ client.
+	const baud = sensorBaud
 
 	var ps PumpSensor
 	err = tx.QueryRow(ctx, `
-		INSERT INTO station.pump_sensor (tenant_id, pump_id, serial, com_port, baud)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, tenant_id, pump_id, serial, com_port, baud, version, created_at, updated_at
-	`, tenantID, p.ID, serial, comPort, baud).Scan(
-		&ps.ID, &ps.TenantID, &ps.PumpID, &ps.Serial, &ps.ComPort, &ps.Baud, &ps.Version, &ps.CreatedAt, &ps.UpdatedAt,
+		INSERT INTO station.pump_sensor (tenant_id, pump_id, branch_id, name, serial, com_port, baud)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, tenant_id, pump_id, name, serial, com_port, baud, version, created_at, updated_at
+	`, tenantID, p.ID, req.BranchID, sensorName, serial, comPort, baud).Scan(
+		&ps.ID, &ps.TenantID, &ps.PumpID, &ps.Name, &ps.Serial, &ps.ComPort, &ps.Baud, &ps.Version, &ps.CreatedAt, &ps.UpdatedAt,
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, fmt.Errorf("%w: COM port %s is already used by another pump in this store", apperr.ErrConflict, comPort)
+		}
 		return nil, fmt.Errorf("insert sensor: %w", err)
 	}
 	p.Sensor = &ps
@@ -843,10 +860,8 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 	if req.TerminalHost != nil && *req.TerminalHost != "" {
 		host = *req.TerminalHost
 	}
-	port := 80
-	if req.TerminalPort != nil && *req.TerminalPort > 0 {
-		port = *req.TerminalPort
-	}
+	// Cổng máy chấm công Hikvision cố định 80, không nhận từ client.
+	const port = terminalPort
 	https := false
 	if req.TerminalHTTPS != nil {
 		https = *req.TerminalHTTPS
@@ -1011,10 +1026,10 @@ func (s *Service) ListDevices(ctx context.Context, branchID string) ([]DeviceVie
 		// Sensor
 		var ps PumpSensor
 		err := s.pool.QueryRow(ctx, `
-			SELECT id, tenant_id, pump_id, serial, com_port, baud, version, created_at, updated_at
+			SELECT id, tenant_id, pump_id, name, serial, com_port, baud, version, created_at, updated_at
 			FROM station.pump_sensor
 			WHERE tenant_id = $1 AND pump_id = $2
-		`, tenantID, d.PumpID).Scan(&ps.ID, &ps.TenantID, &ps.PumpID, &ps.Serial, &ps.ComPort, &ps.Baud, &ps.Version, &ps.CreatedAt, &ps.UpdatedAt)
+		`, tenantID, d.PumpID).Scan(&ps.ID, &ps.TenantID, &ps.PumpID, &ps.Name, &ps.Serial, &ps.ComPort, &ps.Baud, &ps.Version, &ps.CreatedAt, &ps.UpdatedAt)
 		if err == nil {
 			d.Sensor = &ps
 		}
@@ -1044,22 +1059,24 @@ func (s *Service) UpdateSensor(ctx context.Context, pumpID string, req UpdateSen
 	if strings.TrimSpace(req.ComPort) == "" {
 		return nil, fmt.Errorf("%w: com_port is required", apperr.ErrInvalidInput)
 	}
-	if req.Baud <= 0 {
-		req.Baud = 9600
-	}
+	req.Baud = sensorBaud
 
 	var ps PumpSensor
 	err = s.pool.QueryRow(ctx, `
 		UPDATE station.pump_sensor
-		SET serial = $3, com_port = $4, baud = $5, updated_at = now()
+		SET name = COALESCE(NULLIF(btrim($6), ''), name), serial = $3, com_port = $4, baud = $5, updated_at = now()
 		WHERE tenant_id = $1 AND pump_id = $2
-		RETURNING id, tenant_id, pump_id, serial, com_port, baud, version, created_at, updated_at
-	`, tenantID, pumpID, req.Serial, req.ComPort, req.Baud).Scan(
-		&ps.ID, &ps.TenantID, &ps.PumpID, &ps.Serial, &ps.ComPort, &ps.Baud, &ps.Version, &ps.CreatedAt, &ps.UpdatedAt,
+		RETURNING id, tenant_id, pump_id, name, serial, com_port, baud, version, created_at, updated_at
+	`, tenantID, pumpID, req.Serial, strings.TrimSpace(req.ComPort), req.Baud, req.Name).Scan(
+		&ps.ID, &ps.TenantID, &ps.PumpID, &ps.Name, &ps.Serial, &ps.ComPort, &ps.Baud, &ps.Version, &ps.CreatedAt, &ps.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperr.ErrNotFound
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, fmt.Errorf("%w: COM port %s is already used by another pump in this store", apperr.ErrConflict, req.ComPort)
 		}
 		return nil, fmt.Errorf("update sensor: %w", err)
 	}
@@ -1087,9 +1104,7 @@ func (s *Service) UpdateTerminal(ctx context.Context, pumpID string, req UpdateT
 	if strings.TrimSpace(req.TerminalCode) == "" || strings.TrimSpace(req.Host) == "" || strings.TrimSpace(req.Username) == "" {
 		return nil, fmt.Errorf("%w: terminal_code, host, and username are required", apperr.ErrInvalidInput)
 	}
-	if req.Port <= 0 {
-		req.Port = 80
-	}
+	req.Port = terminalPort
 
 	var at AccessTerminal
 	if req.Password != nil && *req.Password != "" {

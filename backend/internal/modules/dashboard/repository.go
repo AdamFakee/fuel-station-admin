@@ -169,11 +169,42 @@ func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID stri
 	`
 	_ = r.pool.QueryRow(ctx, onlineStationSQL, tenantID, branchIDs).Scan(&kpi.OnlineStations)
 
+	// Lượng cấp phát 7 ngày gần nhất (kể cả hôm nay); ngày không có phiên vẫn có dòng với số 0.
+	dailySQL := `
+		SELECT to_char(d.day, 'YYYY-MM-DD'),
+		       COALESCE(SUM(ds.dispensed_ml) FILTER (WHERE ds.status = 'completed'), 0),
+		       COUNT(ds.id) FILTER (WHERE ds.status = 'completed')
+		FROM generate_series(
+		       (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date - 6,
+		       (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,
+		       interval '1 day') AS d(day)
+		LEFT JOIN station.dispense_session ds
+		       ON ds.tenant_id = $1
+		      AND (cardinality($2::uuid[]) = 0 OR ds.branch_id = ANY($2::uuid[]))
+		      AND (COALESCE(ds.finished_at, ds.received_at) AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = d.day::date
+		GROUP BY d.day
+		ORDER BY d.day
+	`
+	daily := make([]DailyDispenseItem, 0, 7)
+	if dRows, dErr := r.pool.Query(ctx, dailySQL, tenantID, branchIDs); dErr == nil {
+		defer dRows.Close()
+		for dRows.Next() {
+			var item DailyDispenseItem
+			var ml int64
+			if err := dRows.Scan(&item.Date, &ml, &item.Sessions); err != nil {
+				return nil, fmt.Errorf("scan daily dispense: %w", err)
+			}
+			item.Liters = float64(ml) / 1000.0
+			daily = append(daily, item)
+		}
+	}
+
 	return &DashboardResponse{
 		Kpi:            kpi,
 		Tanks:          tanks,
 		Pumps:          pumps,
 		RecentSessions: sessions,
+		DailyDispense:  daily,
 		GeneratedAt:    time.Now().UTC(),
 	}, nil
 }

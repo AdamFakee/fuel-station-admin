@@ -58,7 +58,7 @@ func (s *Service) ListSuppliers(ctx context.Context) ([]Supplier, error) {
 	}
 	defer rows.Close()
 
-	var list []Supplier
+	list := make([]Supplier, 0)
 	for rows.Next() {
 		var sup Supplier
 		if err := rows.Scan(
@@ -223,7 +223,7 @@ func (s *Service) ListReceipts(ctx context.Context, q ReceiptListQuery) ([]Stock
 	}
 	defer rows.Close()
 
-	var receipts []StockReceipt
+	receipts := make([]StockReceipt, 0)
 	for rows.Next() {
 		var rc StockReceipt
 		if err := rows.Scan(
@@ -286,7 +286,8 @@ func (s *Service) GetReceipt(ctx context.Context, id string) (*StockReceipt, err
 		return nil, fmt.Errorf("get receipt: %w", err)
 	}
 
-	// Fetch lines
+	// Fetch lines (luôn trả mảng, không bao giờ null)
+	rc.Lines = make([]StockReceiptLine, 0)
 	lineRows, err := s.pool.Query(ctx, `
 		SELECT l.id, l.tenant_id, l.receipt_id, l.tank_id, t.code AS tank_code, t.name AS tank_name,
 		       l.fuel_type_id, ft.name AS fuel_type_name,
@@ -757,7 +758,7 @@ func (s *Service) ListIssues(ctx context.Context, q IssueListQuery) ([]StockIssu
 	}
 	defer rows.Close()
 
-	var issues []StockIssue
+	issues := make([]StockIssue, 0)
 	for rows.Next() {
 		var is StockIssue
 		if err := rows.Scan(
@@ -1276,7 +1277,7 @@ func (s *Service) ListTankStocks(ctx context.Context, branchID string) ([]TankSt
 	}
 	defer rows.Close()
 
-	var items []TankStockItem
+	items := make([]TankStockItem, 0)
 	for rows.Next() {
 		var it TankStockItem
 		if err := rows.Scan(
@@ -1336,7 +1337,7 @@ func (s *Service) ListTankStockLedger(ctx context.Context, tankID string, page, 
 	}
 	defer rows.Close()
 
-	var items []StockLedgerItem
+	items := make([]StockLedgerItem, 0)
 	for rows.Next() {
 		var it StockLedgerItem
 		var refID *uuid.UUID
@@ -1448,7 +1449,7 @@ func (s *Service) ListReconciliations(ctx context.Context, q ReconciliationListQ
 	}
 	defer rows.Close()
 
-	var list []StockReconciliationItem
+	list := make([]StockReconciliationItem, 0)
 	for rows.Next() {
 		var it StockReconciliationItem
 		var mByID, cByID *uuid.UUID
@@ -1992,7 +1993,7 @@ func (s *Service) ListAlerts(ctx context.Context, branchID string, resolved *boo
 	}
 	defer rows.Close()
 
-	var list []AlertItem
+	list := make([]AlertItem, 0)
 	for rows.Next() {
 		var it AlertItem
 		var bID, tID, esID *uuid.UUID

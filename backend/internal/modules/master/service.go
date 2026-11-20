@@ -73,8 +73,6 @@ func (s *Service) GetCatalogsSummary(ctx context.Context) (*CatalogsSummary, err
 		Branches:     make([]BranchOption, 0),
 		FuelTypes:    make([]CatalogItem, 0),
 		VehicleTypes: make([]CatalogItem, 0),
-		Groups:       make([]CatalogItem, 0),
-		Routes:       make([]CatalogItem, 0),
 	}
 
 	// 1. Branches
@@ -134,44 +132,6 @@ func (s *Service) GetCatalogsSummary(ctx context.Context) (*CatalogsSummary, err
 		summary.VehicleTypes = append(summary.VehicleTypes, vt)
 	}
 
-	// 4. Vehicle Groups
-	gRows, err := s.pool.Query(ctx, `
-		SELECT id, code, name, true, created_at
-		FROM station.vehicle_group
-		WHERE tenant_id = $1
-		ORDER BY name ASC
-	`, tenantID)
-	if err != nil {
-		return nil, fmt.Errorf("query groups: %w", err)
-	}
-	defer gRows.Close()
-	for gRows.Next() {
-		var g CatalogItem
-		if err := gRows.Scan(&g.ID, &g.Code, &g.Name, &g.Active, &g.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan group: %w", err)
-		}
-		summary.Groups = append(summary.Groups, g)
-	}
-
-	// 5. Routes
-	rRows, err := s.pool.Query(ctx, `
-		SELECT id, code, name, true, created_at
-		FROM station.route
-		WHERE tenant_id = $1
-		ORDER BY name ASC
-	`, tenantID)
-	if err != nil {
-		return nil, fmt.Errorf("query routes: %w", err)
-	}
-	defer rRows.Close()
-	for rRows.Next() {
-		var r CatalogItem
-		if err := rRows.Scan(&r.ID, &r.Code, &r.Name, &r.Active, &r.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan route: %w", err)
-		}
-		summary.Routes = append(summary.Routes, r)
-	}
-
 	return summary, nil
 }
 
@@ -208,7 +168,7 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 	}
 
 	if q.BranchID != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("v.branch_id = $%d", argIdx))
+		whereClauses = append(whereClauses, fmt.Sprintf("EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $%d)", argIdx))
 		args = append(args, *q.BranchID)
 		argIdx++
 	}
@@ -231,18 +191,6 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 		argIdx++
 	}
 
-	if q.RouteID != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("v.route_id = $%d", argIdx))
-		args = append(args, *q.RouteID)
-		argIdx++
-	}
-
-	if q.GroupID != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("EXISTS (SELECT 1 FROM station.vehicle_group_member gm WHERE gm.tenant_id = v.tenant_id AND gm.vehicle_id = v.id AND gm.group_id = $%d)", argIdx))
-		args = append(args, *q.GroupID)
-		argIdx++
-	}
-
 	whereSQL := strings.Join(whereClauses, " AND ")
 
 	countSQL := fmt.Sprintf(`SELECT COUNT(*) FROM station.vehicle v WHERE %s`, whereSQL)
@@ -253,18 +201,15 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 
 	querySQL := fmt.Sprintf(`
 		SELECT 
-			v.id, v.branch_id, b.name AS branch_name, v.code, v.plate,
+			v.id, v.code, v.plate,
 			v.vehicle_type_id, COALESCE(vt.name, '') AS vehicle_type_name,
 			v.fuel_type_id, ft.name AS fuel_type_name,
-			v.route_id, COALESCE(r.name, '') AS route_name,
-			v.tank_capacity_ml, v.status, COALESCE(v.note, '') AS note,
+			v.status, COALESCE(v.note, '') AS note,
 			COALESCE(c.external_id, '') AS card_number,
 			v.version, v.created_at, v.updated_at
 		FROM station.vehicle v
-		JOIN station.branch b ON b.tenant_id = v.tenant_id AND b.id = v.branch_id
 		JOIN station.fuel_type ft ON ft.tenant_id = v.tenant_id AND ft.id = v.fuel_type_id
 		LEFT JOIN station.vehicle_type vt ON vt.tenant_id = v.tenant_id AND vt.id = v.vehicle_type_id
-		LEFT JOIN station.route r ON r.tenant_id = v.tenant_id AND r.id = v.route_id
 		LEFT JOIN station.credential c ON c.tenant_id = v.tenant_id AND c.vehicle_id = v.id AND c.method = 'card' AND c.status = 'active'
 		WHERE %s
 		ORDER BY v.created_at DESC
@@ -285,58 +230,140 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 	for rows.Next() {
 		var item VehicleListItem
 		err := rows.Scan(
-			&item.ID, &item.BranchID, &item.BranchName, &item.Code, &item.Plate,
+			&item.ID, &item.Code, &item.Plate,
 			&item.VehicleTypeID, &item.VehicleTypeName,
 			&item.FuelTypeID, &item.FuelTypeName,
-			&item.RouteID, &item.RouteName,
-			&item.TankCapacityML, &item.Status, &item.Note,
+			&item.Status, &item.Note,
 			&item.CardNumber,
 			&item.Version, &item.CreatedAt, &item.UpdatedAt,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("scan vehicle: %w", err)
 		}
-		if item.TankCapacityML != nil && *item.TankCapacityML > 0 {
-			liters := float64(*item.TankCapacityML) / 1000.0
-			item.TankCapacityL = &liters
-		}
-		item.GroupIDs = make([]uuid.UUID, 0)
-		item.GroupNames = make([]string, 0)
+		item.BranchIDs = make([]uuid.UUID, 0)
+		item.BranchNames = make([]string, 0)
 		items = append(items, item)
 		vehicleIDs = append(vehicleIDs, item.ID)
 	}
 
-	// Fetch groups for returned vehicles
+	// Cửa hàng được phép của các xe trả về
 	if len(vehicleIDs) > 0 {
-		groupRows, err := s.pool.Query(ctx, `
-			SELECT gm.vehicle_id, g.id, g.name
-			FROM station.vehicle_group_member gm
-			JOIN station.vehicle_group g ON g.tenant_id = gm.tenant_id AND g.id = gm.group_id
-			WHERE gm.tenant_id = $1 AND gm.vehicle_id = ANY($2)
-			ORDER BY g.name ASC
-		`, tenantID, vehicleIDs)
-		if err == nil {
-			defer groupRows.Close()
-			groupMap := make(map[uuid.UUID][]uuid.UUID)
-			groupNameMap := make(map[uuid.UUID][]string)
-			for groupRows.Next() {
-				var vID, gID uuid.UUID
-				var gName string
-				if err := groupRows.Scan(&vID, &gID, &gName); err == nil {
-					groupMap[vID] = append(groupMap[vID], gID)
-					groupNameMap[vID] = append(groupNameMap[vID], gName)
-				}
-			}
-			for i := range items {
-				if gIDs, ok := groupMap[items[i].ID]; ok {
-					items[i].GroupIDs = gIDs
-					items[i].GroupNames = groupNameMap[items[i].ID]
+		branchMap, err := s.loadVehicleBranches(ctx, tenantID, vehicleIDs)
+		if err != nil {
+			return nil, 0, err
+		}
+		for i := range items {
+			if refs, ok := branchMap[items[i].ID]; ok {
+				for _, ref := range refs {
+					items[i].BranchIDs = append(items[i].BranchIDs, ref.ID)
+					items[i].BranchNames = append(items[i].BranchNames, ref.Name)
 				}
 			}
 		}
 	}
 
 	return items, total, nil
+}
+
+// branchRef là một cửa hàng (id và tên) trong danh sách được phép của xe.
+type branchRef struct {
+	ID   uuid.UUID
+	Name string
+}
+
+// loadVehicleBranches trả về, với mỗi xe, các cửa hàng được phép đổ (sắp theo tên).
+func (s *Service) loadVehicleBranches(ctx context.Context, tenantID uuid.UUID, vehicleIDs []uuid.UUID) (map[uuid.UUID][]branchRef, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT vb.vehicle_id, b.id, b.name
+		FROM station.vehicle_branch vb
+		JOIN station.branch b ON b.tenant_id = vb.tenant_id AND b.id = vb.branch_id
+		WHERE vb.tenant_id = $1 AND vb.vehicle_id = ANY($2)
+		ORDER BY b.name ASC
+	`, tenantID, vehicleIDs)
+	if err != nil {
+		return nil, fmt.Errorf("load vehicle branches: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[uuid.UUID][]branchRef)
+	for rows.Next() {
+		var vehicleID uuid.UUID
+		var ref branchRef
+		if err := rows.Scan(&vehicleID, &ref.ID, &ref.Name); err != nil {
+			return nil, fmt.Errorf("scan vehicle branch: %w", err)
+		}
+		out[vehicleID] = append(out[vehicleID], ref)
+	}
+	return out, rows.Err()
+}
+
+// normalizeBranchIDs bỏ trùng, và kiểm tra mọi cửa hàng đều thuộc công ty hiện tại.
+func normalizeBranchIDs(ctx context.Context, q interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}, tenantID uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error) {
+	seen := make(map[uuid.UUID]struct{}, len(ids))
+	unique := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if id == uuid.Nil {
+			return nil, fmt.Errorf("%w: invalid branch id", apperr.ErrInvalidInput)
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return unique, nil
+	}
+	var found int
+	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM station.branch WHERE tenant_id = $1 AND id = ANY($2)`, tenantID, unique).Scan(&found); err != nil {
+		return nil, fmt.Errorf("check branches: %w", err)
+	}
+	if found != len(unique) {
+		return nil, fmt.Errorf("%w: one or more branches do not exist", apperr.ErrInvalidInput)
+	}
+	return unique, nil
+}
+
+// syncVehicleBranches đưa danh sách cửa hàng được phép của xe về đúng `want`, chỉ thêm hoặc xóa phần chênh lệch.
+// (Mỗi thêm hoặc xóa làm tăng version của xe để Edge Agent đồng bộ lại, nên không xóa rồi chèn lại toàn bộ.)
+func syncVehicleBranches(ctx context.Context, tx pgx.Tx, tenantID, vehicleID uuid.UUID, want []uuid.UUID) error {
+	rows, err := tx.Query(ctx, `SELECT branch_id FROM station.vehicle_branch WHERE tenant_id = $1 AND vehicle_id = $2`, tenantID, vehicleID)
+	if err != nil {
+		return fmt.Errorf("read vehicle branches: %w", err)
+	}
+	have := make(map[uuid.UUID]struct{})
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan vehicle branch: %w", err)
+		}
+		have[id] = struct{}{}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read vehicle branches: %w", err)
+	}
+
+	wanted := make(map[uuid.UUID]struct{}, len(want))
+	for _, id := range want {
+		wanted[id] = struct{}{}
+		if _, ok := have[id]; !ok {
+			if _, err := tx.Exec(ctx, `INSERT INTO station.vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES ($1, $2, $3)`, tenantID, vehicleID, id); err != nil {
+				return fmt.Errorf("add vehicle branch: %w", err)
+			}
+		}
+	}
+	for id := range have {
+		if _, ok := wanted[id]; !ok {
+			if _, err := tx.Exec(ctx, `DELETE FROM station.vehicle_branch WHERE tenant_id = $1 AND vehicle_id = $2 AND branch_id = $3`, tenantID, vehicleID, id); err != nil {
+				return fmt.Errorf("remove vehicle branch: %w", err)
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail, error) {
@@ -348,26 +375,22 @@ func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail,
 	var d VehicleDetail
 	err = s.pool.QueryRow(ctx, `
 		SELECT 
-			v.id, v.branch_id, b.name AS branch_name, v.code, v.plate,
+			v.id, v.code, v.plate,
 			v.vehicle_type_id, COALESCE(vt.name, '') AS vehicle_type_name,
 			v.fuel_type_id, ft.name AS fuel_type_name,
-			v.route_id, COALESCE(r.name, '') AS route_name,
-			v.tank_capacity_ml, v.status, COALESCE(v.note, '') AS note,
+			v.status, COALESCE(v.note, '') AS note,
 			COALESCE(c.external_id, '') AS card_number,
 			v.version, v.created_at, v.updated_at
 		FROM station.vehicle v
-		JOIN station.branch b ON b.tenant_id = v.tenant_id AND b.id = v.branch_id
 		JOIN station.fuel_type ft ON ft.tenant_id = v.tenant_id AND ft.id = v.fuel_type_id
 		LEFT JOIN station.vehicle_type vt ON vt.tenant_id = v.tenant_id AND vt.id = v.vehicle_type_id
-		LEFT JOIN station.route r ON r.tenant_id = v.tenant_id AND r.id = v.route_id
 		LEFT JOIN station.credential c ON c.tenant_id = v.tenant_id AND c.vehicle_id = v.id AND c.method = 'card' AND c.status = 'active'
 		WHERE v.tenant_id = $1 AND v.id = $2 AND v.deleted_at IS NULL
 	`, tenantID, id).Scan(
-		&d.ID, &d.BranchID, &d.BranchName, &d.Code, &d.Plate,
+		&d.ID, &d.Code, &d.Plate,
 		&d.VehicleTypeID, &d.VehicleTypeName,
 		&d.FuelTypeID, &d.FuelTypeName,
-		&d.RouteID, &d.RouteName,
-		&d.TankCapacityML, &d.Status, &d.Note,
+		&d.Status, &d.Note,
 		&d.CardNumber,
 		&d.Version, &d.CreatedAt, &d.UpdatedAt,
 	)
@@ -376,11 +399,6 @@ func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail,
 			return nil, fmt.Errorf("%w: vehicle not found", apperr.ErrNotFound)
 		}
 		return nil, fmt.Errorf("get vehicle: %w", err)
-	}
-
-	if d.TankCapacityML != nil && *d.TankCapacityML > 0 {
-		liters := float64(*d.TankCapacityML) / 1000.0
-		d.TankCapacityL = &liters
 	}
 
 	// Active Card Credential
@@ -397,25 +415,13 @@ func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail,
 		d.CardCredential = &cred
 	}
 
-	// Group assignments
-	d.GroupIDs = make([]uuid.UUID, 0)
-	d.GroupNames = make([]string, 0)
-	gRows, err := s.pool.Query(ctx, `
-		SELECT g.id, g.name
-		FROM station.vehicle_group_member gm
-		JOIN station.vehicle_group g ON g.tenant_id = gm.tenant_id AND g.id = gm.group_id
-		WHERE gm.tenant_id = $1 AND gm.vehicle_id = $2
-		ORDER BY g.name ASC
-	`, tenantID, id)
-	if err == nil {
-		defer gRows.Close()
-		for gRows.Next() {
-			var gID uuid.UUID
-			var gName string
-			if err := gRows.Scan(&gID, &gName); err == nil {
-				d.GroupIDs = append(d.GroupIDs, gID)
-				d.GroupNames = append(d.GroupNames, gName)
-			}
+	// Cửa hàng được phép
+	d.BranchIDs = make([]uuid.UUID, 0)
+	d.BranchNames = make([]string, 0)
+	if branchMap, err := s.loadVehicleBranches(ctx, tenantID, []uuid.UUID{id}); err == nil {
+		for _, ref := range branchMap[id] {
+			d.BranchIDs = append(d.BranchIDs, ref.ID)
+			d.BranchNames = append(d.BranchNames, ref.Name)
 		}
 	}
 
@@ -428,33 +434,20 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 		return nil, err
 	}
 
-	req.Code = strings.TrimSpace(req.Code)
-	if !rxMachineCode.MatchString(req.Code) {
-		return nil, fmt.Errorf("%w: vehicle code must be 1-32 alphanumeric characters", apperr.ErrInvalidInput)
-	}
-
 	req.Plate = strings.TrimSpace(req.Plate)
 	if req.Plate == "" {
 		return nil, fmt.Errorf("%w: license plate is required", apperr.ErrInvalidInput)
 	}
 
-	if req.BranchID == uuid.Nil {
-		return nil, fmt.Errorf("%w: branch is required", apperr.ErrInvalidInput)
-	}
 	if req.FuelTypeID == uuid.Nil {
 		return nil, fmt.Errorf("%w: fuel type is required", apperr.ErrInvalidInput)
 	}
 
-	var tankCapacityML *int64
-	if req.TankCapacityL != nil && *req.TankCapacityL > 0 {
-		ml := int64(*req.TankCapacityL * 1000)
-		tankCapacityML = &ml
-	} else if req.TankCapacityML != nil && *req.TankCapacityML > 0 {
-		tankCapacityML = req.TankCapacityML
-	}
-
 	req.CardNumber = strings.TrimSpace(req.CardNumber)
-	if req.CardNumber != "" && !rxCardNumber.MatchString(req.CardNumber) {
+	if req.CardNumber == "" {
+		return nil, fmt.Errorf("%w: NFC card number is required", apperr.ErrInvalidInput)
+	}
+	if !rxCardNumber.MatchString(req.CardNumber) {
 		return nil, fmt.Errorf("%w: NFC card number must be numeric decimal digits", apperr.ErrInvalidInput)
 	}
 
@@ -464,16 +457,15 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 	}
 	defer tx.Rollback(ctx)
 
-	// Check code duplicate
-	var codeExists bool
-	err = tx.QueryRow(ctx, `
-		SELECT EXISTS(SELECT 1 FROM station.vehicle WHERE tenant_id = $1 AND code = $2 AND deleted_at IS NULL)
-	`, tenantID, req.Code).Scan(&codeExists)
+	branchIDs, err := normalizeBranchIDs(ctx, tx, tenantID, req.BranchIDs)
 	if err != nil {
-		return nil, fmt.Errorf("check code: %w", err)
+		return nil, err
 	}
-	if codeExists {
-		return nil, fmt.Errorf("%w: vehicle code '%s' already exists", apperr.ErrConflict, req.Code)
+
+	// Mã xe do hệ thống sinh (không nhận từ client). Dùng làm employeeNo trên máy chấm công nên chỉ gồm chữ và số:
+	// kind 'XE' + năm + số thứ tự, ví dụ XE20260001.
+	if err := tx.QueryRow(ctx, `SELECT replace(station.next_code($1, 'XE'), '-', '')`, tenantID).Scan(&req.Code); err != nil {
+		return nil, fmt.Errorf("generate vehicle code: %w", err)
 	}
 
 	// Check plate duplicate
@@ -505,31 +497,21 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 	vehicleID := uuid.New()
 	_, err = tx.Exec(ctx, `
 		INSERT INTO station.vehicle (
-			id, tenant_id, branch_id, code, plate,
-			vehicle_type_id, fuel_type_id, route_id,
-			tank_capacity_ml, status, note, version, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, 1, now(), now())
-	`, vehicleID, tenantID, req.BranchID, req.Code, req.Plate,
-		req.VehicleTypeID, req.FuelTypeID, req.RouteID,
-		tankCapacityML, req.Note)
+			id, tenant_id, code, plate,
+			vehicle_type_id, fuel_type_id, status, note, version, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, 1, now(), now())
+	`, vehicleID, tenantID, req.Code, req.Plate,
+		req.VehicleTypeID, req.FuelTypeID, req.Note)
 	if err != nil {
 		return nil, fmt.Errorf("insert vehicle: %w", err)
 	}
 
-	// Vehicle groups
-	for _, gID := range req.GroupIDs {
-		_, err = tx.Exec(ctx, `
-			INSERT INTO station.vehicle_group_member (tenant_id, group_id, vehicle_id)
-			VALUES ($1, $2, $3)
-			ON CONFLICT DO NOTHING
-		`, tenantID, gID, vehicleID)
-		if err != nil {
-			return nil, fmt.Errorf("assign group: %w", err)
-		}
+	if err := syncVehicleBranches(ctx, tx, tenantID, vehicleID, branchIDs); err != nil {
+		return nil, err
 	}
 
-	// Assign NFC card credential if provided
-	if req.CardNumber != "" {
+	// Thẻ NFC (bắt buộc)
+	{
 		credID := uuid.New()
 		_, err = tx.Exec(ctx, `
 			INSERT INTO station.credential (
@@ -550,13 +532,11 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 		ActorUserID: &actorID,
 		ActorName:   actorName,
 		NewData: map[string]any{
-			"code":             req.Code,
-			"plate":            req.Plate,
-			"branch_id":        req.BranchID,
-			"fuel_type_id":     req.FuelTypeID,
-			"tank_capacity_ml": tankCapacityML,
-			"card_number":      req.CardNumber,
-			"group_ids":        req.GroupIDs,
+			"code":         req.Code,
+			"plate":        req.Plate,
+			"branch_ids":   branchIDs,
+			"fuel_type_id": req.FuelTypeID,
+			"card_number":  req.CardNumber,
 		},
 	})
 
@@ -577,19 +557,8 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 	if req.Plate == "" {
 		return nil, fmt.Errorf("%w: license plate is required", apperr.ErrInvalidInput)
 	}
-	if req.BranchID == uuid.Nil {
-		return nil, fmt.Errorf("%w: branch is required", apperr.ErrInvalidInput)
-	}
 	if req.FuelTypeID == uuid.Nil {
 		return nil, fmt.Errorf("%w: fuel type is required", apperr.ErrInvalidInput)
-	}
-
-	var tankCapacityML *int64
-	if req.TankCapacityL != nil && *req.TankCapacityL > 0 {
-		ml := int64(*req.TankCapacityL * 1000)
-		tankCapacityML = &ml
-	} else if req.TankCapacityML != nil && *req.TankCapacityML > 0 {
-		tankCapacityML = req.TankCapacityML
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -597,6 +566,11 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	branchIDs, err := normalizeBranchIDs(ctx, tx, tenantID, req.BranchIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	var currentCode string
 	var currentPlate string
@@ -629,29 +603,17 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 
 	_, err = tx.Exec(ctx, `
 		UPDATE station.vehicle
-		SET branch_id = $1, plate = $2, vehicle_type_id = $3, fuel_type_id = $4,
-		    route_id = $5, tank_capacity_ml = $6, note = $7, updated_at = now()
-		WHERE tenant_id = $8 AND id = $9 AND deleted_at IS NULL
-	`, req.BranchID, req.Plate, req.VehicleTypeID, req.FuelTypeID,
-		req.RouteID, tankCapacityML, req.Note, tenantID, id)
+		SET plate = $1, vehicle_type_id = $2, fuel_type_id = $3,
+		    note = $4, updated_at = now()
+		WHERE tenant_id = $5 AND id = $6 AND deleted_at IS NULL
+	`, req.Plate, req.VehicleTypeID, req.FuelTypeID,
+		req.Note, tenantID, id)
 	if err != nil {
 		return nil, fmt.Errorf("update vehicle: %w", err)
 	}
 
-	// Sync groups
-	_, err = tx.Exec(ctx, `DELETE FROM station.vehicle_group_member WHERE tenant_id = $1 AND vehicle_id = $2`, tenantID, id)
-	if err != nil {
-		return nil, fmt.Errorf("delete old groups: %w", err)
-	}
-	for _, gID := range req.GroupIDs {
-		_, err = tx.Exec(ctx, `
-			INSERT INTO station.vehicle_group_member (tenant_id, group_id, vehicle_id)
-			VALUES ($1, $2, $3)
-			ON CONFLICT DO NOTHING
-		`, tenantID, gID, id)
-		if err != nil {
-			return nil, fmt.Errorf("assign updated group: %w", err)
-		}
+	if err := syncVehicleBranches(ctx, tx, tenantID, id, branchIDs); err != nil {
+		return nil, err
 	}
 
 	// Audit Log
@@ -664,11 +626,9 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 		ActorName:   actorName,
 		OldData:     map[string]any{"plate": currentPlate},
 		NewData: map[string]any{
-			"plate":            req.Plate,
-			"branch_id":        req.BranchID,
-			"fuel_type_id":     req.FuelTypeID,
-			"tank_capacity_ml": tankCapacityML,
-			"group_ids":        req.GroupIDs,
+			"plate":        req.Plate,
+			"branch_ids":   branchIDs,
+			"fuel_type_id": req.FuelTypeID,
 		},
 	})
 
@@ -931,21 +891,9 @@ func (s *Service) ListDrivers(ctx context.Context, q DriverListQuery) ([]DriverL
 		argIdx++
 	}
 
-	if q.BranchID != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("d.branch_id = $%d", argIdx))
-		args = append(args, *q.BranchID)
-		argIdx++
-	}
-
 	if q.Status != "" {
 		whereClauses = append(whereClauses, fmt.Sprintf("d.status = $%d", argIdx))
 		args = append(args, q.Status)
-		argIdx++
-	}
-
-	if q.Position != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("d.position = $%d", argIdx))
-		args = append(args, q.Position)
 		argIdx++
 	}
 
@@ -965,16 +913,15 @@ func (s *Service) ListDrivers(ctx context.Context, q DriverListQuery) ([]DriverL
 
 	querySQL := fmt.Sprintf(`
 		SELECT 
-			d.id, d.branch_id, b.name AS branch_name, d.code, d.full_name,
+			d.id, d.code, d.full_name,
 			COALESCE(d.phone, '') AS phone, COALESCE(d.department, '') AS department,
-			d.position, d.status, d.valid_from, d.valid_to, COALESCE(d.note, '') AS note,
+			d.status, d.valid_from, d.valid_to, COALESCE(d.note, '') AS note,
 			COALESCE(card.external_id, '') AS card_number,
 			(face.id IS NOT NULL) AS has_face,
 			face.face_file_id,
 			(fp.id IS NOT NULL) AS has_fingerprint,
 			d.version, d.created_at, d.updated_at
 		FROM station.driver d
-		JOIN station.branch b ON b.tenant_id = d.tenant_id AND b.id = d.branch_id
 		LEFT JOIN station.credential card ON card.tenant_id = d.tenant_id AND card.driver_id = d.id AND card.method = 'card' AND card.status = 'active'
 		LEFT JOIN station.credential face ON face.tenant_id = d.tenant_id AND face.driver_id = d.id AND face.method = 'face' AND face.status = 'active'
 		LEFT JOIN station.credential fp ON fp.tenant_id = d.tenant_id AND fp.driver_id = d.id AND fp.method = 'fingerprint' AND fp.status = 'active'
@@ -995,8 +942,8 @@ func (s *Service) ListDrivers(ctx context.Context, q DriverListQuery) ([]DriverL
 	for rows.Next() {
 		var item DriverListItem
 		err := rows.Scan(
-			&item.ID, &item.BranchID, &item.BranchName, &item.Code, &item.FullName,
-			&item.Phone, &item.Department, &item.Position, &item.Status,
+			&item.ID, &item.Code, &item.FullName,
+			&item.Phone, &item.Department, &item.Status,
 			&item.ValidFrom, &item.ValidTo, &item.Note,
 			&item.CardNumber, &item.HasFace, &item.FaceFileID, &item.HasFingerprint,
 			&item.Version, &item.CreatedAt, &item.UpdatedAt,
@@ -1019,23 +966,22 @@ func (s *Service) GetDriver(ctx context.Context, id uuid.UUID) (*DriverDetail, e
 	var d DriverDetail
 	err = s.pool.QueryRow(ctx, `
 		SELECT 
-			d.id, d.branch_id, b.name AS branch_name, d.code, d.full_name,
+			d.id, d.code, d.full_name,
 			COALESCE(d.phone, '') AS phone, COALESCE(d.department, '') AS department,
-			d.position, d.status, d.valid_from, d.valid_to, COALESCE(d.note, '') AS note,
+			d.status, d.valid_from, d.valid_to, COALESCE(d.note, '') AS note,
 			COALESCE(card.external_id, '') AS card_number,
 			(face.id IS NOT NULL) AS has_face,
 			face.face_file_id,
 			(fp.id IS NOT NULL) AS has_fingerprint,
 			d.version, d.created_at, d.updated_at
 		FROM station.driver d
-		JOIN station.branch b ON b.tenant_id = d.tenant_id AND b.id = d.branch_id
 		LEFT JOIN station.credential card ON card.tenant_id = d.tenant_id AND card.driver_id = d.id AND card.method = 'card' AND card.status = 'active'
 		LEFT JOIN station.credential face ON face.tenant_id = d.tenant_id AND face.driver_id = d.id AND face.method = 'face' AND face.status = 'active'
 		LEFT JOIN station.credential fp ON fp.tenant_id = d.tenant_id AND fp.driver_id = d.id AND fp.method = 'fingerprint' AND fp.status = 'active'
 		WHERE d.tenant_id = $1 AND d.id = $2 AND d.deleted_at IS NULL
 	`, tenantID, id).Scan(
-		&d.ID, &d.BranchID, &d.BranchName, &d.Code, &d.FullName,
-		&d.Phone, &d.Department, &d.Position, &d.Status,
+		&d.ID, &d.Code, &d.FullName,
+		&d.Phone, &d.Department, &d.Status,
 		&d.ValidFrom, &d.ValidTo, &d.Note,
 		&d.CardNumber, &d.HasFace, &d.FaceFileID, &d.HasFingerprint,
 		&d.Version, &d.CreatedAt, &d.UpdatedAt,
@@ -1085,17 +1031,6 @@ func (s *Service) CreateDriver(ctx context.Context, req CreateDriverRequest) (*D
 	req.FullName = strings.TrimSpace(req.FullName)
 	if req.FullName == "" {
 		return nil, fmt.Errorf("%w: full name is required", apperr.ErrInvalidInput)
-	}
-
-	if req.BranchID == uuid.Nil {
-		return nil, fmt.Errorf("%w: branch is required", apperr.ErrInvalidInput)
-	}
-
-	if req.Position == "" {
-		req.Position = "driver"
-	}
-	if req.Position != "driver" && req.Position != "guard" && req.Position != "operator" {
-		return nil, fmt.Errorf("%w: invalid position (must be driver, guard, operator)", apperr.ErrInvalidInput)
 	}
 
 	if req.Status == "" {
@@ -1149,11 +1084,11 @@ func (s *Service) CreateDriver(ctx context.Context, req CreateDriverRequest) (*D
 	driverID := uuid.New()
 	_, err = tx.Exec(ctx, `
 		INSERT INTO station.driver (
-			id, tenant_id, branch_id, code, full_name, phone, department,
-			position, status, valid_from, valid_to, note, version, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 1, now(), now())
-	`, driverID, tenantID, req.BranchID, req.Code, req.FullName,
-		req.Phone, req.Department, req.Position, req.Status,
+			id, tenant_id, code, full_name, phone, department,
+			status, valid_from, valid_to, note, version, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, now(), now())
+	`, driverID, tenantID, req.Code, req.FullName,
+		req.Phone, req.Department, req.Status,
 		req.ValidFrom, req.ValidTo, req.Note)
 	if err != nil {
 		return nil, fmt.Errorf("insert driver: %w", err)
@@ -1182,8 +1117,6 @@ func (s *Service) CreateDriver(ctx context.Context, req CreateDriverRequest) (*D
 		NewData: map[string]any{
 			"code":        req.Code,
 			"full_name":   req.FullName,
-			"branch_id":   req.BranchID,
-			"position":    req.Position,
 			"status":      req.Status,
 			"card_number": req.CardNumber,
 		},
@@ -1206,12 +1139,6 @@ func (s *Service) UpdateDriver(ctx context.Context, id uuid.UUID, req UpdateDriv
 	if req.FullName == "" {
 		return nil, fmt.Errorf("%w: full name is required", apperr.ErrInvalidInput)
 	}
-	if req.BranchID == uuid.Nil {
-		return nil, fmt.Errorf("%w: branch is required", apperr.ErrInvalidInput)
-	}
-	if req.Position != "driver" && req.Position != "guard" && req.Position != "operator" {
-		return nil, fmt.Errorf("%w: invalid position", apperr.ErrInvalidInput)
-	}
 	if req.ValidFrom != nil && req.ValidTo != nil && req.ValidFrom.After(*req.ValidTo) {
 		return nil, fmt.Errorf("%w: valid_from cannot be after valid_to", apperr.ErrInvalidInput)
 	}
@@ -1229,11 +1156,11 @@ func (s *Service) UpdateDriver(ctx context.Context, id uuid.UUID, req UpdateDriv
 
 	_, err = s.pool.Exec(ctx, `
 		UPDATE station.driver
-		SET branch_id = $1, full_name = $2, phone = $3, department = $4,
-		    position = $5, valid_from = $6, valid_to = $7, note = $8, updated_at = now()
-		WHERE tenant_id = $9 AND id = $10 AND deleted_at IS NULL
-	`, req.BranchID, req.FullName, req.Phone, req.Department,
-		req.Position, req.ValidFrom, req.ValidTo, req.Note, tenantID, id)
+		SET full_name = $1, phone = $2, department = $3,
+		    valid_from = $4, valid_to = $5, note = $6, updated_at = now()
+		WHERE tenant_id = $7 AND id = $8 AND deleted_at IS NULL
+	`, req.FullName, req.Phone, req.Department,
+		req.ValidFrom, req.ValidTo, req.Note, tenantID, id)
 	if err != nil {
 		return nil, fmt.Errorf("update driver: %w", err)
 	}
@@ -1247,8 +1174,6 @@ func (s *Service) UpdateDriver(ctx context.Context, id uuid.UUID, req UpdateDriv
 		ActorName:   actorName,
 		NewData: map[string]any{
 			"full_name":  req.FullName,
-			"branch_id":  req.BranchID,
-			"position":   req.Position,
 			"department": req.Department,
 		},
 	})
@@ -1667,4 +1592,24 @@ func (s *Service) OpenFile(ctx context.Context, fileID uuid.UUID) (*storage.Stor
 	}
 
 	return &sf, rc, nil
+}
+
+// ImportDrivers tạo nhiều tài xế một lần. Mỗi dòng độc lập: dòng lỗi được ghi nhận kèm lý do, các dòng còn lại vẫn tạo.
+func (s *Service) ImportDrivers(ctx context.Context, req ImportDriversRequest) (*ImportDriversResult, error) {
+	if len(req.Rows) == 0 {
+		return nil, fmt.Errorf("%w: no rows to import", apperr.ErrInvalidInput)
+	}
+	if len(req.Rows) > MaxImportRows {
+		return nil, fmt.Errorf("%w: at most %d rows per import", apperr.ErrInvalidInput, MaxImportRows)
+	}
+
+	result := &ImportDriversResult{Failed: make([]ImportRowError, 0)}
+	for index, row := range req.Rows {
+		if _, err := s.CreateDriver(ctx, row); err != nil {
+			result.Failed = append(result.Failed, ImportRowError{Row: index + 1, Code: row.Code, Message: err.Error()})
+			continue
+		}
+		result.Created++
+	}
+	return result, nil
 }

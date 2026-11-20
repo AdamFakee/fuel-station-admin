@@ -136,6 +136,7 @@ type PumpSensor struct {
 	ID        string    `json:"id"`
 	TenantID  string    `json:"tenant_id"`
 	PumpID    string    `json:"pump_id"`
+	Name      string    `json:"name"` // tên gợi nhớ của bộ số, mặc định BS-<mã trụ>
 	Serial    uint32    `json:"serial"`
 	ComPort   string    `json:"com_port"`
 	Baud      int       `json:"baud"`
@@ -185,7 +186,8 @@ type CreatePumpRequest struct {
 	Note       *string `json:"note,omitempty"`
 	TankID     string  `json:"tank_id"` // initial nozzle connected tank
 
-	// Optional initial sensor configuration
+	// Bộ số Montech của trụ. Cổng COM là bắt buộc (mỗi trụ một cổng riêng trong cửa hàng); serial mặc định 1234 và được phép trùng giữa các trụ.
+	SensorName    *string `json:"sensor_name,omitempty"`
 	SensorComPort *string `json:"sensor_com_port,omitempty"`
 	SensorSerial  *uint32 `json:"sensor_serial,omitempty"`
 	SensorBaud    *int    `json:"sensor_baud,omitempty"`
@@ -206,6 +208,7 @@ type UpdatePumpRequest struct {
 }
 
 type UpdateSensorRequest struct {
+	Name    string `json:"name"` // để trống thì giữ tên cũ
 	Serial  uint32 `json:"serial"`
 	ComPort string `json:"com_port"`
 	Baud    int    `json:"baud"`
@@ -230,11 +233,11 @@ type PumpListQuery struct {
 
 // DeviceView combines pump, sensor and terminal for /devices screen
 type DeviceView struct {
-	PumpID       string          `json:"pump_id"`
-	PumpCode     string          `json:"pump_code"`
-	PumpName     string          `json:"pump_name"`
-	BranchID     string          `json:"branch_id"`
-	BranchName   string          `json:"branch_name"`
-	Sensor       *PumpSensor     `json:"sensor,omitempty"`
-	Terminal     *AccessTerminal `json:"terminal,omitempty"`
+	PumpID     string          `json:"pump_id"`
+	PumpCode   string          `json:"pump_code"`
+	PumpName   string          `json:"pump_name"`
+	BranchID   string          `json:"branch_id"`
+	BranchName string          `json:"branch_name"`
+	Sensor     *PumpSensor     `json:"sensor,omitempty"`
+	Terminal   *AccessTerminal `json:"terminal,omitempty"`
 }

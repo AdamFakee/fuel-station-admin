@@ -8,6 +8,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  ACTION_HEAD_CLASS,
+  ACTION_CELL_CLASS,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,7 +94,7 @@ export function UserTable({
 
   return (
     <>
-      <div className="rounded-md border bg-card overflow-hidden">
+      <div className="rounded-md border bg-card overflow-hidden flex min-h-0 flex-1 flex-col">
         <Table>
           <TableHeader>
             <TableRow>
@@ -103,7 +105,7 @@ export function UserTable({
               <TableHead className="text-left">Chi nhánh</TableHead>
               <TableHead className="text-left w-[110px]">Trạng thái</TableHead>
               <TableHead className="text-right tabular-nums w-[170px]">Đăng nhập cuối</TableHead>
-              <TableHead className="text-right w-[80px]">Thao tác</TableHead>
+              <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -150,11 +152,11 @@ export function UserTable({
                   <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                     {formatDateTimeVN(u.last_login_at)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className={ACTION_CELL_CLASS}>
                     <div className="flex justify-end gap-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="outline" size="icon" className="h-8 w-8">
                             <EllipsisHorizontalIcon className="h-4 w-4" />
                             <span className="sr-only">Tùy chọn</span>
                           </Button>

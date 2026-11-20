@@ -57,7 +57,7 @@ export function AppSidebar() {
       label: 'Tổng quan',
       items: [
         {
-          title: 'Bảng điều khiển (Dashboard)',
+          title: 'Dashboard',
           href: '/',
           icon: HomeIcon,
           permission: 'dashboard:view',
@@ -74,7 +74,7 @@ export function AppSidebar() {
           permission: 'asset.tank:view',
         },
         {
-          title: 'Trụ bơm & Thiết bị',
+          title: 'Trụ bơm',
           href: '/pumps',
           icon: AdjustmentsHorizontalIcon,
           permission: 'asset.pump:view',

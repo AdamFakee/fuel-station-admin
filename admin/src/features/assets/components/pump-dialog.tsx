@@ -18,9 +18,17 @@ import { Label } from '@/components/ui/label';
 import { PumpDetail, PumpInput, pumpSchema } from '../types';
 import { useCreatePump } from '../api/create-pump';
 import { useUpdatePump } from '../api/update-pump';
+import { useUpdateSensor } from '../api/update-sensor';
+import { useUpdateTerminal } from '../api/update-terminal';
 import { useBranches } from '../api/get-branches';
 import { useTanks } from '../api/get-tanks';
 import { toast } from 'sonner';
+
+/** Tốc độ baud của bộ số Montech: phần cứng cố định, không cho sửa. */
+const SENSOR_BAUD = 9600;
+
+/** Cổng HTTP của máy chấm công Hikvision: cố định 80, không cho sửa. */
+const TERMINAL_PORT = 80;
 
 interface PumpDialogProps {
   open: boolean;
@@ -28,13 +36,39 @@ interface PumpDialogProps {
   pump?: PumpDetail | null;
 }
 
+const EMPTY_VALUES: PumpInput = {
+  code: '',
+  name: '',
+  branch_id: '',
+  tank_id: '',
+  edge_pump_id: undefined,
+  note: '',
+  sensor_name: '',
+  sensor_com_port: '',
+  sensor_serial: 1234,
+  sensor_baud: SENSOR_BAUD,
+  terminal_code: '',
+  terminal_host: '',
+  terminal_port: TERMINAL_PORT,
+  terminal_https: false,
+  terminal_username: 'admin',
+  terminal_password: '',
+};
+
+/**
+ * Trụ bơm cùng bộ số Montech và máy chấm công Hikvision của nó trong MỘT form: mỗi trụ có đúng một bộ số (cổng COM riêng)
+ * và một máy chấm công, nên cấu hình thiết bị đi kèm trụ, không tách màn riêng.
+ */
 export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
   const isEdit = !!pump;
   const createMutation = useCreatePump();
   const updateMutation = useUpdatePump();
+  const updateSensor = useUpdateSensor();
+  const updateTerminal = useUpdateTerminal();
 
   const { data: branchData } = useBranches();
-  const { data: tankData } = useTanks();
+  // Lấy đủ bể để chọn (mặc định API chỉ trả một trang đầu, bể ở trang sau sẽ không hiện trong ô chọn).
+  const { data: tankData } = useTanks({ page_size: 200 });
 
   const branches = branchData?.data || [];
   const tanks = tankData?.data || [];
@@ -44,29 +78,28 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
     handleSubmit,
     reset,
     watch,
+    setValue,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<PumpInput>({
     resolver: zodResolver(pumpSchema),
-    defaultValues: {
-      code: '',
-      name: '',
-      branch_id: '',
-      tank_id: '',
-      edge_pump_id: 1,
-      note: '',
-      sensor_com_port: 'COM1',
-      sensor_serial: 1234,
-      terminal_code: 'T1',
-      terminal_host: '192.168.1.100',
-      terminal_password: 'Admin@123',
-    },
+    defaultValues: EMPTY_VALUES,
   });
 
   const selectedBranchId = watch('branch_id');
+  const selectedTankId = watch('tank_id');
   const availableTanks = React.useMemo(() => {
     if (!selectedBranchId) return tanks;
     return tanks.filter((t) => t.branch_id === selectedBranchId);
   }, [tanks, selectedBranchId]);
+
+  // Đổi cửa hàng thì bể phải thuộc cửa hàng đó: bể đang chọn không hợp lệ thì chọn bể đầu tiên của cửa hàng (hoặc để trống nếu chưa có).
+  React.useEffect(() => {
+    if (isEdit || !selectedBranchId) return;
+    if (!availableTanks.some((t) => t.id === selectedTankId)) {
+      setValue('tank_id', availableTanks[0]?.id ?? '');
+    }
+  }, [isEdit, selectedBranchId, selectedTankId, availableTanks, setValue]);
 
   React.useEffect(() => {
     if (pump) {
@@ -77,42 +110,60 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
         tank_id: pump.nozzles?.[0]?.tank_id || '',
         edge_pump_id: pump.edge_pump_id,
         note: pump.note || '',
-        sensor_com_port: pump.sensor?.com_port || 'COM1',
-        sensor_serial: pump.sensor?.serial || 1234,
-        terminal_code: pump.terminal?.terminal_code || 'T1',
-        terminal_host: pump.terminal?.host || '192.168.1.100',
+        sensor_name: pump.sensor?.name || '',
+        sensor_com_port: pump.sensor?.com_port || '',
+        sensor_serial: pump.sensor?.serial ?? 1234,
+        sensor_baud: SENSOR_BAUD,
+        terminal_code: pump.terminal?.terminal_code || '',
+        terminal_host: pump.terminal?.host || '',
+        terminal_port: TERMINAL_PORT,
+        terminal_https: pump.terminal?.https ?? false,
+        terminal_username: pump.terminal?.username || 'admin',
         terminal_password: '',
       });
     } else {
       reset({
-        code: '',
-        name: '',
+        ...EMPTY_VALUES,
         branch_id: branches[0]?.id || '',
         tank_id: tanks[0]?.id || '',
-        edge_pump_id: undefined,
-        note: '',
-        sensor_com_port: 'COM1',
-        sensor_serial: 1234,
-        terminal_code: 'T1',
-        terminal_host: '192.168.1.100',
-        terminal_password: 'Admin@123',
       });
     }
-  }, [pump, branches, tanks, reset]);
+  }, [pump, branches, tanks, reset, open]);
 
   const onSubmit = async (data: PumpInput) => {
     try {
       if (isEdit && pump) {
+        // Ba lần lưu liên tiếp: trụ, bộ số, máy chấm công. Lần nào lỗi thì dừng và báo; phần đã lưu trước đó vẫn giữ.
         await updateMutation.mutateAsync({
           id: pump.id,
+          input: { name: data.name, note: data.note, enabled: pump.enabled },
+        });
+        await updateSensor.mutateAsync({
+          pumpId: pump.id,
           input: {
-            name: data.name,
-            note: data.note,
-            enabled: pump.enabled,
+            name: data.sensor_name || undefined,
+            serial: data.sensor_serial,
+            com_port: data.sensor_com_port,
+            baud: SENSOR_BAUD,
           },
         });
-        toast.success('Cập nhật trụ bơm thành công');
+        await updateTerminal.mutateAsync({
+          pumpId: pump.id,
+          input: {
+            terminal_code: data.terminal_code || pump.terminal?.terminal_code || `T${pump.edge_pump_id}`,
+            host: data.terminal_host,
+            port: TERMINAL_PORT,
+            https: data.terminal_https,
+            username: data.terminal_username,
+            password: data.terminal_password || undefined,
+          },
+        });
+        toast.success('Cập nhật trụ bơm và thiết bị thành công');
       } else {
+        if (!data.terminal_password) {
+          setError('terminal_password', { message: 'Vui lòng nhập mật khẩu máy chấm công' });
+          return;
+        }
         await createMutation.mutateAsync(data);
         toast.success('Khai báo trụ bơm và thiết bị thành công');
       }
@@ -122,44 +173,44 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
     }
   };
 
+  const selectClass =
+    'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Chỉnh sửa Trụ Bơm' : 'Khai báo Trụ Bơm & Thiết bị Ngoại vi'}</DialogTitle>
+          <DialogTitle>{isEdit ? `Chỉnh sửa trụ bơm: ${pump?.code}` : 'Khai báo trụ bơm'}</DialogTitle>
           <DialogDescription>
-            {isEdit
-              ? 'Cập nhật tên và ghi chú vận hành trụ bơm'
-              : 'Thiết lập trụ bơm, vòi xuất nhiên liệu, bộ số Montech và máy chấm công'}
+            Mỗi trụ có một bộ số Montech (cổng COM riêng) và một máy chấm công Hikvision.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="contents">
-          <DialogBody className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="code">Mã trụ bơm *</Label>
-                <Input id="code" placeholder="VD: TRU-01, PUMP-01" disabled={isEdit} {...register('code')} />
-                {errors.code && <p className="text-xs text-destructive">{errors.code.message}</p>}
-              </div>
+          <DialogBody className="max-h-[65vh] space-y-4 overflow-y-auto py-2">
+            <div className="border-b pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Trụ và vòi bơm
+            </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              {isEdit && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="code">Mã trụ bơm</Label>
+                  <Input id="code" disabled {...register('code')} />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label htmlFor="name">Tên trụ bơm *</Label>
-                <Input id="name" placeholder="VD: Trụ bơm Dầu DO Số 1" {...register('name')} />
+                <Input id="name" placeholder="VD: Trụ số 1" {...register('name')} />
                 {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="branch_id">Thuộc Chi nhánh *</Label>
-                <select
-                  id="branch_id"
-                  disabled={isEdit}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                  {...register('branch_id')}
-                >
-                  <option value="">-- Chọn chi nhánh --</option>
+                <Label htmlFor="branch_id">Cửa hàng *</Label>
+                <select id="branch_id" disabled={isEdit} className={selectClass} {...register('branch_id')}>
+                  <option value="">-- Chọn cửa hàng --</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
@@ -168,66 +219,99 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
                 </select>
                 {errors.branch_id && <p className="text-xs text-destructive">{errors.branch_id.message}</p>}
               </div>
-
               <div className="space-y-1.5">
-                <Label htmlFor="tank_id">Bể chứa nguồn cấp cho vòi *</Label>
-                <select
-                  id="tank_id"
-                  disabled={isEdit}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                  {...register('tank_id')}
-                >
+                <Label htmlFor="tank_id">Bể chứa cấp cho vòi *</Label>
+                <select id="tank_id" disabled={isEdit} className={selectClass} {...register('tank_id')}>
                   <option value="">-- Chọn bể chứa --</option>
+                  {/* Bể hiện tại của vòi luôn có trong danh sách, kể cả khi chưa tải về. */}
+                  {pump?.nozzles?.[0] && !availableTanks.some((t) => t.id === pump.nozzles?.[0]?.tank_id) && (
+                    <option value={pump.nozzles[0].tank_id}>{pump.nozzles[0].tank_name}</option>
+                  )}
                   {availableTanks.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name} ({t.fuel_type_name})
                     </option>
                   ))}
                 </select>
+                {!isEdit && selectedBranchId && availableTanks.length === 0 && (
+                  <p className="text-xs text-amber-600">Cửa hàng này chưa có bể chứa. Hãy tạo bể trước ở màn Bể chứa nhiên liệu.</p>
+                )}
                 {errors.tank_id && <p className="text-xs text-destructive">{errors.tank_id.message}</p>}
               </div>
             </div>
 
-            {!isEdit && (
-              <>
-                <div className="border-t pt-3">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Cấu hình Thiết bị Ngoại vi (Bộ số & Máy chấm công)
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="sensor_com_port">Cổng COM Bộ số Montech</Label>
-                    <Input id="sensor_com_port" placeholder="VD: COM1, COM7" {...register('sensor_com_port')} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="sensor_serial">Serial Bộ số (4-byte)</Label>
-                    <Input id="sensor_serial" type="number" placeholder="1234" {...register('sensor_serial')} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="terminal_host">IP Máy chấm công Hikvision</Label>
-                    <Input id="terminal_host" placeholder="192.168.1.100" {...register('terminal_host')} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="terminal_password">Mật khẩu máy chấm công</Label>
-                    <Input
-                      id="terminal_password"
-                      type="password"
-                      placeholder="Mã hóa AES-GCM tự động"
-                      {...register('terminal_password')}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
             <div className="space-y-1.5">
               <Label htmlFor="note">Ghi chú</Label>
               <Input id="note" placeholder="Thông tin bổ sung về trụ bơm..." {...register('note')} />
+            </div>
+
+            <div className="border-b pb-1.5 pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Bộ số Montech (RS-485)
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="sensor_name">Tên bộ số</Label>
+                <Input id="sensor_name" placeholder="Để trống: tự đặt BS-<mã trụ>" {...register('sensor_name')} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sensor_com_port">Cổng COM *</Label>
+                <Input id="sensor_com_port" placeholder="VD: COM7 (mỗi trụ một cổng riêng)" {...register('sensor_com_port')} />
+                {errors.sensor_com_port && <p className="text-xs text-destructive">{errors.sensor_com_port.message}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="sensor_serial">Serial của bộ số</Label>
+                <Input id="sensor_serial" type="number" placeholder="1234" {...register('sensor_serial')} />
+                <p className="text-[11px] text-muted-foreground">
+                  Địa chỉ trong khung RS-485, phải đúng với bộ số thật (mặc định xuất xưởng 1234). Các trụ được phép trùng serial. Tốc độ baud cố định 9600.
+                </p>
+              </div>
+            </div>
+
+            <div className="border-b pb-1.5 pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Máy chấm công Hikvision (ISAPI)
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="terminal_host">Địa chỉ IP *</Label>
+                <Input id="terminal_host" placeholder="192.168.1.17" {...register('terminal_host')} />
+                {errors.terminal_host && <p className="text-xs text-destructive">{errors.terminal_host.message}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="terminal_code">Mã máy</Label>
+                <Input id="terminal_code" placeholder="Để trống: tự đặt theo trụ (T1, T2...)" {...register('terminal_code')} />
+              </div>
+              <div className="flex items-end pb-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" className="h-4 w-4" {...register('terminal_https')} />
+                  Dùng HTTPS
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="terminal_username">Tài khoản *</Label>
+                <Input id="terminal_username" placeholder="admin" {...register('terminal_username')} />
+                {errors.terminal_username && <p className="text-xs text-destructive">{errors.terminal_username.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="terminal_password">Mật khẩu {isEdit ? '' : '*'}</Label>
+                <Input
+                  id="terminal_password"
+                  type="password"
+                  placeholder={isEdit ? 'Để trống để giữ nguyên' : 'Được mã hóa AES-GCM khi lưu'}
+                  {...register('terminal_password')}
+                />
+                {errors.terminal_password && <p className="text-xs text-destructive">{errors.terminal_password.message}</p>}
+              </div>
             </div>
           </DialogBody>
 
@@ -235,7 +319,16 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Hủy
             </Button>
-            <Button type="submit" disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                isSubmitting ||
+                createMutation.isPending ||
+                updateMutation.isPending ||
+                updateSensor.isPending ||
+                updateTerminal.isPending
+              }
+            >
               {isEdit ? 'Lưu thay đổi' : 'Tạo trụ bơm'}
             </Button>
           </DialogFooter>

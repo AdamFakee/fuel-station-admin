@@ -1,72 +1,117 @@
 'use client';
 
 import * as React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { AdjustmentsHorizontalIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { Cell, Pie, PieChart } from 'recharts';
+import { AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { PumpStatusItem } from '../types';
-import { formatNumberVN } from '@/lib/format';
-import { Empty } from '@/components/empty';
+
+const chartConfig = {
+  online: { label: 'Đang kết nối', color: '#10b981' },
+  offline: { label: 'Mất kết nối', color: '#ef4444' },
+} satisfies ChartConfig;
 
 interface PumpStatusCardsProps {
   pumps: PumpStatusItem[];
   isLoading?: boolean;
 }
 
-export function PumpStatusCards({ pumps, isLoading }: PumpStatusCardsProps) {
-  if (!isLoading && pumps.length === 0) {
-    return (
-      <Empty
-        title="Chưa có trụ bơm nào"
-        description="Chưa có trụ bơm nhiên liệu được khai báo cho chi nhánh này."
-      />
-    );
+interface StationSummary {
+  branchName: string;
+  total: number;
+  offline: number;
+}
+
+/** Mất kết nối là chuyện của trạm Edge, nên tóm tắt theo trạm (cửa hàng): bao nhiêu trụ offline trên tổng số trụ của trạm. */
+function summarizeByStation(pumps: PumpStatusItem[]): StationSummary[] {
+  const byBranch = new Map<string, StationSummary>();
+  for (const pump of pumps) {
+    const current = byBranch.get(pump.branch_name) ?? { branchName: pump.branch_name, total: 0, offline: 0 };
+    current.total += 1;
+    if (!pump.is_station_online) current.offline += 1;
+    byBranch.set(pump.branch_name, current);
   }
+  return [...byBranch.values()].sort((a, b) => b.offline - a.offline);
+}
+
+/** Khối "Trụ bơm": biểu đồ vòng trụ đang kết nối so với mất kết nối, kèm các trạm đang có trụ offline. */
+export function PumpStatusCards({ pumps, isLoading }: PumpStatusCardsProps) {
+  const stations = summarizeByStation(pumps);
+  const offlineStations = stations.filter((station) => station.offline > 0);
+  const offlineCount = pumps.filter((pump) => !pump.is_station_online).length;
+  const onlineCount = pumps.length - offlineCount;
+  const chartData = [
+    { name: 'online', value: onlineCount },
+    { name: 'offline', value: offlineCount },
+  ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {pumps.map((pump) => (
-        <Card key={pump.pump_id} className="border-border">
-          <CardHeader className="p-3.5 pb-2 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-2">
-              <AdjustmentsHorizontalIcon className="w-4 h-4 text-primary" />
-              <div>
-                <CardTitle className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  {pump.pump_name}
-                  <span className="font-mono text-[10px] text-muted-foreground">({pump.pump_code})</span>
-                </CardTitle>
-                <p className="text-[10px] text-muted-foreground">{pump.branch_name}</p>
-              </div>
-            </div>
+    <section className="flex flex-col rounded-xl border bg-card shadow-sm">
+      <header className="flex items-center justify-between gap-2 border-b px-4 py-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <AdjustmentsHorizontalIcon className="h-4 w-4 text-primary" />
+          Trụ bơm
+        </h2>
+        <Link href="/pumps" className="text-xs text-primary hover:underline">
+          Xem tất cả
+        </Link>
+      </header>
 
-            {pump.is_station_online ? (
-              <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 text-[10px] px-1.5 py-0 font-normal">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Online
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="gap-1 border-zinc-300 bg-zinc-50 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 text-[10px] px-1.5 py-0 font-normal">
-                <SignalSlashIcon className="w-2.5 h-2.5 text-zinc-400" />
-                Offline
-              </Badge>
-            )}
-          </CardHeader>
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex items-center gap-6">
+          <div className="relative h-[140px] w-[140px] shrink-0">
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <PieChart>
+                <Pie
+                  data={pumps.length === 0 ? [{ name: 'empty', value: 1 }] : chartData}
+                  dataKey="value"
+                  innerRadius={46}
+                  outerRadius={64}
+                  strokeWidth={0}
+                  isAnimationActive={false}
+                >
+                  {pumps.length === 0 ? (
+                    <Cell fill="var(--muted)" />
+                  ) : (
+                    chartData.map((slice) => <Cell key={slice.name} fill={`var(--color-${slice.name})`} />)
+                  )}
+                </Pie>
+              </PieChart>
+            </ChartContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-bold tabular-nums">{isLoading ? '...' : pumps.length}</span>
+              <span className="text-xs text-muted-foreground">trụ</span>
+            </div>
+          </div>
 
-          <CardContent className="p-3.5 pt-2 flex items-center justify-between">
-            <div>
-              <span className="text-lg font-bold tabular-nums text-foreground">
-                {formatNumberVN(pump.today_dispensed_liters, 1)}
-              </span>
-              <span className="text-[11px] text-muted-foreground ml-1">Lít hôm nay</span>
-            </div>
-            <div className="text-right">
-              <span className="text-xs font-medium tabular-nums text-muted-foreground">
-                {pump.today_dispense_count} phiên
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+          <ul className="space-y-2 text-sm">
+            <li className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              Đang kết nối
+              <b className="ml-1 tabular-nums">{onlineCount}</b>
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+              Mất kết nối
+              <b className="ml-1 tabular-nums">{offlineCount}</b>
+            </li>
+          </ul>
+        </div>
+
+        {offlineStations.length > 0 && (
+          <ul className="divide-y rounded-lg border">
+            {offlineStations.slice(0, 4).map((station) => (
+              <li key={station.branchName} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <span className="truncate">{station.branchName}</span>
+                <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                  {station.offline}/{station.total} trụ offline
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }

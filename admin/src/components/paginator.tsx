@@ -1,154 +1,143 @@
 'use client';
 
-// this is where you'd implement some pagination logic like whether a next page is available, which can then be imported to the DataTable
-
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
-import { generatePaginationLinks } from './generate-pages';
+import * as React from 'react';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select';
-import { useState } from 'react';
-import { Input } from './ui/input';
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
-type PaginatorProps = {
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 50, 100];
+
+interface PaginatorProps {
+  /** Trang hiện tại, bắt đầu từ 1. */
   currentPage: number;
-  totalPages?: number;
-  totalItems?: number;
-  count?: number;
-  pageSize?: number;
-  onPageChange: (pageNumber: number, pSize?: number) => void;
-  showPreviousNext?: boolean;
+  /** Số dòng mỗi trang. */
+  pageSize: number;
+  /** Tổng số bản ghi (toàn bộ, không chỉ trang hiện tại). */
+  totalItems: number;
+  /** Gọi khi đổi trang hoặc đổi số dòng mỗi trang (đổi số dòng thì về trang 1). */
+  onPageChange: (page: number, pageSize: number) => void;
   className?: string;
-  hideStats?: boolean;
-  hideGotoPage?: boolean;
-  isRelative?: boolean;
-};
-const arrSelect = [
-  { id: '10', name: '10/trang' },
-  { id: '20', name: '20/trang' },
-  { id: '50', name: '50/trang' },
-  { id: '100', name: '100/trang' },
-];
+}
 
+/** Dãy số trang rút gọn: luôn có trang đầu và cuối, dùng `null` cho dấu "...". */
+function pageWindow(current: number, total: number): (number | null)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set<number>([1, total, current - 1, current, current + 1]);
+  if (current <= 3) [2, 3, 4].forEach((p) => pages.add(p));
+  if (current >= total - 2) [total - 3, total - 2, total - 1].forEach((p) => pages.add(p));
+  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const out: (number | null)[] = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push(null);
+    out.push(p);
+  });
+  return out;
+}
+
+/**
+ * Thanh phân trang chuẩn dưới mọi bảng: "Hiển thị 1–15 trên 42", chọn số dòng mỗi trang, nút trước/sau và số trang.
+ * Luôn hiện khi có dữ liệu (kể cả chỉ một trang) để người dùng biết tổng số bản ghi.
+ */
 export default function Paginator({
   currentPage,
-  totalPages,
+  pageSize,
   totalItems,
-  count = 0,
-  pageSize = 10,
   onPageChange,
-  showPreviousNext = true,
   className,
-  hideStats = false,
-  hideGotoPage = false,
-  isRelative = false,
 }: PaginatorProps) {
-  const actualCount = totalItems !== undefined ? totalItems : count;
-  const actualTotalPages = totalPages !== undefined ? totalPages : Math.max(1, Math.ceil(actualCount / (pageSize || 10)));
-  const [pageSizeInternal, setPageSizeInternal] = useState(pageSize.toString());
-  const [pageIndex, setPageIndex] = useState<string>();
+  if (totalItems <= 0) return null;
 
-  const onChangeVal = (val: string) => {
-    setPageSizeInternal(val);
-    onPageChange(currentPage, Number(val));
-  };
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const page = Math.min(Math.max(1, currentPage), totalPages);
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, totalItems);
 
-  const onPageChangeFromLink = (pageNumber: number) => {
-    onPageChange(pageNumber, Number(pageSizeInternal));
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      if (!pageIndex) return;
-      if (Number(pageIndex) <= 0) return;
-      onPageChange(Number(pageIndex), Number(pageSizeInternal));
-    }
+  const go = (next: number) => {
+    if (next < 1 || next > totalPages || next === page) return;
+    onPageChange(next, pageSize);
   };
 
   return (
-    <Pagination
-      className={`${isRelative ? 'relative' : '!absolute bottom-0 left-0 right-0'} z-10 mx-auto w-full shadow ${className}`}
+    <div
+      className={cn(
+        'flex shrink-0 flex-col gap-3 rounded-md border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between',
+        className
+      )}
     >
-      <PaginationContent className="w-full bg-white flex justify-between py-1">
-        <div className="flex items-center">
-          {!hideStats && (
-            <p className="text-[#020617] text-sm font-medium px-4">
-              {(currentPage - 1) * pageSize + 1}-{currentPage * pageSize} trên
-              tổng {actualCount} dữ liệu
-            </p>
-          )}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+        <span className="tabular-nums">
+          Hiển thị <span className="font-medium text-foreground">{from}–{to}</span> trên{' '}
+          <span className="font-medium text-foreground">{totalItems}</span> bản ghi
+        </span>
+        <div className="flex items-center gap-2">
+          <span>Mỗi trang</span>
           <Select
-            value={pageSizeInternal.toString()}
-            onValueChange={onChangeVal}
+            value={String(pageSize)}
+            onValueChange={(value) => onPageChange(1, Number(value))}
           >
-            <SelectTrigger
-              size="sm"
-              className="w-[112px] h-[32px] text-sm bg-white mr-8"
-            >
+            <SelectTrigger size="sm" className="h-8 w-[78px] bg-card text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {arrSelect.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.name}
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center">
-          {showPreviousNext && actualTotalPages ? (
-            <PaginationItem>
-              <PaginationPrevious
-                onClick={() =>
-                  currentPage - 1 < 1
-                    ? undefined
-                    : onPageChange(currentPage - 1, Number(pageSizeInternal))
-                }
-              />
-            </PaginationItem>
-          ) : null}
-          {generatePaginationLinks(
-            currentPage,
-            actualTotalPages,
-            onPageChangeFromLink
-          )}
-          {showPreviousNext && actualTotalPages ? (
-            <PaginationItem>
-              <PaginationNext
-                onClick={() =>
-                  currentPage > actualTotalPages - 1
-                    ? undefined
-                    : onPageChange(currentPage + 1, Number(pageSizeInternal))
-                }
-              />
-            </PaginationItem>
-          ) : null}
-          {!hideGotoPage && (
-            <div className="text-[#020617] text-sm font-medium px-4 flex items-center gap-x-4">
-              <p className="inline-block text-nowrap">Đến trang</p>
-              <Input
-                type="number"
-                className="w-[56px] bg-white"
-                min={1}
-                value={pageIndex}
-                onChange={(e) => setPageIndex(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-            </div>
-          )}
-        </div>
-      </PaginationContent>
-    </Pagination>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={() => go(page - 1)}
+          disabled={page <= 1}
+          aria-label="Trang trước"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </Button>
+
+        {pageWindow(page, totalPages).map((p, i) =>
+          p === null ? (
+            <span key={`gap-${i}`} className="px-1 text-sm text-muted-foreground">
+              …
+            </span>
+          ) : (
+            <Button
+              key={p}
+              variant={p === page ? 'default' : 'outline'}
+              size="sm"
+              className="h-8 min-w-8 px-2 tabular-nums"
+              onClick={() => go(p)}
+              aria-current={p === page ? 'page' : undefined}
+            >
+              {p}
+            </Button>
+          )
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={() => go(page + 1)}
+          disabled={page >= totalPages}
+          aria-label="Trang sau"
+        >
+          <ChevronRightIcon className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   );
 }

@@ -88,9 +88,10 @@ DO $$
 DECLARE t1 UUID := (SELECT v FROM ids WHERE k = 't1'); b1 UUID := (SELECT v FROM ids WHERE k = 'b1'); f1 UUID := (SELECT v FROM ids WHERE k = 'f1');
         v1 UUID; v2 UUID; d1 UUID;
 BEGIN
-    INSERT INTO vehicle (tenant_id, branch_id, code, plate, fuel_type_id) VALUES (t1, b1, 'VEH0001', '51A-123.45', f1) RETURNING id INTO v1;
-    INSERT INTO vehicle (tenant_id, branch_id, code, plate, fuel_type_id) VALUES (t1, b1, 'VEH0002', '51A-678.90', f1) RETURNING id INTO v2;
-    INSERT INTO driver (tenant_id, branch_id, code, full_name) VALUES (t1, b1, 'DRV0001', 'Bùi Đình Tuấn') RETURNING id INTO d1;
+    INSERT INTO vehicle (tenant_id, code, plate, fuel_type_id) VALUES (t1, 'VEH0001', '51A-123.45', f1) RETURNING id INTO v1;
+    INSERT INTO vehicle (tenant_id, code, plate, fuel_type_id) VALUES (t1, 'VEH0002', '51A-678.90', f1) RETURNING id INTO v2;
+    INSERT INTO vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES (t1, v1, b1);
+    INSERT INTO driver (tenant_id, code, full_name) VALUES (t1, 'DRV0001', 'Bùi Đình Tuấn') RETURNING id INTO d1;
     INSERT INTO credential (tenant_id, vehicle_id, method, external_id) VALUES (t1, v1, 'card', '3862658937');
     INSERT INTO credential (tenant_id, driver_id, method, external_id) VALUES (t1, d1, 'face', 'DRV0001');
     INSERT INTO ids VALUES ('v1', v1), ('v2', v2), ('d1', d1);
@@ -103,18 +104,20 @@ SELECT pg_temp.expect_error(format(
     $q$INSERT INTO credential (tenant_id, vehicle_id, method, external_id) VALUES (%L, %L, 'card', '3862658937')$q$,
     (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'v2')), '23505', 'một số thẻ chỉ một chủ đang hiệu lực');
 SELECT pg_temp.expect_error(format(
-    $q$INSERT INTO vehicle (tenant_id, branch_id, code, plate, fuel_type_id) VALUES (%L, %L, 'VEH-0003', 'X', %L)$q$,
-    (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'b1'), (SELECT v FROM ids WHERE k = 'f1')), '23514', 'mã xe chỉ chữ và số (employeeNo của máy chấm công)');
+    $q$INSERT INTO vehicle (tenant_id, code, plate, fuel_type_id) VALUES (%L, 'VEH-0003', 'X', %L)$q$,
+    (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'f1')), '23514', 'mã xe chỉ chữ và số (employeeNo của máy chấm công)');
 
 -- ---- 5. Đồng bộ: version tăng, nhật ký thay đổi ghi đúng ----
 DO $$
-DECLARE v1 UUID := (SELECT v FROM ids WHERE k = 'v1'); ver BIGINT; n BIGINT;
+DECLARE v1 UUID := (SELECT v FROM ids WHERE k = 'v1'); ver0 BIGINT; ver BIGINT; n0 BIGINT; n BIGINT;
 BEGIN
+    SELECT version INTO ver0 FROM vehicle WHERE id = v1;
+    SELECT count(*) INTO n0 FROM sync_change_log WHERE entity_type = 'vehicle' AND entity_id = v1;
     UPDATE vehicle SET note = 'đổi ghi chú' WHERE id = v1;
     SELECT version INTO ver FROM vehicle WHERE id = v1;
-    ASSERT ver = 2, 'version phải tăng lên 2';
+    ASSERT ver = ver0 + 1, 'version phải tăng thêm 1 sau mỗi lần sửa';
     SELECT count(*) INTO n FROM sync_change_log WHERE entity_type = 'vehicle' AND entity_id = v1;
-    ASSERT n = 2, 'nhật ký thay đổi phải có 2 dòng (thêm, sửa)';
+    ASSERT n = n0 + 1, 'mỗi lần sửa phải ghi thêm một dòng nhật ký đồng bộ';
     UPDATE vehicle SET deleted_at = now() WHERE id = v1;
     ASSERT (SELECT deleted FROM sync_change_log WHERE entity_id = v1 ORDER BY seq DESC LIMIT 1), 'xóa mềm phải đánh dấu deleted';
     UPDATE vehicle SET deleted_at = NULL WHERE id = v1;
@@ -226,7 +229,7 @@ DECLARE t1 UUID := (SELECT v FROM ids WHERE k = 't1'); b1 UUID := (SELECT v FROM
 BEGIN
     INSERT INTO edge_station (tenant_id, branch_id, code, name) VALUES (t1, b1, 'TRAM-01', 'Trạm 1') RETURNING id INTO es;
     INSERT INTO pump (tenant_id, branch_id, code, edge_pump_id, name) VALUES (t1, b1, 'PUMP-01', 1, 'Trụ 1') RETURNING id INTO p;
-    INSERT INTO pump_sensor (tenant_id, pump_id, serial, com_port) VALUES (t1, p, 1234, 'COM7');
+    INSERT INTO pump_sensor (tenant_id, pump_id, branch_id, name, serial, com_port) VALUES (t1, p, b1, 'Bộ số trụ 1', 1234, 'COM7');
     INSERT INTO access_terminal (tenant_id, pump_id, terminal_code, host, username, password_enc) VALUES (t1, p, 'T1', '192.168.1.17', 'admin', '\x00');
     INSERT INTO dispense_session (tenant_id, branch_id, edge_station_id, code, edge_ref, pump_id, tank_id, pump_name, dispensed_ml, sensor_serial, sale_seq, edge_state, status)
         VALUES (t1, b1, es, next_code(t1, 'GD'), 'sale:1234:52', p, tk1, 'Trụ 1', 4410, 1234, 52, 'completed', 'completed');
@@ -243,17 +246,17 @@ SELECT pg_temp.expect_error(format(
     $q$INSERT INTO dispense_session (tenant_id, branch_id, edge_station_id, code, edge_ref, pump_id, pump_name, dispensed_ml, sensor_serial, sale_seq, edge_state, status)
        VALUES (%L, %L, %L, 'GD-Y', 'khac', %L, 'Trụ 1', 4410, 1234, 52, 'completed', 'completed')$q$,
     (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'b1'), (SELECT v FROM ids WHERE k = 'es'), (SELECT v FROM ids WHERE k = 'pump')),
-    '23505', 'một lần bơm của bộ số chỉ ghi một lần');
+    '23505', 'một lần bơm của một trụ chỉ ghi một lần');
 SELECT pg_temp.expect_error(format(
     $q$INSERT INTO dispense_session (tenant_id, branch_id, edge_station_id, code, edge_ref, pump_id, pump_name, dispensed_ml, edge_state, status)
        VALUES (%L, %L, %L, 'GD-Z', 'z', %L, 'Trụ 1', 100, 'timed_out', 'cancelled')$q$,
     (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'b1'), (SELECT v FROM ids WHERE k = 'es'), (SELECT v FROM ids WHERE k = 'pump')),
     '23514', 'phiên đã hủy phải có số lít bằng 0');
 
--- ---- 12. Định mức: đúng một đối tượng ----
+-- ---- 12. Định mức: bắt buộc có xe ----
 SELECT pg_temp.expect_error(format(
     $q$INSERT INTO quota_rule (tenant_id, code, period, max_volume_ml, effective_from) VALUES (%L, 'Q1', 'day', 100000, current_date)$q$,
-    (SELECT v FROM ids WHERE k = 't1')), '23514', 'định mức phải có đúng một đối tượng áp dụng');
+    (SELECT v FROM ids WHERE k = 't1')), '23502', 'định mức phải gắn với một xe');
 
 -- ---- 13. Kiểm kê: sổ sách phải khớp công thức ----
 SELECT pg_temp.expect_error(format(
@@ -261,6 +264,75 @@ SELECT pg_temp.expect_error(format(
        VALUES (%L, %L, %L, current_date, 1000, 500, 200, 0, 999, 0.5)$q$,
     (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'b1'), (SELECT v FROM ids WHERE k = 'tk1')),
     '23514', 'tồn cuối sổ sách = tồn đầu + nhập - xuất');
+
+-- ---- 14. Phạm vi cửa hàng theo xe ----
+DO $$
+DECLARE t1 UUID := (SELECT v FROM ids WHERE k = 't1'); b1 UUID := (SELECT v FROM ids WHERE k = 'b1'); v1 UUID := (SELECT v FROM ids WHERE k = 'v1');
+        v2 UUID := (SELECT v FROM ids WHERE k = 'v2'); b_new UUID; ver_before BIGINT; ver_after BIGINT; n BIGINT;
+BEGIN
+    -- xe không có dòng nào trong vehicle_branch thì không được đổ ở cửa hàng nào
+    ASSERT (SELECT count(*) FROM vehicle_branch WHERE vehicle_id = v2) = 0, 'xe mới chưa được phép ở cửa hàng nào';
+
+    -- thêm cửa hàng được phép: version của xe tăng và có dòng nhật ký đồng bộ mới
+    INSERT INTO branch (tenant_id, code, name) VALUES (t1, 'TRAM9', 'Trạm 9') RETURNING id INTO b_new;
+    SELECT version INTO ver_before FROM vehicle WHERE id = v1;
+    SELECT count(*) INTO n FROM sync_change_log WHERE entity_type = 'vehicle' AND entity_id = v1;
+    INSERT INTO vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES (t1, v1, b_new);
+    SELECT version INTO ver_after FROM vehicle WHERE id = v1;
+    ASSERT ver_after = ver_before + 1, 'thêm cửa hàng được phép phải tăng version của xe';
+    ASSERT (SELECT count(*) FROM sync_change_log WHERE entity_type = 'vehicle' AND entity_id = v1) = n + 1, 'phải ghi nhật ký đồng bộ';
+
+    -- bỏ cửa hàng: cũng tăng version
+    DELETE FROM vehicle_branch WHERE vehicle_id = v1 AND branch_id = b_new;
+    ASSERT (SELECT version FROM vehicle WHERE id = v1) = ver_after + 1, 'gỡ cửa hàng được phép phải tăng version của xe';
+    RAISE NOTICE 'OK   xe nhiều-nhiều cửa hàng được phép, đổi là đồng bộ lại';
+END;
+$$;
+SELECT pg_temp.expect_error(format(
+    $q$INSERT INTO vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES (%L, %L, %L)$q$,
+    (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'v1'), (SELECT v FROM ids WHERE k = 'b1')),
+    '23505', 'một xe không được phép trùng một cửa hàng hai lần');
+SELECT pg_temp.expect_error(format(
+    $q$INSERT INTO vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES (%L, %L, %L)$q$,
+    (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'v2'), (SELECT v FROM ids WHERE k = 'b2')),
+    '23503', 'xe không gắn được cửa hàng của công ty khác');
+
+-- ---- 15. Mỗi trụ một cổng COM, serial được trùng ----
+DO $$
+DECLARE t1 UUID := (SELECT v FROM ids WHERE k = 't1'); b1 UUID := (SELECT v FROM ids WHERE k = 'b1'); p2 UUID;
+BEGIN
+    INSERT INTO pump (tenant_id, branch_id, code, edge_pump_id, name) VALUES (t1, b1, 'PUMP-02', 2, 'Trụ 2') RETURNING id INTO p2;
+    -- cùng serial 1234 nhưng cổng COM khác: được
+    INSERT INTO pump_sensor (tenant_id, pump_id, branch_id, name, serial, com_port) VALUES (t1, p2, b1, 'Bộ số trụ 2', 1234, 'COM8');
+    INSERT INTO ids VALUES ('pump2', p2);
+    -- trụ thứ ba chưa có bộ số, dùng cho các kiểm tra bên dưới
+    INSERT INTO pump (tenant_id, branch_id, code, edge_pump_id, name) VALUES (t1, b1, 'PUMP-03', 3, 'Trụ 3') RETURNING id INTO p2;
+    INSERT INTO ids VALUES ('pump3', p2);
+    RAISE NOTICE 'OK   hai bộ số cùng serial 1234 trên hai cổng COM khác nhau';
+END;
+$$;
+SELECT pg_temp.expect_error(format(
+    $q$UPDATE pump_sensor SET com_port = 'com7' WHERE pump_id = %L$q$, (SELECT v FROM ids WHERE k = 'pump2')),
+    '23505', 'hai trụ cùng cửa hàng không dùng chung một cổng COM (không phân biệt hoa thường)');
+SELECT pg_temp.expect_error(format(
+    $q$INSERT INTO pump_sensor (tenant_id, pump_id, branch_id, name, serial, com_port) VALUES (%L, %L, %L, 'x', 1, 'COM9')$q$,
+    (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'pump3'), (SELECT v FROM ids WHERE k = 'b2')),
+    '23503', 'bộ số phải cùng cửa hàng với trụ');
+SELECT pg_temp.expect_error(format(
+    $q$INSERT INTO pump_sensor (tenant_id, pump_id, branch_id, name, serial, com_port) VALUES (%L, %L, %L, '  ', 1, 'COM11')$q$,
+    (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'pump3'), (SELECT v FROM ids WHERE k = 'b1')),
+    '23514', 'bộ số phải có tên');
+
+-- ---- 16. Lần bơm theo (trụ, số thứ tự): hai trụ cùng serial không đụng nhau ----
+DO $$
+DECLARE t1 UUID := (SELECT v FROM ids WHERE k = 't1'); b1 UUID := (SELECT v FROM ids WHERE k = 'b1'); es UUID := (SELECT v FROM ids WHERE k = 'es');
+        p2 UUID := (SELECT v FROM ids WHERE k = 'pump2');
+BEGIN
+    INSERT INTO dispense_session (tenant_id, branch_id, edge_station_id, code, edge_ref, pump_id, pump_name, dispensed_ml, sensor_serial, sale_seq, edge_state, status)
+        VALUES (t1, b1, es, next_code(t1, 'GD'), 'sale:pump2:52', p2, 'Trụ 2', 1000, 1234, 52, 'completed', 'completed');
+    RAISE NOTICE 'OK   cùng serial và cùng số thứ tự nhưng khác trụ vẫn ghi được';
+END;
+$$;
 
 DO $$ BEGIN RAISE NOTICE '=== TẤT CẢ KIỂM TRA SCHEMA ĐẠT ==='; END; $$;
 ROLLBACK;

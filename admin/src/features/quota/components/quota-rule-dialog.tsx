@@ -1,5 +1,6 @@
 'use client';
 
+import { DatePicker } from '@/components/date-picker';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -64,7 +65,6 @@ export function QuotaRuleDialog({ open, onOpenChange, editingRule }: QuotaRuleDi
   });
 
   const watchPeriod = watch('period');
-  const watchTargetType = watch('target_type');
   const watchTargetId = watch('target_id');
 
   React.useEffect(() => {
@@ -100,10 +100,6 @@ export function QuotaRuleDialog({ open, onOpenChange, editingRule }: QuotaRuleDi
     switch (selectedTargetType) {
       case 'vehicle':
         return targets.vehicles || [];
-      case 'vehicle_group':
-        return targets.vehicle_groups || [];
-      case 'route':
-        return targets.routes || [];
       default:
         return [];
     }
@@ -162,34 +158,9 @@ export function QuotaRuleDialog({ open, onOpenChange, editingRule }: QuotaRuleDi
             </div>
 
             {/* Đối tượng áp dụng */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
-                <Label>Loại đối tượng áp dụng</Label>
-                <Select
-                  value={watchTargetType}
-                  onValueChange={(val: QuotaTargetType) => {
-                    setSelectedTargetType(val);
-                    setValue('target_type', val);
-                    setValue('target_id', '');
-                  }}
-                  disabled={isEdit || isSubmitting}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn loại đối tượng" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vehicle">Xe cụ thể (Biển số)</SelectItem>
-                    <SelectItem value="vehicle_group">Nhóm xe</SelectItem>
-                    <SelectItem value="route">Tuyến đường vận tải</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.target_type && (
-                  <p className="text-xs text-destructive">{errors.target_type.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Đối tượng cụ thể</Label>
+                <Label>Xe áp dụng</Label>
                 {isEdit ? (
                   <Input
                     value={editingRule?.target_name || editingRule?.target_code || ''}
@@ -203,7 +174,7 @@ export function QuotaRuleDialog({ open, onOpenChange, editingRule }: QuotaRuleDi
                     disabled={isSubmitting}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="-- Chọn đối tượng áp dụng --" />
+                      <SelectValue placeholder="-- Chọn xe áp dụng --" />
                     </SelectTrigger>
                     <SelectContent>
                       {targetOptions.map((opt) => (
@@ -284,11 +255,11 @@ export function QuotaRuleDialog({ open, onOpenChange, editingRule }: QuotaRuleDi
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="effective_from">Có hiệu lực từ ngày</Label>
-                <Input
+                <DatePicker
                   id="effective_from"
-                  type="date"
                   disabled={isEdit || isSubmitting}
-                  {...register('effective_from')}
+                  value={watch('effective_from') ?? ''}
+                  onChange={(next) => setValue('effective_from', next, { shouldValidate: true })}
                 />
                 {errors.effective_from && (
                   <p className="text-xs text-destructive">{errors.effective_from.message}</p>
@@ -297,11 +268,12 @@ export function QuotaRuleDialog({ open, onOpenChange, editingRule }: QuotaRuleDi
 
               <div className="space-y-1.5">
                 <Label htmlFor="effective_to">Đến ngày (Để trống nếu vô thời hạn)</Label>
-                <Input
+                <DatePicker
                   id="effective_to"
-                  type="date"
+                  clearable
                   disabled={isSubmitting}
-                  {...register('effective_to')}
+                  value={watch('effective_to') ?? ''}
+                  onChange={(next) => setValue('effective_to', next)}
                 />
               </div>
             </div>

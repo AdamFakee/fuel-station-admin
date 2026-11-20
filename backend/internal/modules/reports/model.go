@@ -145,20 +145,17 @@ type DispenseReportResponse struct {
 // ---------------------------------------------------------------------------------------------------
 
 type VehicleConsumptionQuery struct {
-	BranchID       *uuid.UUID `json:"branch_id"`
-	VehicleGroupID *uuid.UUID `json:"vehicle_group_id"`
-	VehicleID      *uuid.UUID `json:"vehicle_id"`
-	FromDate       *time.Time `json:"from_date"`
-	ToDate         *time.Time `json:"to_date"`
+	BranchID  *uuid.UUID `json:"branch_id"`
+	VehicleID *uuid.UUID `json:"vehicle_id"`
+	FromDate  *time.Time `json:"from_date"`
+	ToDate    *time.Time `json:"to_date"`
 }
 
 type VehicleConsumptionItem struct {
 	VehicleID            uuid.UUID `json:"vehicle_id"`
 	VehicleCode          string    `json:"vehicle_code"`
 	VehiclePlate         string    `json:"vehicle_plate"`
-	GroupName            *string   `json:"group_name"`
 	TypeName             *string   `json:"type_name"`
-	RouteName            *string   `json:"route_name"`
 	SessionCount         int       `json:"session_count"`
 	TotalDispensedLiters float64   `json:"total_dispensed_liters"`
 	QuotaLiters          *float64  `json:"quota_liters"`
@@ -216,25 +213,25 @@ type ReconciliationReportQuery struct {
 }
 
 type ReconciliationReportItem struct {
-	ID                 uuid.UUID  `json:"id"`
-	PeriodDate         string     `json:"period_date"`
-	BranchName         string     `json:"branch_name"`
-	TankName           string     `json:"tank_name"`
-	TankCode           string     `json:"tank_code"`
-	FuelTypeName       string     `json:"fuel_type_name"`
-	OpeningLiters      float64    `json:"opening_liters"`
-	ReceiptsLiters     float64    `json:"receipts_liters"`
-	DispensedLiters    float64    `json:"dispensed_liters"`
-	OtherIssuesLiters  float64    `json:"other_issues_liters"`
-	BookClosingLiters  float64    `json:"book_closing_liters"`
-	MeasuredLiters     *float64   `json:"measured_liters"`
+	ID                  uuid.UUID `json:"id"`
+	PeriodDate          string    `json:"period_date"`
+	BranchName          string    `json:"branch_name"`
+	TankName            string    `json:"tank_name"`
+	TankCode            string    `json:"tank_code"`
+	FuelTypeName        string    `json:"fuel_type_name"`
+	OpeningLiters       float64   `json:"opening_liters"`
+	ReceiptsLiters      float64   `json:"receipts_liters"`
+	DispensedLiters     float64   `json:"dispensed_liters"`
+	OtherIssuesLiters   float64   `json:"other_issues_liters"`
+	BookClosingLiters   float64   `json:"book_closing_liters"`
+	MeasuredLiters      *float64  `json:"measured_liters"`
 	PumpTotalizerLiters *float64  `json:"pump_totalizer_liters"`
-	VarianceLiters     *float64   `json:"variance_liters"`
-	VariancePct        *float64   `json:"variance_pct"`
-	TolerancePct       float64    `json:"tolerance_pct"`
-	Status             string     `json:"status"`
-	MeasuredByName     *string    `json:"measured_by_name"`
-	ConfirmedByName    *string    `json:"confirmed_by_name"`
+	VarianceLiters      *float64  `json:"variance_liters"`
+	VariancePct         *float64  `json:"variance_pct"`
+	TolerancePct        float64   `json:"tolerance_pct"`
+	Status              string    `json:"status"`
+	MeasuredByName      *string   `json:"measured_by_name"`
+	ConfirmedByName     *string   `json:"confirmed_by_name"`
 }
 
 type ReconciliationReportResponse struct {

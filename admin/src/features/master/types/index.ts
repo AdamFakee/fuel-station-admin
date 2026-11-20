@@ -24,30 +24,23 @@ export interface CatalogsSummary {
   branches: BranchOption[];
   fuel_types: CatalogItem[];
   vehicle_types: CatalogItem[];
-  groups: CatalogItem[];
-  routes: CatalogItem[];
 }
 
 // Vehicle
 export interface VehicleListItem {
   id: string;
-  branch_id: string;
-  branch_name: string;
   code: string;
   plate: string;
   vehicle_type_id?: string;
   vehicle_type_name?: string;
   fuel_type_id: string;
   fuel_type_name: string;
-  route_id?: string;
-  route_name?: string;
-  tank_capacity_ml?: number;
-  tank_capacity_liters?: number;
   status: 'active' | 'banned';
   note?: string;
   card_number?: string;
-  group_ids: string[];
-  group_names: string[];
+  /** Cửa hàng được phép đổ. Rỗng: xe chưa đổ được ở cửa hàng nào. */
+  branch_ids: string[];
+  branch_names: string[];
   version: number;
   created_at: string;
   updated_at: string;
@@ -70,27 +63,21 @@ export interface VehicleDetail extends VehicleListItem {
 }
 
 export interface CreateVehicleInput {
-  branch_id: string;
-  code: string;
+  branch_ids: string[];
   plate: string;
   vehicle_type_id?: string;
   fuel_type_id: string;
-  route_id?: string;
-  tank_capacity_liters?: number;
   note?: string;
-  card_number?: string;
-  group_ids?: string[];
+  /** Số thẻ NFC (thập phân), bắt buộc khi tạo xe. */
+  card_number: string;
 }
 
 export interface UpdateVehicleInput {
-  branch_id: string;
+  branch_ids: string[];
   plate: string;
   vehicle_type_id?: string;
   fuel_type_id: string;
-  route_id?: string;
-  tank_capacity_liters?: number;
   note?: string;
-  group_ids?: string[];
 }
 
 export interface VehicleListParams {
@@ -101,20 +88,15 @@ export interface VehicleListParams {
   status?: string;
   vehicle_type_id?: string;
   fuel_type_id?: string;
-  route_id?: string;
-  group_id?: string;
 }
 
 // Driver
 export interface DriverListItem {
   id: string;
-  branch_id: string;
-  branch_name: string;
   code: string;
   full_name: string;
   phone?: string;
   department?: string;
-  position: 'driver' | 'guard' | 'operator';
   status: 'active' | 'blocked' | 'inactive';
   valid_from?: string;
   valid_to?: string;
@@ -133,12 +115,10 @@ export interface DriverDetail extends DriverListItem {
 }
 
 export interface CreateDriverInput {
-  branch_id: string;
   code: string;
   full_name: string;
   phone?: string;
   department?: string;
-  position: 'driver' | 'guard' | 'operator';
   status?: 'active' | 'blocked' | 'inactive';
   valid_from?: string;
   valid_to?: string;
@@ -147,11 +127,9 @@ export interface CreateDriverInput {
 }
 
 export interface UpdateDriverInput {
-  branch_id: string;
   full_name: string;
   phone?: string;
   department?: string;
-  position: 'driver' | 'guard' | 'operator';
   valid_from?: string;
   valid_to?: string;
   note?: string;
@@ -161,8 +139,6 @@ export interface DriverListParams {
   page?: number;
   page_size?: number;
   q?: string;
-  branch_id?: string;
   status?: string;
-  position?: string;
   department?: string;
 }

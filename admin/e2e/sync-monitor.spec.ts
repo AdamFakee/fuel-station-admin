@@ -73,7 +73,6 @@ test.describe('Module M8 - Theo dõi đồng bộ & Trạng thái trạm (Sync M
     await page.goto('/sync-monitor');
 
     // Tiêu đề & KPI
-    await expect(page.getByText('Trạng thái trạm & Giám sát đồng bộ')).toBeVisible();
     await expect(page.getByText('Tổng số Trạm Edge')).toBeVisible();
     await expect(page.getByText('Đang kết nối (Online)')).toBeVisible();
     await expect(page.getByText('Mất kết nối (Offline)', { exact: true })).toBeVisible();
@@ -90,7 +89,8 @@ test.describe('Module M8 - Theo dõi đồng bộ & Trạng thái trạm (Sync M
     await expect(page.getByText('Timeout connecting COM7 Montech sensor')).toBeVisible();
 
     // Toggle tự làm mới và nút làm mới
-    await expect(page.getByText('Tự làm mới (30s)')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Làm mới/i })).toBeVisible();
+    // Không tự làm mới: không có công tắc auto-refresh
+    await expect(page.getByText('Tự làm mới (30s)')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Làm mới/i })).toHaveCount(0);
   });
 });

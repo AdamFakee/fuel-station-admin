@@ -8,6 +8,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  ACTION_HEAD_CLASS,
+  ACTION_CELL_CLASS,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,8 +35,6 @@ const periodLabels: Record<string, { label: string; className: string }> = {
 
 const targetTypeLabels: Record<string, { label: string; className: string }> = {
   vehicle: { label: 'Xe', className: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-  vehicle_group: { label: 'Nhóm xe', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  route: { label: 'Tuyến đường', className: 'bg-orange-50 text-orange-700 border-orange-200' },
 };
 
 export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps) {
@@ -90,7 +90,7 @@ export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps
 
   return (
     <>
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border bg-card flex min-h-0 flex-1 flex-col">
         <Table>
           <TableHeader>
             <TableRow>
@@ -101,7 +101,7 @@ export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps
               <TableHead className="w-[130px] text-right">Giãn cách (Phút)</TableHead>
               <TableHead className="w-[190px] text-left">Thời gian hiệu lực</TableHead>
               <TableHead className="w-[110px] text-center">Trạng thái</TableHead>
-              <TableHead className="w-[110px] text-right">Thao tác</TableHead>
+              <TableHead className={`${ACTION_HEAD_CLASS} w-[110px]`}>Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -164,20 +164,8 @@ export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps
                   </TableCell>
 
                   {/* Thao tác */}
-                  <TableCell className="text-right">
+                  <TableCell className={ACTION_CELL_CLASS}>
                     <div className="flex items-center justify-end gap-1">
-                      {canUpdate && isActive && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={() => onEdit(rule)}
-                          title="Chỉnh sửa định mức"
-                        >
-                          <PencilSquareIcon className="h-4 w-4" />
-                          <span className="sr-only">Sửa</span>
-                        </Button>
-                      )}
                       {canDelete && isActive && (
                         <Button
                           variant="ghost"
@@ -188,6 +176,18 @@ export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps
                         >
                           <NoSymbolIcon className="h-4 w-4" />
                           <span className="sr-only">Hủy</span>
+                        </Button>
+                      )}
+                      {canUpdate && isActive && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => onEdit(rule)}
+                          title="Chỉnh sửa định mức"
+                        >
+                          <PencilSquareIcon className="h-4 w-4" />
+                          <span className="sr-only">Sửa</span>
                         </Button>
                       )}
                     </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { DatePicker } from '@/components/date-picker';
 import * as React from 'react';
 import {
   Table,
@@ -61,9 +62,11 @@ const statusConfig: Record<
 interface StocktakeTableProps {
   branchFilter?: string;
   onBranchFilterChange?: (branchId: string) => void;
+  /** Trang tăng số này mỗi lần bấm nút "Khởi tạo kỳ đối chiếu" (nút nằm ở hàng tab của trang) để mở hộp thoại tạo. */
+  createRequestId?: number;
 }
 
-export function StocktakeTable({ branchFilter = '', onBranchFilterChange }: StocktakeTableProps) {
+export function StocktakeTable({ branchFilter = '', onBranchFilterChange, createRequestId = 0 }: StocktakeTableProps) {
   const [dateFilter, setDateFilter] = React.useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -109,6 +112,13 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange }: Stoc
     setCreateOpen(true);
   };
 
+  // Mở hộp thoại khi trang yêu cầu (so sánh ngay lúc render, không cần effect).
+  const [handledCreateRequestId, setHandledCreateRequestId] = React.useState(createRequestId);
+  if (createRequestId !== handledCreateRequestId) {
+    setHandledCreateRequestId(createRequestId);
+    handleOpenCreate();
+  }
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId || !selectedTankId) {
@@ -138,11 +148,11 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange }: Stoc
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Ngày đối chiếu:</span>
-            <Input
-              type="date"
+            <DatePicker
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="w-[155px] h-9 text-xs"
+              onChange={setDateFilter}
+              clearable
+              className="h-9 w-[160px] text-xs"
             />
           </div>
 
@@ -201,16 +211,6 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange }: Stoc
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={handleOpenCreate}
-            className="h-9 text-xs gap-1.5"
-          >
-            <PlusIcon className="h-3.5 w-3.5" />
-            Khởi tạo kỳ đối chiếu
-          </Button>
-        </div>
       </div>
 
       {/* Bảng danh sách phiếu đối chiếu */}
@@ -245,7 +245,7 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange }: Stoc
               <TableRow>
                 <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
                   <p className="text-sm font-medium">Chưa có phiếu đối chiếu nào trong ngày hoặc bộ lọc đã chọn</p>
-                  <p className="text-xs mt-1">Bấm &quot;Khởi tạo kỳ đối chiếu&quot; ở trên để tạo danh sách đối soát cho các bể.</p>
+                  <p className="text-xs mt-1">Bấm &quot;Khởi tạo kỳ đối chiếu&quot; để tạo danh sách đối soát cho các bể.</p>
                 </TableCell>
               </TableRow>
             ) : (
@@ -409,7 +409,7 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange }: Stoc
                       <SelectValue placeholder="Chọn bể chứa" />
                     </SelectTrigger>
                     <SelectContent>
-                      {tankData.map((t) => (
+                      {(tankData ?? []).map((t) => (
                         <SelectItem key={t.tank_id} value={t.tank_id}>
                           {t.name} ({t.code} - {t.fuel_type_name})
                         </SelectItem>
@@ -420,12 +420,7 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange }: Stoc
 
                 <div className="space-y-2">
                   <Label>Ngày đối chiếu <span className="text-destructive">*</span></Label>
-                  <Input
-                    type="date"
-                    value={periodDate}
-                    onChange={(e) => setPeriodDate(e.target.value)}
-                    required
-                  />
+                  <DatePicker value={periodDate} onChange={setPeriodDate} />
                 </div>
               </div>
             </DialogBody>

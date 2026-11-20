@@ -44,6 +44,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 		// Driver Routes
 		protected.With(authz.RequirePermission("master.driver:view", h.log)).Get("/master/drivers", h.ListDrivers)
 		protected.With(authz.RequirePermission("master.driver:create", h.log)).Post("/master/drivers", h.CreateDriver)
+		protected.With(authz.RequirePermission("master.driver:create", h.log)).Post("/master/drivers/import", h.ImportDrivers)
 		protected.With(authz.RequirePermission("master.driver:view", h.log)).Get("/master/drivers/{id}", h.GetDriver)
 		protected.With(authz.RequirePermission("master.driver:update", h.log)).Put("/master/drivers/{id}", h.UpdateDriver)
 		protected.With(authz.RequirePermission("master.driver:update", h.log)).Patch("/master/drivers/{id}/status", h.UpdateDriverStatus)
@@ -99,16 +100,6 @@ func (h *Handler) ListVehicles(w http.ResponseWriter, r *http.Request) {
 	if ftStr := r.URL.Query().Get("fuel_type_id"); ftStr != "" {
 		if ftID, err := uuid.Parse(ftStr); err == nil {
 			q.FuelTypeID = &ftID
-		}
-	}
-	if rStr := r.URL.Query().Get("route_id"); rStr != "" {
-		if rID, err := uuid.Parse(rStr); err == nil {
-			q.RouteID = &rID
-		}
-	}
-	if gStr := r.URL.Query().Get("group_id"); gStr != "" {
-		if gID, err := uuid.Parse(gStr); err == nil {
-			q.GroupID = &gID
 		}
 	}
 
@@ -265,14 +256,7 @@ func (h *Handler) ListDrivers(w http.ResponseWriter, r *http.Request) {
 		PageSize:   pageSize,
 		Search:     r.URL.Query().Get("q"),
 		Status:     r.URL.Query().Get("status"),
-		Position:   r.URL.Query().Get("position"),
 		Department: r.URL.Query().Get("department"),
-	}
-
-	if bStr := r.URL.Query().Get("branch_id"); bStr != "" {
-		if bID, err := uuid.Parse(bStr); err == nil {
-			q.BranchID = &bID
-		}
 	}
 
 	items, total, err := h.service.ListDrivers(r.Context(), q)
@@ -319,6 +303,23 @@ func (h *Handler) CreateDriver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusCreated, created)
+}
+
+func (h *Handler) ImportDrivers(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+	var req ImportDriversRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.Error(w, r, h.log, apperr.ErrInvalidInput)
+		return
+	}
+
+	result, err := h.service.ImportDrivers(r.Context(), req)
+	if err != nil {
+		httpx.Error(w, r, h.log, err)
+		return
+	}
+
+	httpx.JSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) UpdateDriver(w http.ResponseWriter, r *http.Request) {

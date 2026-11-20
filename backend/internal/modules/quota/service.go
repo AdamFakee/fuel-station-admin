@@ -45,9 +45,7 @@ func (s *Service) ListRules(ctx context.Context, status, q, targetType string, p
 
 	baseQuery := `
 		FROM station.quota_rule qr
-		LEFT JOIN station.vehicle v ON v.id = qr.vehicle_id AND v.tenant_id = qr.tenant_id
-		LEFT JOIN station.vehicle_group vg ON vg.id = qr.vehicle_group_id AND vg.tenant_id = qr.tenant_id
-		LEFT JOIN station.route r ON r.id = qr.route_id AND r.tenant_id = qr.tenant_id
+		JOIN station.vehicle v ON v.id = qr.vehicle_id AND v.tenant_id = qr.tenant_id
 		WHERE qr.tenant_id = $1
 	`
 	args := []any{tenantID}
@@ -59,19 +57,8 @@ func (s *Service) ListRules(ctx context.Context, status, q, targetType string, p
 		argIdx++
 	}
 
-	if targetType != "" {
-		switch targetType {
-		case "vehicle":
-			baseQuery += " AND qr.vehicle_id IS NOT NULL"
-		case "vehicle_group":
-			baseQuery += " AND qr.vehicle_group_id IS NOT NULL"
-		case "route":
-			baseQuery += " AND qr.route_id IS NOT NULL"
-		}
-	}
-
 	if q = strings.TrimSpace(q); q != "" {
-		baseQuery += fmt.Sprintf(" AND (qr.code ILIKE $%d OR v.plate ILIKE $%d OR vg.name ILIKE $%d OR r.name ILIKE $%d)", argIdx, argIdx, argIdx, argIdx)
+		baseQuery += fmt.Sprintf(" AND (qr.code ILIKE $%d OR v.plate ILIKE $%d OR v.code ILIKE $%d)", argIdx, argIdx, argIdx)
 		args = append(args, "%"+q+"%")
 		argIdx++
 	}
@@ -86,10 +73,7 @@ func (s *Service) ListRules(ctx context.Context, status, q, targetType string, p
 	// Query page items
 	selectQuery := `
 		SELECT qr.id, qr.tenant_id, qr.code,
-		       qr.vehicle_id, qr.vehicle_group_id, qr.route_id,
-		       v.code, v.plate,
-		       vg.code, vg.name,
-		       r.code, r.name,
+		       qr.vehicle_id, v.code, v.plate,
 		       qr.period, qr.max_volume_ml, qr.min_interval_minutes,
 		       qr.effective_from::text, qr.effective_to::text, qr.status,
 		       qr.created_by, qr.created_at, qr.updated_at
@@ -105,18 +89,16 @@ func (s *Service) ListRules(ctx context.Context, status, q, targetType string, p
 	items := make([]QuotaRuleListItem, 0)
 	for rows.Next() {
 		var (
-			item                                                QuotaRuleListItem
-			vehicleID, groupID, routeID                         *uuid.UUID
-			vCode, vPlate, gCode, gName, rCode, rName, effToStr *string
-			createdByUUID                                       *uuid.UUID
+			item          QuotaRuleListItem
+			vehicleID     uuid.UUID
+			vCode, vPlate string
+			effToStr      *string
+			createdByUUID *uuid.UUID
 		)
 
 		err := rows.Scan(
 			&item.ID, &item.TenantID, &item.Code,
-			&vehicleID, &groupID, &routeID,
-			&vCode, &vPlate,
-			&gCode, &gName,
-			&rCode, &rName,
+			&vehicleID, &vCode, &vPlate,
 			&item.Period, &item.MaxVolumeML, &item.MinIntervalMinutes,
 			&item.EffectiveFrom, &effToStr, &item.Status,
 			&createdByUUID, &item.CreatedAt, &item.UpdatedAt,
@@ -132,34 +114,10 @@ func (s *Service) ListRules(ctx context.Context, status, q, targetType string, p
 			item.CreatedBy = &s
 		}
 
-		if vehicleID != nil {
-			item.TargetType = "vehicle"
-			item.TargetID = vehicleID.String()
-			if vPlate != nil {
-				item.TargetName = *vPlate
-			}
-			if vCode != nil {
-				item.TargetCode = *vCode
-			}
-		} else if groupID != nil {
-			item.TargetType = "vehicle_group"
-			item.TargetID = groupID.String()
-			if gName != nil {
-				item.TargetName = *gName
-			}
-			if gCode != nil {
-				item.TargetCode = *gCode
-			}
-		} else if routeID != nil {
-			item.TargetType = "route"
-			item.TargetID = routeID.String()
-			if rName != nil {
-				item.TargetName = *rName
-			}
-			if rCode != nil {
-				item.TargetCode = *rCode
-			}
-		}
+		item.TargetType = "vehicle"
+		item.TargetID = vehicleID.String()
+		item.TargetName = vPlate
+		item.TargetCode = vCode
 
 		items = append(items, item)
 	}
@@ -181,33 +139,26 @@ func (s *Service) GetRule(ctx context.Context, id string) (*QuotaRuleListItem, e
 
 	query := `
 		SELECT qr.id, qr.tenant_id, qr.code,
-		       qr.vehicle_id, qr.vehicle_group_id, qr.route_id,
-		       v.code, v.plate,
-		       vg.code, vg.name,
-		       r.code, r.name,
+		       qr.vehicle_id, v.code, v.plate,
 		       qr.period, qr.max_volume_ml, qr.min_interval_minutes,
 		       qr.effective_from::text, qr.effective_to::text, qr.status,
 		       qr.created_by, qr.created_at, qr.updated_at
 		FROM station.quota_rule qr
-		LEFT JOIN station.vehicle v ON v.id = qr.vehicle_id AND v.tenant_id = qr.tenant_id
-		LEFT JOIN station.vehicle_group vg ON vg.id = qr.vehicle_group_id AND vg.tenant_id = qr.tenant_id
-		LEFT JOIN station.route r ON r.id = qr.route_id AND r.tenant_id = qr.tenant_id
+		JOIN station.vehicle v ON v.id = qr.vehicle_id AND v.tenant_id = qr.tenant_id
 		WHERE qr.id = $1 AND qr.tenant_id = $2
 	`
 
 	var (
-		item                                                QuotaRuleListItem
-		vehicleID, groupID, routeID                         *uuid.UUID
-		vCode, vPlate, gCode, gName, rCode, rName, effToStr *string
-		createdByUUID                                       *uuid.UUID
+		item          QuotaRuleListItem
+		vehicleID     uuid.UUID
+		vCode, vPlate string
+		effToStr      *string
+		createdByUUID *uuid.UUID
 	)
 
 	err = s.pool.QueryRow(ctx, query, ruleID, tenantID).Scan(
 		&item.ID, &item.TenantID, &item.Code,
-		&vehicleID, &groupID, &routeID,
-		&vCode, &vPlate,
-		&gCode, &gName,
-		&rCode, &rName,
+		&vehicleID, &vCode, &vPlate,
 		&item.Period, &item.MaxVolumeML, &item.MinIntervalMinutes,
 		&item.EffectiveFrom, &effToStr, &item.Status,
 		&createdByUUID, &item.CreatedAt, &item.UpdatedAt,
@@ -226,34 +177,10 @@ func (s *Service) GetRule(ctx context.Context, id string) (*QuotaRuleListItem, e
 		item.CreatedBy = &s
 	}
 
-	if vehicleID != nil {
-		item.TargetType = "vehicle"
-		item.TargetID = vehicleID.String()
-		if vPlate != nil {
-			item.TargetName = *vPlate
-		}
-		if vCode != nil {
-			item.TargetCode = *vCode
-		}
-	} else if groupID != nil {
-		item.TargetType = "vehicle_group"
-		item.TargetID = groupID.String()
-		if gName != nil {
-			item.TargetName = *gName
-		}
-		if gCode != nil {
-			item.TargetCode = *gCode
-		}
-	} else if routeID != nil {
-		item.TargetType = "route"
-		item.TargetID = routeID.String()
-		if rName != nil {
-			item.TargetName = *rName
-		}
-		if rCode != nil {
-			item.TargetCode = *rCode
-		}
-	}
+	item.TargetType = "vehicle"
+	item.TargetID = vehicleID.String()
+	item.TargetName = vPlate
+	item.TargetCode = vCode
 
 	return &item, nil
 }
@@ -301,17 +228,11 @@ func (s *Service) CreateRule(ctx context.Context, req CreateQuotaRuleRequest) (*
 		}
 	}
 
-	var vehicleID, groupID, routeID *uuid.UUID
-	switch req.TargetType {
-	case "vehicle":
-		vehicleID = &targetID
-	case "vehicle_group":
-		groupID = &targetID
-	case "route":
-		routeID = &targetID
-	default:
-		return nil, fmt.Errorf("%w: đối tượng áp dụng không hợp lệ", apperr.ErrInvalidInput)
+	// Định mức chỉ áp theo xe (không còn nhóm xe hay tuyến đường).
+	if req.TargetType != "" && req.TargetType != "vehicle" {
+		return nil, fmt.Errorf("%w: định mức chỉ áp theo xe", apperr.ErrInvalidInput)
 	}
+	vehicleID := targetID
 
 	var createdBy *uuid.UUID
 	if p, ok := authz.FromContext(ctx); ok && p.UserID != "" {
@@ -323,18 +244,18 @@ func (s *Service) CreateRule(ctx context.Context, req CreateQuotaRuleRequest) (*
 	ruleID := uuid.New()
 	insertQuery := `
 		INSERT INTO station.quota_rule (
-			id, tenant_id, code, vehicle_id, vehicle_group_id, route_id,
+			id, tenant_id, code, vehicle_id,
 			period, max_volume_ml, min_interval_minutes, effective_from, effective_to,
 			status, created_by
 		) VALUES (
-			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10::date, $11::date,
-			'active', $12
+			$1, $2, $3, $4,
+			$5, $6, $7, $8::date, $9::date,
+			'active', $10
 		)
 	`
 
 	_, err = s.pool.Exec(ctx, insertQuery,
-		ruleID, tenantID, code, vehicleID, groupID, routeID,
+		ruleID, tenantID, code, vehicleID,
 		req.Period, maxVolumeML, req.MinIntervalMinutes, req.EffectiveFrom, req.EffectiveTo,
 		createdBy,
 	)
@@ -350,7 +271,7 @@ func (s *Service) CreateRule(ctx context.Context, req CreateQuotaRuleRequest) (*
 		EntityCode: code,
 		NewData: map[string]any{
 			"code":              code,
-			"target_type":       req.TargetType,
+			"target_type":       "vehicle",
 			"target_id":         targetID.String(),
 			"period":            req.Period,
 			"max_volume_liters": req.MaxVolumeLiters,
@@ -602,7 +523,7 @@ func (s *Service) CreateExtra(ctx context.Context, req CreateQuotaExtraRequest) 
 	return &extras[0], nil
 }
 
-// GetTargets lists selectable targets (vehicles, vehicle groups, routes).
+// GetTargets lists selectable targets (vehicles).
 func (s *Service) GetTargets(ctx context.Context) (*QuotaTargets, error) {
 	tenantID, ok := middleware.TenantIDFromContext(ctx)
 	if !ok || tenantID == "" {
@@ -610,9 +531,7 @@ func (s *Service) GetTargets(ctx context.Context) (*QuotaTargets, error) {
 	}
 
 	targets := &QuotaTargets{
-		Vehicles:      make([]TargetOption, 0),
-		VehicleGroups: make([]TargetOption, 0),
-		Routes:        make([]TargetOption, 0),
+		Vehicles: make([]TargetOption, 0),
 	}
 
 	if s.pool == nil {
@@ -632,40 +551,6 @@ func (s *Service) GetTargets(ctx context.Context) (*QuotaTargets, error) {
 			opt.Type = "vehicle"
 			if err := vRows.Scan(&opt.ID, &opt.Code, &opt.Name); err == nil {
 				targets.Vehicles = append(targets.Vehicles, opt)
-			}
-		}
-	}
-
-	// Vehicle Groups
-	gRows, err := s.pool.Query(ctx, `
-		SELECT id, code, name FROM station.vehicle_group
-		WHERE tenant_id = $1
-		ORDER BY name ASC
-	`, tenantID)
-	if err == nil {
-		defer gRows.Close()
-		for gRows.Next() {
-			var opt TargetOption
-			opt.Type = "vehicle_group"
-			if err := gRows.Scan(&opt.ID, &opt.Code, &opt.Name); err == nil {
-				targets.VehicleGroups = append(targets.VehicleGroups, opt)
-			}
-		}
-	}
-
-	// Routes
-	rRows, err := s.pool.Query(ctx, `
-		SELECT id, code, name FROM station.route
-		WHERE tenant_id = $1
-		ORDER BY name ASC
-	`, tenantID)
-	if err == nil {
-		defer rRows.Close()
-		for rRows.Next() {
-			var opt TargetOption
-			opt.Type = "route"
-			if err := rRows.Scan(&opt.ID, &opt.Code, &opt.Name); err == nil {
-				targets.Routes = append(targets.Routes, opt)
 			}
 		}
 	}

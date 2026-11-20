@@ -1,5 +1,6 @@
 'use client';
 
+import { DatePicker } from '@/components/date-picker';
 import * as React from 'react';
 import {
   Dialog,
@@ -319,13 +320,12 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
 
               <div>
                 <Label htmlFor="received_at">Thời gian nhập *</Label>
-                <Input
+                <DatePicker
                   id="received_at"
-                  type="datetime-local"
+                  withTime
                   className="mt-1.5"
                   value={receivedAt}
-                  onChange={(e) => setReceivedAt(e.target.value)}
-                  required
+                  onChange={setReceivedAt}
                 />
               </div>
 

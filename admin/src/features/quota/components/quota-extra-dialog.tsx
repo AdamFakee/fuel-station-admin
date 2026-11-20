@@ -1,5 +1,6 @@
 'use client';
 
+import { DatePicker } from '@/components/date-picker';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -151,11 +152,12 @@ export function QuotaExtraDialog({ open, onOpenChange }: QuotaExtraDialogProps) 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="valid_from">Bắt đầu từ</Label>
-                <Input
+                <DatePicker
                   id="valid_from"
-                  type="datetime-local"
+                  withTime
                   disabled={createMutation.isPending}
-                  {...register('valid_from')}
+                  value={watch('valid_from') ?? ''}
+                  onChange={(next) => setValue('valid_from', next, { shouldValidate: true })}
                 />
                 {errors.valid_from && (
                   <p className="text-xs text-destructive">{errors.valid_from.message}</p>
@@ -164,11 +166,12 @@ export function QuotaExtraDialog({ open, onOpenChange }: QuotaExtraDialogProps) 
 
               <div className="space-y-1.5">
                 <Label htmlFor="valid_to">Kết thúc lúc</Label>
-                <Input
+                <DatePicker
                   id="valid_to"
-                  type="datetime-local"
+                  withTime
                   disabled={createMutation.isPending}
-                  {...register('valid_to')}
+                  value={watch('valid_to') ?? ''}
+                  onChange={(next) => setValue('valid_to', next, { shouldValidate: true })}
                 />
                 {errors.valid_to && (
                   <p className="text-xs text-destructive">{errors.valid_to.message}</p>

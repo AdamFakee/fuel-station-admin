@@ -95,9 +95,7 @@ export interface VehicleConsumptionItem {
   vehicle_id: string;
   vehicle_code: string;
   vehicle_plate: string;
-  group_name: string | null;
   type_name: string | null;
-  route_name: string | null;
   session_count: number;
   total_dispensed_liters: number;
   quota_liters: number | null;

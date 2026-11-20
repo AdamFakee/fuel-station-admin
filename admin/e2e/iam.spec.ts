@@ -191,7 +191,6 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
     await page.goto('/users');
 
     await expect(page.getByText('Quản lý Tài khoản & Nhân sự')).toBeVisible();
-    await expect(page.getByText('3 tài khoản')).toBeVisible();
     await expect(page.getByRole('button', { name: /Thêm tài khoản/i })).toBeVisible();
 
     // Kiểm tra các cột bảng chuẩn admin-table-format
@@ -320,7 +319,6 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
     await page.goto('/roles');
 
     await expect(page.getByText('Vai trò & Ma trận Phân quyền')).toBeVisible();
-    await expect(page.getByText('3 vai trò')).toBeVisible();
     await expect(page.getByRole('button', { name: /Tạo vai trò mới/i })).toBeVisible();
 
     // Kiểm tra 3 vai trò hệ thống

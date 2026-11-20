@@ -45,13 +45,20 @@ type RecentSessionItem struct {
 
 // DashboardKpi contains key operational summary counters.
 type DashboardKpi struct {
-	TodayTotalLiters        float64 `json:"today_total_liters"`
-	TodayTotalSessions      int     `json:"today_total_sessions"`
-	TodayCompletedSessions  int     `json:"today_completed_sessions"`
-	TodayFailedSessions     int     `json:"today_failed_sessions"`
-	ActivePumps             int     `json:"active_pumps"`
-	OnlineStations          int     `json:"online_stations"`
-	LowStockTanks           int     `json:"low_stock_tanks"`
+	TodayTotalLiters       float64 `json:"today_total_liters"`
+	TodayTotalSessions     int     `json:"today_total_sessions"`
+	TodayCompletedSessions int     `json:"today_completed_sessions"`
+	TodayFailedSessions    int     `json:"today_failed_sessions"`
+	ActivePumps            int     `json:"active_pumps"`
+	OnlineStations         int     `json:"online_stations"`
+	LowStockTanks          int     `json:"low_stock_tanks"`
+}
+
+// DailyDispenseItem là lượng cấp phát của một ngày (giờ Việt Nam) trong chuỗi 7 ngày gần nhất.
+type DailyDispenseItem struct {
+	Date     string  `json:"date"` // yyyy-MM-dd
+	Liters   float64 `json:"liters"`
+	Sessions int     `json:"sessions"`
 }
 
 // DashboardResponse aggregates all dashboard widgets.
@@ -60,5 +67,6 @@ type DashboardResponse struct {
 	Tanks          []TankStockItem     `json:"tanks"`
 	Pumps          []PumpStatusItem    `json:"pumps"`
 	RecentSessions []RecentSessionItem `json:"recent_sessions"`
+	DailyDispense  []DailyDispenseItem `json:"daily_dispense"`
 	GeneratedAt    time.Time           `json:"generated_at"`
 }

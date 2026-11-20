@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import { DetailPageHeader } from '@/components/detail-page-header';
 import { ReceiptTable } from '@/features/inventory/components/receipt-table';
 
 export const metadata: Metadata = {
@@ -10,8 +9,6 @@ export const metadata: Metadata = {
 export default function StockReceiptsPage() {
   return (
     <div className="flex-1 flex flex-col p-6 space-y-6">
-      <DetailPageHeader title="Phiếu nhập bể" />
-
       <ReceiptTable />
     </div>
   );

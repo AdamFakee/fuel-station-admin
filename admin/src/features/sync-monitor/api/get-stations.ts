@@ -12,11 +12,12 @@ export async function getSyncStations(): Promise<SyncMonitorResponse> {
   return res.data;
 }
 
-export function useSyncStations(options?: { refetchInterval?: number | false }) {
+export function useSyncStations() {
   return useQuery({
     queryKey: syncMonitorKeys.stations(),
     queryFn: getSyncStations,
-    staleTime: 10 * 1000,
-    refetchInterval: options?.refetchInterval ?? 30 * 1000, // BRD: Không realtime, làm mới thủ công hoặc 30 giây
+    // Không tự làm mới (không realtime, dashboard nặng): dữ liệu tải lại khi mở trang.
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }

@@ -117,7 +117,6 @@ test.describe('Module M13 - Bảng điều khiển & Giám sát vận hành (Das
     await page.goto('/');
 
     // 1. Tiêu đề trang
-    await expect(page.getByRole('heading', { name: 'Bảng điều khiển & Giám sát vận hành' })).toBeVisible();
 
     // 2. KPI Cards
     await expect(page.getByText('Nhiên liệu cấp hôm nay')).toBeVisible();
@@ -132,28 +131,17 @@ test.describe('Module M13 - Bảng điều khiển & Giám sát vận hành (Das
     await expect(page.getByText('2 trạm Edge Online')).toBeVisible();
 
     await expect(page.getByText('Cảnh báo mức tồn bể')).toBeVisible();
-    await expect(page.getByText('1 bể')).toBeVisible();
+    await expect(page.getByText('1 Bể', { exact: true })).toBeVisible();
 
-    // 3. Tank Stock Cards
-    await expect(page.getByRole('heading', { name: /Mức tồn kho bể chứa nhiên liệu/i })).toBeVisible();
-    await expect(page.getByText('BE-01')).toBeVisible();
-    await expect(page.getByText('Bể Xăng RON 95-III')).toBeVisible();
-    await expect(page.getByText('74.0%')).toBeVisible();
-
-    await expect(page.getByText('BE-02')).toBeVisible();
+    // 3. Bể: liệt kê bể tồn thấp nhất, bể thấp nhất (BE-02) đứng đầu
+    await expect(page.getByRole('heading', { name: /Bể tồn thấp nhất/i })).toBeVisible();
+    await expect(page.getByText('1 bể cần chú ý')).toBeVisible();
     await expect(page.getByText('Bể Dầu DO 0.05S')).toBeVisible();
-    await expect(page.getByText('11.0%')).toBeVisible();
-    await expect(page.getByText('Tồn thấp')).toBeVisible();
+    await expect(page.getByText('11%', { exact: true })).toBeVisible();
 
-    // 4. Pump Status Cards
-    await expect(page.getByRole('heading', { name: /Trạng thái trụ bơm & Kết nối trạm Edge/i })).toBeVisible();
-    await expect(page.getByText('Trụ bơm 01').first()).toBeVisible();
-    await expect(page.getByText('(TRU-01)')).toBeVisible();
-    await expect(page.getByText('Online', { exact: true })).toBeVisible();
-
-    await expect(page.getByText('Trụ bơm 02').first()).toBeVisible();
-    await expect(page.getByText('(TRU-02)')).toBeVisible();
-    await expect(page.getByText('Offline', { exact: true })).toBeVisible();
+    // 4. Trụ: biểu đồ vòng trụ kết nối / mất kết nối và các trạm có trụ offline
+    await expect(page.getByRole('heading', { name: /^Trụ bơm$/ })).toBeVisible();
+    await expect(page.getByText('1/2 trụ offline')).toBeVisible();
 
     // 5. Recent Sessions Table
     await expect(page.getByRole('heading', { name: /Giao dịch cấp phát nhiên liệu gần nhất/i })).toBeVisible();
@@ -168,7 +156,7 @@ test.describe('Module M13 - Bảng điều khiển & Giám sát vận hành (Das
     await expect(page.getByText('120,00')).toBeVisible();
   });
 
-  test('2. Nút làm mới dữ liệu và công tắc tự làm mới hoạt động chuẩn xác', async ({ page }) => {
+  test('2. Dashboard không tự làm mới và không có nút làm mới thủ công', async ({ page }) => {
     await page.route('**/auth/me', async (route) => {
       await route.fulfill({
         status: 200,
@@ -183,9 +171,7 @@ test.describe('Module M13 - Bảng điều khiển & Giám sát vận hành (Das
       });
     });
 
-    let refreshCallCount = 0;
     await page.route('**/dashboard', async (route) => {
-      refreshCallCount++;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -195,19 +181,8 @@ test.describe('Module M13 - Bảng điều khiển & Giám sát vận hành (Das
 
     await page.goto('/');
 
-    const refreshBtn = page.getByRole('button', { name: /Làm mới/i });
-    await expect(refreshBtn).toBeVisible();
-    await refreshBtn.click();
-
-    expect(refreshCallCount).toBeGreaterThanOrEqual(1);
-
-    const autoRefreshSwitch = page.locator('#auto-refresh');
-    await expect(autoRefreshSwitch).toBeVisible();
-    await expect(autoRefreshSwitch).toBeChecked();
-
-    // Tắt tự làm mới
-    await autoRefreshSwitch.click();
-    await expect(autoRefreshSwitch).not.toBeChecked();
+    await expect(page.getByRole('button', { name: /Làm mới/i })).toHaveCount(0);
+    await expect(page.locator('#auto-refresh')).toHaveCount(0);
   });
 
   test('3. Kế toán (ACCOUNTANT) có quyền dashboard:view truy cập dashboard bình thường', async ({ page }) => {
@@ -235,7 +210,6 @@ test.describe('Module M13 - Bảng điều khiển & Giám sát vận hành (Das
 
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'Bảng điều khiển & Giám sát vận hành' })).toBeVisible();
     await expect(page.getByText('Nhiên liệu cấp hôm nay')).toBeVisible();
   });
 });

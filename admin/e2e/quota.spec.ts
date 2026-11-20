@@ -34,8 +34,6 @@ test.describe('Module M6 - Quota Management E2E Tests', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           vehicles: [{ id: 'v-1', code: 'XE-01', name: '51B-12345', type: 'vehicle' }],
-          vehicle_groups: [{ id: 'g-1', code: 'GRP-01', name: 'Đội xe miền Tây', type: 'vehicle_group' }],
-          routes: [{ id: 'r-1', code: 'RT-01', name: 'Tuyến SG-CT', type: 'route' }],
         }),
       });
     });
@@ -108,7 +106,6 @@ test.describe('Module M6 - Quota Management E2E Tests', () => {
 
     // Kiểm tra Header
     await expect(page.getByText('Quản lý Định mức Nhiên liệu')).toBeVisible();
-    await expect(page.getByText('Theo dõi Lít • Không xử lý tiền tệ')).toBeVisible();
 
     // Kiểm tra Tabs
     await expect(page.getByRole('tab', { name: /Quy tắc định mức/i })).toBeVisible();
@@ -134,7 +131,7 @@ test.describe('Module M6 - Quota Management E2E Tests', () => {
     await expect(page.getByText('Khai báo hạn mức nhiên liệu (Lít)')).toBeVisible();
 
     // Kiểm tra các trường
-    await expect(page.getByText('Loại đối tượng áp dụng')).toBeVisible();
+    await expect(page.getByText('Xe áp dụng', { exact: true })).toBeVisible();
     await expect(page.getByText('Chu kỳ cấp phát')).toBeVisible();
     await expect(page.getByLabel('Hạn mức tối đa (Lít)')).toBeVisible();
     await expect(page.getByLabel('Giãn cách tối thiểu giữa 2 lần bơm liên tiếp (Phút)')).toBeVisible();

@@ -114,3 +114,22 @@ Gợi ý chia đợt phát hành:
 - Cách gửi email (SMTP nào) cho quên mật khẩu và cảnh báo.
 - Ngưỡng "trạm offline" (đề xuất 5 phút) và nhịp heartbeat của Edge Agent.
 - Múi giờ hiển thị: lưu UTC, hiển thị theo `Asia/Ho_Chi_Minh`.
+
+## 7. Mô hình cửa hàng, xe, tài xế (chốt sau, thay thế các mô tả cũ ở trên)
+
+```text
+Cửa hàng ─┬─ Trụ ─┬─ Bộ số Montech (1, cổng COM riêng, serial được trùng)
+          │       └─ Máy chấm công Hikvision (1)
+          └─ Mini PC chạy Edge Agent (1 cho cả cửa hàng)
+
+Xe ─── nhiều-nhiều ─── Cửa hàng được phép đổ   (bảng vehicle_branch; không có dòng nào = không đổ được ở đâu)
+Tài xế: dữ liệu cấp công ty, lái được mọi xe (quyền theo cửa hàng suy ra từ XE)
+```
+
+- **Migration `000011_vehicle_store_scope`:** thêm `vehicle_branch`; bỏ `vehicle.branch_id`, `driver.branch_id`, `driver.position` (không còn nhân viên vận hành, bảo vệ);
+  `pump_sensor` thêm `branch_id` và `name`, cổng COM duy nhất trong một cửa hàng, serial không cần duy nhất; một lần bơm nhận diện theo (trụ, số thứ tự) thay vì (serial, số thứ tự).
+  Đổi danh sách cửa hàng của xe tự tăng `version` của xe và ghi nhật ký đồng bộ.
+- **Đồng bộ xuống trạm (phương án b):** API Edge đẩy MỌI xe của công ty kèm cờ `allowed_here`, để Edge Agent từ chối với lý do riêng (xe đổ nhầm cửa hàng) và ghi vết, thay vì coi là thẻ lạ.
+- **Migration `000012_simplify_vehicle`:** bỏ tuyến đường, đội nhóm phương tiện và dung tích bình chứa của xe; định mức chỉ còn áp theo xe (các quy tắc định mức theo nhóm hoặc tuyến bị xóa); số thẻ NFC bắt buộc khi tạo xe (kiểm tra ở API); báo cáo tiêu hao theo xe bỏ cột nhóm, tuyến.
+- **Giao diện:** form trụ gồm 3 phần (trụ và vòi, bộ số, máy chấm công), bỏ màn Thiết bị riêng (`/devices` chuyển về `/pumps`); form xe có ô chọn nhiều cửa hàng; màn tài xế bỏ vị trí và chi nhánh.
+- **Còn lại phía Edge Agent (repo `fuel-station`, chưa làm):** đọc cờ `allowed_here` và từ chối `NotAllowedHere`; nhận diện bộ số bằng (cổng COM, serial) thay vì chỉ serial; khóa lần bơm theo (trụ, số thứ tự).
