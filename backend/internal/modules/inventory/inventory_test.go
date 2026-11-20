@@ -523,7 +523,7 @@ func TestM12_StockReconciliation_Workflow(t *testing.T) {
 		t.Fatalf("SubmitMeasuredStock alert failed: %v", err)
 	}
 	if alertRec.Status != "alert" {
-		t.Errorf("expected status 'alert', got '%s'", alertRec.Status)
+		t.Errorf("expected status 'alert', got '%s' (varPct=%v, tolPct=%v, measL=%v, bookL=%v)", alertRec.Status, alertRec.VariancePct, alertRec.TolerancePct, alertRec.MeasuredLiters, alertRec.BookClosingLiters)
 	}
 
 	// 4. Separation of duties: creator (adminUserID) cannot confirm
