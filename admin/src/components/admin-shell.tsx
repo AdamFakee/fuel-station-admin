@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { usePathname } from 'next/navigation';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 
@@ -9,6 +10,17 @@ interface AdminShellProps {
 }
 
 export function AdminShell({ children }: AdminShellProps) {
+  const pathname = usePathname();
+  const isLoginPage = pathname === '/login' || pathname?.startsWith('/login/');
+
+  if (isLoginPage) {
+    return (
+      <main className="min-h-screen w-full flex flex-col bg-background">
+        {children}
+      </main>
+    );
+  }
+
   return (
     <SidebarProvider defaultOpen>
       <AppSidebar />

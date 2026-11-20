@@ -19,9 +19,12 @@ export interface DetailPageHeaderProps {
   title: React.ReactNode;
   titlePrefix?: string;
   subtitle?: React.ReactNode;
+  description?: React.ReactNode;
   badges?: React.ReactNode;
+  badge?: React.ReactNode;
   back?: { to: string; label?: string };
   headerActions?: React.ReactNode;
+  children?: React.ReactNode;
   mode?: DetailPageHeaderMode;
   onModeChange?: (mode: DetailPageHeaderMode) => void;
   tabs?: DetailPageHeaderTabDef[];
@@ -34,9 +37,12 @@ export function DetailPageHeader({
   title,
   titlePrefix,
   subtitle,
+  description,
   badges,
+  badge,
   back,
   headerActions,
+  children,
   mode,
   onModeChange,
   tabs,
@@ -44,6 +50,9 @@ export function DetailPageHeader({
   onTabChange,
   className,
 }: DetailPageHeaderProps) {
+  const displaySubtitle = subtitle || description;
+  const displayBadges = badges || badge;
+  const displayActions = headerActions || children;
   return (
     <div className={cn('border-b bg-background shrink-0', className)}>
       <div className="flex flex-col gap-3 px-6 py-4">
@@ -73,10 +82,10 @@ export function DetailPageHeader({
                 <h1 className="text-xl font-bold tracking-tight text-foreground truncate">
                   {title}
                 </h1>
-                {badges && <div className="flex items-center gap-1.5">{badges}</div>}
+                {displayBadges && <div className="flex items-center gap-1.5">{displayBadges}</div>}
               </div>
-              {subtitle && (
-                <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>
+              {displaySubtitle && (
+                <div className="text-xs text-muted-foreground mt-0.5">{displaySubtitle}</div>
               )}
             </div>
           </div>
@@ -91,7 +100,7 @@ export function DetailPageHeader({
                 {mode === 'read' ? 'Chỉnh sửa' : 'Xem chi tiết'}
               </Button>
             )}
-            {headerActions}
+            {displayActions}
           </div>
         </div>
 

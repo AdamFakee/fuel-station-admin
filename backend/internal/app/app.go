@@ -9,23 +9,34 @@ import (
 	"time"
 
 	"fuel-station-backend/internal/config"
+	"fuel-station-backend/internal/modules/auth"
+	"fuel-station-backend/internal/modules/iam"
 	"fuel-station-backend/internal/platform/postgres"
 	"fuel-station-backend/internal/shared/httpx"
 	"fuel-station-backend/internal/shared/middleware"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Run executes the composition root, wiring dependencies and starting HTTP server with graceful shutdown.
 func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	// Execute embedded migrations cleanly via platform migrator
 	if err := postgres.RunMigrations(cfg.DB.URL, log); err != nil {
-		log.WarnContext(ctx, "database migration warning (proceeding in dev mode)", "err", err)
+		if cfg.Env != "local" {
+			return fmt.Errorf("database migration failed in environment '%s': %w", cfg.Env, err)
+		}
+		log.WarnContext(ctx, "database migration warning (proceeding in local dev mode)", "err", err)
 	}
 
-	pool, err := postgres.New(ctx, cfg.DB.URL, cfg.DB.MaxConns)
+	var pool *pgxpool.Pool
+	var err error
+	pool, err = postgres.New(ctx, cfg.DB.URL, cfg.DB.MaxConns)
 	if err != nil {
-		log.WarnContext(ctx, "could not connect to postgres, running in fallback mode for dev", "err", err)
+		if cfg.Env != "local" {
+			return fmt.Errorf("failed to connect to postgres pool in environment '%s': %w", cfg.Env, err)
+		}
+		log.WarnContext(ctx, "could not connect to postgres, running in fallback mode for local dev", "err", err)
 	} else {
 		defer pool.Close()
 		log.InfoContext(ctx, "connected to postgres database pool successfully")
@@ -33,7 +44,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 
 	// Router setup
 	r := chi.NewRouter()
-	r.Use(middleware.CORS)
+	r.Use(middleware.CORS(cfg.CORS.AllowedOrigins))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recover(log))
 	r.Use(middleware.Logger(log))
@@ -55,6 +66,16 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		_, _ = w.Write([]byte("READY"))
 	})
 
+	sessionValidator := middleware.NewPostgresSessionValidator(pool)
+	authMiddleware := middleware.RequireAuth(sessionValidator, log)
+
+	authRepo := auth.NewRepository(pool)
+	authService := auth.NewService(authRepo, pool, log)
+	authHandler := auth.NewHandler(authService, log)
+
+	iamService := iam.NewService(pool)
+	iamHandler := iam.NewHandler(iamService, log)
+
 	// V1 Protected & Business API Router Mount
 	r.Route("/v1", func(r chi.Router) {
 		// Ping / Status verification endpoint
@@ -66,11 +87,10 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 			})
 		})
 
-		// Sẵn sàng gắn các module nghiệp vụ mới theo chuẩn Modular Monolith:
-		// e.g.:
-		// pumpHandler.RegisterRoutes(r)
-		// tankHandler.RegisterRoutes(r)
-		// transactionHandler.RegisterRoutes(r)
+		r.Route("/auth", func(authRouter chi.Router) {
+			authHandler.RegisterRoutes(authRouter, authMiddleware)
+		})
+		iamHandler.RegisterRoutes(r, authMiddleware)
 	})
 
 	srv := &http.Server{

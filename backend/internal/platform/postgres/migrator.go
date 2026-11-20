@@ -25,26 +25,15 @@ func RunMigrations(databaseURL string, log *slog.Logger) error {
 	}
 	defer m.Close()
 
-	// Check if the migration state is dirty from a previous interrupted run
+	// Check if the migration state is dirty. Dirty states MUST be resolved manually
+	// by an engineer/DBA rather than automatically forcing clean, which can silently corrupt schemas.
 	version, dirty, vErr := m.Version()
 	if vErr == nil && dirty {
-		log.Warn("database migration state is dirty, forcing clean version before upgrade", "version", version)
-		if forceErr := m.Force(int(version)); forceErr != nil {
-			log.Error("failed to force migration version", "err", forceErr)
-		}
+		return fmt.Errorf("database migration state is dirty at version %d: manual intervention required", version)
 	}
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		// If dirty occurred during upgrade, attempt recovery once
-		if v, d, errV := m.Version(); errV == nil && d {
-			log.Warn("retrying migration after forcing version", "version", v)
-			_ = m.Force(int(v))
-			if retryErr := m.Up(); retryErr != nil && !errors.Is(retryErr, migrate.ErrNoChange) {
-				return fmt.Errorf("apply migrations after dirty recovery: %w", retryErr)
-			}
-		} else {
-			return fmt.Errorf("apply migrations: %w", err)
-		}
+		return fmt.Errorf("apply migrations: %w", err)
 	}
 
 	version, dirty, _ = m.Version()

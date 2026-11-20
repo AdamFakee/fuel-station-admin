@@ -1,18 +1,43 @@
-import { Ban } from "lucide-react";
+import * as React from 'react';
+import { Ban } from 'lucide-react';
 
-interface EmptyStateProps {
+export interface EmptyProps {
+  title?: string;
+  description?: string;
   message?: string;
+  action?: React.ReactNode;
+  icon?: React.ReactNode;
 }
 
-const EmptyState = ({ message = "Không có dữ liệu" }: EmptyStateProps) => {
+export function Empty({
+  title,
+  description,
+  message,
+  action,
+  icon,
+}: EmptyProps) {
+  const displayTitle = title || message || 'Không có dữ liệu';
+
   return (
-    <div className="flex flex-col items-center justify-center p-6">
-      <div className="flex flex-col items-center text-center gap-4">
-        <Ban className="w-12 h-12 text-gray-400" />
-        <p className="text-gray-500">{message}</p>
+    <div className="flex flex-col items-center justify-center p-8 text-center">
+      <div className="flex flex-col items-center gap-3 max-w-sm">
+        {icon ? (
+          icon
+        ) : (
+          <div className="p-3 rounded-full bg-muted/60 text-muted-foreground">
+            <Ban className="w-8 h-8" />
+          </div>
+        )}
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-foreground">{displayTitle}</h3>
+          {description && (
+            <p className="text-xs text-muted-foreground">{description}</p>
+          )}
+        </div>
+        {action && <div className="mt-2">{action}</div>}
       </div>
     </div>
   );
-};
+}
 
-export default EmptyState;
+export default Empty;

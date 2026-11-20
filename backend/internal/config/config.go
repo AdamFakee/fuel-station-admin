@@ -20,6 +20,12 @@ type Config struct {
 		URL      string `env:"DATABASE_URL" envDefault:"postgres://postgres:postgres@localhost:5432/fuel_station_db?sslmode=disable"`
 		MaxConns int32  `env:"DB_MAX_CONNS" envDefault:"20"`
 	}
+	CORS struct {
+		AllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000"`
+	}
+	Storage struct {
+		Dir string `env:"STORAGE_DIR" envDefault:"./data/uploads"`
+	}
 }
 
 // Load parses environment variables into Config and validates required fields.
@@ -31,3 +37,4 @@ func Load() (Config, error) {
 
 	return cfg, nil
 }
+
