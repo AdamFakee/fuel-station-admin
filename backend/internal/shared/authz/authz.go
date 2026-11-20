@@ -84,6 +84,23 @@ func FromContext(ctx context.Context) (Principal, bool) {
 	return p, ok
 }
 
+// GetPrincipal returns the Principal from context or an error.
+func GetPrincipal(ctx context.Context) (Principal, error) {
+	p, ok := FromContext(ctx)
+	if !ok {
+		return Principal{}, apperr.ErrUnauthorized
+	}
+	return p, nil
+}
+
+// GetTenantID returns tenant ID from context.
+func GetTenantID(ctx context.Context) (string, error) {
+	if p, ok := FromContext(ctx); ok && p.TenantID != "" {
+		return p.TenantID, nil
+	}
+	return "", apperr.ErrUnauthorized
+}
+
 // RequirePermission enforces that the authenticated Principal has the required permission.
 func RequirePermission(perm Permission, log *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
