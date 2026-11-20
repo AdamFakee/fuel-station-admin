@@ -1,0 +1,308 @@
+'use client';
+
+import * as React from 'react';
+import { DetailPageHeader } from '@/components/detail-page-header';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import Paginator from '@/components/paginator';
+import {
+  MagnifyingGlassIcon,
+  CheckCircleIcon,
+  ShieldExclamationIcon,
+} from '@heroicons/react/24/outline';
+import { formatNumberVN } from '@/lib/format';
+import { useBranches } from '@/features/iam/api/get-branches';
+import { useSessions } from '@/features/dispense/api/get-sessions';
+import { useAccessEvents } from '@/features/dispense/api/get-access-events';
+import { useDispenseSummary } from '@/features/dispense/api/get-dispense-summary';
+import { SessionTable } from '@/features/dispense/components/session-table';
+import { SessionDetailDialog } from '@/features/dispense/components/session-detail-dialog';
+import { AccessEventTable } from '@/features/dispense/components/access-event-table';
+
+export default function DispenseSessionsPage() {
+  const { data: rawBranches = [] } = useBranches();
+  const branches: any[] = Array.isArray(rawBranches) ? rawBranches : ((rawBranches as any)?.items || (rawBranches as any)?.data || []);
+
+  // Tab state
+  const [activeTab, setActiveTab] = React.useState('sessions');
+
+  // Filter states
+  const [branchId, setBranchId] = React.useState<string>('all');
+  const [status, setStatus] = React.useState<string>('all');
+  const [search, setSearch] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  const [sessionPage, setSessionPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(15);
+
+  // Access Events filter states
+  const [decision, setDecision] = React.useState<string>('reject'); // Default show rejects
+  const [method, setMethod] = React.useState<string>('all');
+  const [accessPage, setAccessPage] = React.useState(1);
+
+  // Detail dialog
+  const [selectedSessionId, setSelectedSessionId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setSessionPage(1);
+      setAccessPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Queries
+  const {
+    data: sessionsData,
+    isLoading: isSessionsLoading,
+  } = useSessions({
+    page: sessionPage,
+    page_size: pageSize,
+    branch_id: branchId !== 'all' ? branchId : undefined,
+    status: status !== 'all' ? status : undefined,
+    q: debouncedSearch || undefined,
+  });
+
+  const {
+    data: accessEventsData,
+    isLoading: isAccessLoading,
+  } = useAccessEvents({
+    page: accessPage,
+    page_size: pageSize,
+    branch_id: branchId !== 'all' ? branchId : undefined,
+    decision: decision !== 'all' ? decision : undefined,
+    method: method !== 'all' ? method : undefined,
+    q: debouncedSearch || undefined,
+  });
+
+  const { data: summary } = useDispenseSummary(
+    branchId !== 'all' ? branchId : undefined
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
+        {/* Detail Page Header */}
+        <DetailPageHeader
+          title="Nhật ký Phiên bơm & Cấp phát Nhiên liệu" />
+
+        {/* Overview KPI Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <Card className="shadow-xs bg-card">
+            <CardContent className="p-4">
+              <span className="text-xs font-medium text-muted-foreground uppercase">Tổng phiên</span>
+              <div className="text-2xl font-bold text-foreground tabular-nums mt-1">
+                {summary ? formatNumberVN(summary.total_sessions) : '—'}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-xs bg-card border-emerald-500/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-emerald-600 uppercase">Hoàn thành</span>
+                <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="text-2xl font-bold text-emerald-600 tabular-nums mt-1">
+                {summary ? formatNumberVN(summary.completed_sessions) : '—'}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-xs bg-card">
+            <CardContent className="p-4">
+              <span className="text-xs font-medium text-muted-foreground uppercase">Đã hủy / Lỗi</span>
+              <div className="text-2xl font-bold text-muted-foreground tabular-nums mt-1">
+                {summary ? formatNumberVN(summary.cancelled_sessions + summary.failed_sessions) : '—'}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-xs bg-primary/5 border-primary/20">
+            <CardContent className="p-4">
+              <span className="text-xs font-medium text-primary uppercase">Tổng thể tích cấp</span>
+              <div className="text-2xl font-bold text-primary tabular-nums mt-1 truncate">
+                {summary ? `${formatNumberVN(summary.total_dispensed_liters, 2)} L` : '—'}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-xs bg-card border-rose-500/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-rose-600 uppercase">Bị từ chối</span>
+                <ShieldExclamationIcon className="h-4 w-4 text-rose-600" />
+              </div>
+              <div className="text-2xl font-bold text-rose-600 tabular-nums mt-1">
+                {summary ? formatNumberVN(summary.rejected_auth_count) : '—'}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Tabs Container */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <TabsList className="grid w-full sm:w-auto grid-cols-2">
+              <TabsTrigger value="sessions" className="text-xs sm:text-sm">
+                Danh sách Phiên đổ ({sessionsData?.total ?? 0})
+              </TabsTrigger>
+              <TabsTrigger value="access" className="text-xs sm:text-sm">
+                Lượt bị từ chối & Xác thực ({accessEventsData?.total ?? 0})
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Filter controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 sm:w-64">
+                <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={
+                    activeTab === 'sessions'
+                      ? 'Tìm biển số, tài xế, mã...'
+                      : 'Tìm mã thẻ, người quẹt...'
+                  }
+                  className="pl-8 h-9 text-xs"
+                />
+              </div>
+
+              <Select
+                value={branchId}
+                onValueChange={(val) => {
+                  setBranchId(val);
+                  setSessionPage(1);
+                  setAccessPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[160px] h-9 text-xs">
+                  <SelectValue placeholder="Chi nhánh" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả chi nhánh</SelectItem>
+                  {branches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {activeTab === 'sessions' ? (
+                <Select
+                  value={status}
+                  onValueChange={(val) => {
+                    setStatus(val);
+                    setSessionPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[140px] h-9 text-xs">
+                    <SelectValue placeholder="Trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                    <SelectItem value="completed">Hoàn thành</SelectItem>
+                    <SelectItem value="cancelled">Đã hủy</SelectItem>
+                    <SelectItem value="failed">Lỗi bơm</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <>
+                  <Select
+                    value={decision}
+                    onValueChange={(val) => {
+                      setDecision(val);
+                      setAccessPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[130px] h-9 text-xs">
+                      <SelectValue placeholder="Kết quả" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả kết quả</SelectItem>
+                      <SelectItem value="reject">Bị từ chối</SelectItem>
+                      <SelectItem value="accept">Hợp lệ</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={method}
+                    onValueChange={(val) => {
+                      setMethod(val);
+                      setAccessPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[120px] h-9 text-xs">
+                      <SelectValue placeholder="Phương thức" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      <SelectItem value="card">Thẻ NFC</SelectItem>
+                      <SelectItem value="face">Khuôn mặt</SelectItem>
+                      <SelectItem value="fingerprint">Vân tay</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Tab 1: Sessions */}
+          <TabsContent value="sessions" className="flex min-h-0 flex-1 flex-col gap-4 data-[state=inactive]:hidden">
+            <SessionTable
+              sessions={sessionsData?.items || []}
+              isLoading={isSessionsLoading}
+              onViewDetail={(s) => setSelectedSessionId(s.id)}
+            />
+
+            {sessionsData && (
+          <Paginator
+            currentPage={sessionPage}
+            pageSize={pageSize}
+            totalItems={sessionsData.total}
+            onPageChange={(p, size) => {
+              setSessionPage(p);
+              setPageSize(size);
+            }}
+          />
+        )}
+          </TabsContent>
+
+          {/* Tab 2: Access Events */}
+          <TabsContent value="access" className="flex min-h-0 flex-1 flex-col gap-4 data-[state=inactive]:hidden">
+            <AccessEventTable
+              events={accessEventsData?.items || []}
+              isLoading={isAccessLoading}
+            />
+
+            {accessEventsData && (
+          <Paginator
+            currentPage={accessPage}
+            pageSize={pageSize}
+            totalItems={accessEventsData.total}
+            onPageChange={(p, size) => {
+              setAccessPage(p);
+              setPageSize(size);
+            }}
+          />
+        )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Session Detail Dialog */}
+        <SessionDetailDialog
+          open={Boolean(selectedSessionId)}
+          onOpenChange={(open) => !open && setSelectedSessionId(null)}
+          sessionId={selectedSessionId}
+        />
+      </div>
+  );
+}
