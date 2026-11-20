@@ -30,7 +30,6 @@ import {
   BuildingOffice2Icon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
-  CpuChipIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
@@ -75,16 +74,10 @@ export function AppSidebar() {
           permission: 'asset.tank:view',
         },
         {
-          title: 'Trụ bơm & Vòi',
+          title: 'Trụ bơm & Thiết bị',
           href: '/pumps',
           icon: AdjustmentsHorizontalIcon,
           permission: 'asset.pump:view',
-        },
-        {
-          title: 'Thiết bị & Máy chấm công',
-          href: '/devices',
-          icon: CpuChipIcon,
-          permission: 'asset.device:view',
         },
         {
           title: 'Phiên đổ & Cấp phát',

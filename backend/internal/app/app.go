@@ -11,12 +11,14 @@ import (
 	"fuel-station-backend/internal/config"
 	"fuel-station-backend/internal/modules/assets"
 	"fuel-station-backend/internal/modules/auth"
+	"fuel-station-backend/internal/modules/dashboard"
 	"fuel-station-backend/internal/modules/dispense"
 	"fuel-station-backend/internal/modules/edge"
 	"fuel-station-backend/internal/modules/iam"
 	"fuel-station-backend/internal/modules/inventory"
 	"fuel-station-backend/internal/modules/master"
 	"fuel-station-backend/internal/modules/quota"
+	"fuel-station-backend/internal/modules/reports"
 	"fuel-station-backend/internal/modules/syncmonitor"
 	"fuel-station-backend/internal/platform/postgres"
 	"fuel-station-backend/internal/shared/httpx"
@@ -112,6 +114,13 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	inventoryService := inventory.NewService(pool)
 	inventoryHandler := inventory.NewHandler(inventoryService, log)
 
+	dashboardRepo := dashboard.NewRepository(pool)
+	dashboardService := dashboard.NewService(dashboardRepo, log)
+	dashboardHandler := dashboard.NewHandler(dashboardService, log)
+
+	reportsService := reports.NewService(pool)
+	reportsHandler := reports.NewHandler(reportsService, log)
+
 	// Edge Agent Dedicated API Mount (/edge/v1)
 	r.Route("/edge/v1", func(er chi.Router) {
 		edgeHandler.RegisterRoutes(er, edge.RequireEdgeApiKey(edgeRepo, log))
@@ -138,6 +147,8 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		syncMonitorHandler.RegisterRoutes(r, authMiddleware)
 		dispenseHandler.RegisterRoutes(r, authMiddleware)
 		inventoryHandler.RegisterRoutes(r, authMiddleware)
+		dashboardHandler.RegisterRoutes(r, authMiddleware)
+		reportsHandler.RegisterRoutes(r, authMiddleware)
 	})
 
 	srv := &http.Server{

@@ -1,11 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { AdminShell } from '@/components/admin-shell';
 import { DetailPageHeader } from '@/components/detail-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -14,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import Paginator from '@/components/paginator';
-import { PlusIcon, MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useUsers } from '@/features/iam/api/get-users';
 import { useRoles } from '@/features/iam/api/get-roles';
 import { useMe } from '@/features/auth/api/get-me';
@@ -33,7 +31,7 @@ export default function UsersPage() {
   const [roleId, setRoleId] = React.useState<string>('all');
   const [status, setStatus] = React.useState<string>('all');
   const [page, setPage] = React.useState(1);
-  const pageSize = 15;
+  const [pageSize, setPageSize] = React.useState(15);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -43,7 +41,7 @@ export default function UsersPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const { data, isLoading, refetch, isFetching } = useUsers({
+  const { data, isLoading } = useUsers({
     page,
     page_size: pageSize,
     q: debouncedSearch || undefined,
@@ -71,28 +69,13 @@ export default function UsersPage() {
   };
 
   return (
-    <AdminShell>
-      <div className="flex-1 space-y-6 p-6">
+    <>
+      <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
         {/* Header */}
         <DetailPageHeader
           title="Quản lý Tài khoản & Nhân sự"
-          description="Quản lý danh sách tài khoản quản trị, kỹ thuật và vận hành trạm xăng nội bộ"
-          badge={
-            <Badge variant="outline" className="text-primary border-primary/30 tabular-nums">
-              {data?.total ?? 0} tài khoản
-            </Badge>
-          }
         >
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              title="Làm mới"
-            >
-              <ArrowPathIcon className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-            </Button>
             <Button size="sm" onClick={handleOpenCreate}>
               <PlusIcon className="mr-1.5 h-4 w-4" />
               Thêm tài khoản
@@ -162,15 +145,16 @@ export default function UsersPage() {
         />
 
         {/* Pagination */}
-        {data && data.total_pages > 1 && (
-          <div className="flex justify-end pt-2">
-            <Paginator
-              currentPage={page}
-              totalPages={data.total_pages}
-              showPreviousNext={true}
-              onPageChange={setPage}
-            />
-          </div>
+        {data && (
+          <Paginator
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={data.total}
+            onPageChange={(p, size) => {
+              setPage(p);
+              setPageSize(size);
+            }}
+          />
         )}
 
         {/* Create / Edit Dialog */}
@@ -187,6 +171,6 @@ export default function UsersPage() {
           user={resettingUser}
         />
       </div>
-    </AdminShell>
+    </>
   );
 }
