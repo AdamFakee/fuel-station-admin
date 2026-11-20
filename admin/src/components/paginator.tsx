@@ -22,11 +22,12 @@ import { Input } from './ui/input';
 
 type PaginatorProps = {
   currentPage: number;
-  totalPages: number;
+  totalPages?: number;
+  totalItems?: number;
   count?: number;
   pageSize?: number;
   onPageChange: (pageNumber: number, pSize?: number) => void;
-  showPreviousNext: boolean;
+  showPreviousNext?: boolean;
   className?: string;
   hideStats?: boolean;
   hideGotoPage?: boolean;
@@ -42,15 +43,18 @@ const arrSelect = [
 export default function Paginator({
   currentPage,
   totalPages,
+  totalItems,
   count = 0,
-  pageSize = 0,
+  pageSize = 10,
   onPageChange,
-  showPreviousNext,
+  showPreviousNext = true,
   className,
   hideStats = false,
   hideGotoPage = false,
   isRelative = false,
 }: PaginatorProps) {
+  const actualCount = totalItems !== undefined ? totalItems : count;
+  const actualTotalPages = totalPages !== undefined ? totalPages : Math.max(1, Math.ceil(actualCount / (pageSize || 10)));
   const [pageSizeInternal, setPageSizeInternal] = useState(pageSize.toString());
   const [pageIndex, setPageIndex] = useState<string>();
 
@@ -80,7 +84,7 @@ export default function Paginator({
           {!hideStats && (
             <p className="text-[#020617] text-sm font-medium px-4">
               {(currentPage - 1) * pageSize + 1}-{currentPage * pageSize} trên
-              tổng {count} dữ liệu
+              tổng {actualCount} dữ liệu
             </p>
           )}
           <Select
@@ -103,7 +107,7 @@ export default function Paginator({
           </Select>
         </div>
         <div className="flex items-center">
-          {showPreviousNext && totalPages ? (
+          {showPreviousNext && actualTotalPages ? (
             <PaginationItem>
               <PaginationPrevious
                 onClick={() =>
@@ -116,14 +120,14 @@ export default function Paginator({
           ) : null}
           {generatePaginationLinks(
             currentPage,
-            totalPages,
+            actualTotalPages,
             onPageChangeFromLink
           )}
-          {showPreviousNext && totalPages ? (
+          {showPreviousNext && actualTotalPages ? (
             <PaginationItem>
               <PaginationNext
                 onClick={() =>
-                  currentPage > totalPages - 1
+                  currentPage > actualTotalPages - 1
                     ? undefined
                     : onPageChange(currentPage + 1, Number(pageSizeInternal))
                 }

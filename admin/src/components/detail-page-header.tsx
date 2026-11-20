@@ -24,6 +24,8 @@ export interface DetailPageHeaderProps {
   badge?: React.ReactNode;
   back?: { to: string; label?: string };
   headerActions?: React.ReactNode;
+  actions?: React.ReactNode;
+  breadcrumbs?: any;
   children?: React.ReactNode;
   mode?: DetailPageHeaderMode;
   onModeChange?: (mode: DetailPageHeaderMode) => void;
@@ -42,6 +44,8 @@ export function DetailPageHeader({
   badge,
   back,
   headerActions,
+  actions,
+  breadcrumbs,
   children,
   mode,
   onModeChange,
@@ -52,7 +56,7 @@ export function DetailPageHeader({
 }: DetailPageHeaderProps) {
   const displaySubtitle = subtitle || description;
   const displayBadges = badges || badge;
-  const displayActions = headerActions || children;
+  const displayActions = headerActions || actions || children;
   return (
     <div className={cn('border-b bg-background shrink-0', className)}>
       <div className="flex flex-col gap-3 px-6 py-4">
