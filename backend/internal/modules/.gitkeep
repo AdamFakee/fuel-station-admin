@@ -1,0 +1,7 @@
+# Directory for Modular Monolith domain modules (e.g. pumps, tanks, shifts, meters)
+# Each module follows:
+# modules/<module_name>/
+#   ├── handler.go      (HTTP routing, decode request, encode response via httpx)
+#   ├── service.go      (Business logic, validation, transaction boundary)
+#   ├── repository.go   (Interface & SQL execution via pgxpool)
+#   └── model.go        (Domain structs & DTOs)

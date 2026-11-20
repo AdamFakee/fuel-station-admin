@@ -1,0 +1,6 @@
+# Directory for Feature-Sliced modules (e.g. pumps, tanks, shifts, transactions)
+# Each feature follows:
+# features/<feature-name>/
+#   ├── api/          (1 file = 1 endpoint: schema, queryKey, fetcher, hook)
+#   ├── components/   (tables, dialogs, drawers, cards)
+#   └── types/        (types, enums)

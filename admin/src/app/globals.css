@@ -1,0 +1,455 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind CSS v4
+ * Dark mode kích hoạt khi phần tử <html> có class="dark".
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* =========================================================
+   1. TAILWIND THEME
+   Khai báo token để dùng bằng utility class.
+   Ví dụ: bg-primary, text-success, border-input.
+   ========================================================= */
+
+@theme inline {
+  /* -------------------------
+     Font
+     Khai báo này không tự tải font Inter.
+     ------------------------- */
+
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* -------------------------
+     Brand: xanh xám
+     Dùng bg-brand-50 ... bg-brand-950.
+     Đây là màu cố định, không tự đổi theo theme.
+     ------------------------- */
+
+  --color-brand-50: #f2f7f9;
+  --color-brand-100: #e3edf2;
+  --color-brand-200: #c6dae4;
+  --color-brand-300: #9ec0d1;
+  --color-brand-400: #73a0b7;
+  --color-brand-500: #52849d;
+  --color-brand-600: #3f6b80;
+  --color-brand-700: #35596b;
+  --color-brand-800: #2f4b59;
+  --color-brand-900: #2a404c;
+  --color-brand-950: #182932;
+
+  /* -------------------------
+     Background và nội dung
+     ------------------------- */
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* -------------------------
+     Primary: hành động chính
+     ------------------------- */
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+
+  --color-primary-subtle: var(--primary-subtle);
+  --color-primary-subtle-foreground: var(--primary-subtle-foreground);
+  --color-primary-border: var(--primary-border);
+
+  /* -------------------------
+     Secondary: hành động phụ
+     ------------------------- */
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
+
+  /* -------------------------
+     Muted: vùng và nội dung phụ
+     ------------------------- */
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  /* -------------------------
+     Accent: hover, chọn, nhấn nhẹ
+     ------------------------- */
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* -------------------------
+     Viền, input và focus
+     ------------------------- */
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-placeholder: var(--placeholder);
+
+  --color-ring: var(--ring);
+
+  /* -------------------------
+     Link
+     ------------------------- */
+
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+
+  /* -------------------------
+     Disabled
+     ------------------------- */
+
+  --color-disabled: var(--disabled);
+  --color-disabled-foreground: var(--disabled-foreground);
+
+  /* -------------------------
+     Success: thành công
+     ------------------------- */
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-success-subtle: var(--success-subtle);
+  --color-success-subtle-foreground: var(--success-subtle-foreground);
+  --color-success-border: var(--success-border);
+
+  /* -------------------------
+     Warning: cảnh báo
+     ------------------------- */
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-subtle-foreground: var(--warning-subtle-foreground);
+  --color-warning-border: var(--warning-border);
+
+  /* -------------------------
+     Info: thông tin
+     ------------------------- */
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  --color-info-subtle: var(--info-subtle);
+  --color-info-subtle-foreground: var(--info-subtle-foreground);
+  --color-info-border: var(--info-border);
+
+  /* -------------------------
+     Destructive: lỗi, từ chối, xóa
+     Tên này tương thích quy ước shadcn/ui.
+     ------------------------- */
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-hover: var(--destructive-hover);
+
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-subtle-foreground:
+    var(--destructive-subtle-foreground);
+  --color-destructive-border: var(--destructive-border);
+
+  /* -------------------------
+     Sidebar
+     ------------------------- */
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* -------------------------
+     Overlay
+     ------------------------- */
+
+  --color-overlay: var(--overlay);
+
+  /* -------------------------
+     Border radius
+     ------------------------- */
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* =========================================================
+   2. LIGHT MODE
+   ========================================================= */
+
+:root {
+  color-scheme: light;
+
+  --radius: 0.625rem;
+
+  /* Nền ứng dụng: xám rất nhạt */
+  --background: #f6f8f9;
+  --foreground: #0f172a;
+
+  /* Card, bảng, form */
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+
+  /* Dropdown, popover */
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  /* Nút chính */
+  --primary: #3f6b80;
+  --primary-foreground: #ffffff;
+  --primary-hover: #35596b;
+  --primary-active: #2f4b59;
+
+  /* Vùng nhấn nhẹ theo brand */
+  --primary-subtle: #f2f7f9;
+  --primary-subtle-foreground: #35596b;
+  --primary-border: #c6dae4;
+
+  /* Nút phụ */
+  --secondary: #f1f5f9;
+  --secondary-foreground: #334155;
+  --secondary-hover: #e2e8f0;
+
+  /* Header bảng, vùng phụ, mô tả */
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+
+  /* Hover nhẹ */
+  --accent: #e3edf2;
+  --accent-foreground: #2f4b59;
+
+  /* Viền layout nhẹ; viền input đậm hơn */
+  --border: #e2e8f0;
+  --border-strong: #94a3b8;
+
+  --input: #94a3b8;
+  --input-background: #ffffff;
+  --placeholder: #64748b;
+
+  /* Focus */
+  --ring: #3f6b80;
+
+  /* Link */
+  --link: #35596b;
+  --link-hover: #2f4b59;
+
+  /* Disabled */
+  --disabled: #e2e8f0;
+  --disabled-foreground: #64748b;
+
+  /* Thành công */
+  --success: #15803d;
+  --success-foreground: #ffffff;
+
+  --success-subtle: #f0fdf4;
+  --success-subtle-foreground: #166534;
+  --success-border: #bbf7d0;
+
+  /* Cảnh báo */
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+
+  --warning-subtle: #fffbeb;
+  --warning-subtle-foreground: #92400e;
+  --warning-border: #fde68a;
+
+  /* Thông tin */
+  --info: #1d4ed8;
+  --info-foreground: #ffffff;
+
+  --info-subtle: #eff6ff;
+  --info-subtle-foreground: #1e40af;
+  --info-border: #bfdbfe;
+
+  /* Lỗi / nguy hiểm */
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --destructive-hover: #991b1b;
+
+  --destructive-subtle: #fef2f2;
+  --destructive-subtle-foreground: #991b1b;
+  --destructive-border: #fecaca;
+
+  /* Sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #334155;
+
+  --sidebar-primary: #3f6b80;
+  --sidebar-primary-foreground: #ffffff;
+
+  --sidebar-accent: #e3edf2;
+  --sidebar-accent-foreground: #35596b;
+
+  --sidebar-muted-foreground: #64748b;
+
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #3f6b80;
+
+  /* Lớp phủ modal */
+  --overlay: #0f172a;
+
+  /* Vùng chọn văn bản */
+  --selection: #c6dae4;
+  --selection-foreground: #182932;
+}
+
+/* =========================================================
+   3. DARK MODE
+   ========================================================= */
+
+.dark {
+  color-scheme: dark;
+
+  /* Nền ứng dụng */
+  --background: #0b1220;
+  --foreground: #f1f5f9;
+
+  /* Card, bảng, form */
+  --card: #111c2e;
+  --card-foreground: #f1f5f9;
+
+  /* Dropdown, popover */
+  --popover: #162338;
+  --popover-foreground: #f1f5f9;
+
+  /* Nút chính: nền sáng hơn, chữ tối */
+  --primary: #9ec0d1;
+  --primary-foreground: #182932;
+  --primary-hover: #c6dae4;
+  --primary-active: #73a0b7;
+
+  /* Vùng nhấn nhẹ theo brand */
+  --primary-subtle: #182932;
+  --primary-subtle-foreground: #c6dae4;
+  --primary-border: #35596b;
+
+  /* Nút phụ */
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --secondary-hover: #334155;
+
+  /* Vùng phụ, mô tả */
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  /* Hover nhẹ */
+  --accent: #233847;
+  --accent-foreground: #e3edf2;
+
+  /* Viền */
+  --border: #334155;
+  --border-strong: #64748b;
+
+  --input: #64748b;
+  --input-background: #0f172a;
+  --placeholder: #94a3b8;
+
+  /* Focus */
+  --ring: #9ec0d1;
+
+  /* Link */
+  --link: #9ec0d1;
+  --link-hover: #c6dae4;
+
+  /* Disabled */
+  --disabled: #1e293b;
+  --disabled-foreground: #64748b;
+
+  /* Thành công */
+  --success: #4ade80;
+  --success-foreground: #052e16;
+
+  --success-subtle: #10291e;
+  --success-subtle-foreground: #86efac;
+  --success-border: #166534;
+
+  /* Cảnh báo */
+  --warning: #fbbf24;
+  --warning-foreground: #451a03;
+
+  --warning-subtle: #302315;
+  --warning-subtle-foreground: #fde68a;
+  --warning-border: #92400e;
+
+  /* Thông tin */
+  --info: #60a5fa;
+  --info-foreground: #172554;
+
+  --info-subtle: #132540;
+  --info-subtle-foreground: #93c5fd;
+  --info-border: #1e40af;
+
+  /* Lỗi / nguy hiểm */
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
+  --destructive-hover: #fca5a5;
+
+  --destructive-subtle: #321c23;
+  --destructive-subtle-foreground: #fca5a5;
+  --destructive-border: #991b1b;
+
+  /* Sidebar */
+  --sidebar: #0f172a;
+  --sidebar-foreground: #e2e8f0;
+
+  --sidebar-primary: #9ec0d1;
+  --sidebar-primary-foreground: #182932;
+
+  --sidebar-accent: #233847;
+  --sidebar-accent-foreground: #c6dae4;
+
+  --sidebar-muted-foreground: #94a3b8;
+
+  --sidebar-border: #334155;
+  --sidebar-ring: #9ec0d1;
+
+  /* Lớp phủ modal */
+  --overlay: #000000;
+
+  /* Vùng chọn văn bản */
+  --selection: #35596b;
+  --selection-foreground: #f2f7f9;
+}
+
+/* =========================================================
+   4. BASE STYLES
+   Không ép font-weight trên tất cả phần tử.
+   ========================================================= */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+
+  ::selection {
+    background-color: var(--selection);
+    color: var(--selection-foreground);
+  }
+}
