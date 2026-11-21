@@ -333,7 +333,7 @@ func (s *Service) GetSession(ctx context.Context, idStr string) (*DispenseSessio
 	}
 	defer tRows.Close()
 
-	var timeline []SessionTimelineEvent
+	timeline := []SessionTimelineEvent{}
 	for tRows.Next() {
 		var te SessionTimelineEvent
 		if err := tRows.Scan(&te.FromState, &te.ToState, &te.OccurredAt); err != nil {
@@ -354,7 +354,7 @@ func (s *Service) GetSession(ctx context.Context, idStr string) (*DispenseSessio
 	}
 	defer aRows.Close()
 
-	var accessEvents []SessionAccessEvent
+	accessEvents := []SessionAccessEvent{}
 	for aRows.Next() {
 		var ae SessionAccessEvent
 		if err := aRows.Scan(&ae.ID, &ae.Kind, &ae.Method, &ae.ExternalID, &ae.PartyName, &ae.Decision, &ae.Reason, &ae.OccurredAt); err != nil {

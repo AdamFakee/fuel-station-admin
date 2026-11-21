@@ -253,14 +253,14 @@ export function SessionDetailDialog({ open, onOpenChange, sessionId }: SessionDe
               <div className="space-y-2.5">
                 <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <ClockIcon className="h-4 w-4 text-primary" />
-                  Dòng thời gian phiên bơm ({session.timeline.length} mốc)
+                  Dòng thời gian phiên bơm ({(session.timeline ?? []).length} mốc)
                 </h4>
 
-                {session.timeline.length === 0 ? (
+                {(session.timeline ?? []).length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">Không có dữ liệu chuyển trạng thái chi tiết.</p>
                 ) : (
                   <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
-                    {session.timeline.map((event, idx) => (
+                    {(session.timeline ?? []).map((event, idx) => (
                       <div key={idx} className="relative flex items-start gap-3">
                         <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full border-2 border-primary bg-background shrink-0" />
                         <div className="flex-1 rounded-md border p-2.5 bg-card/60 text-xs">
@@ -285,7 +285,7 @@ export function SessionDetailDialog({ open, onOpenChange, sessionId }: SessionDe
               </div>
 
               {/* Nhật ký xác thực liên kết phiên này */}
-              {session.access_events.length > 0 && (
+              {(session.access_events ?? []).length > 0 && (
                 <div className="space-y-2.5 pt-2 border-t">
                   <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <ShieldCheckIcon className="h-4 w-4 text-primary" />
@@ -303,7 +303,7 @@ export function SessionDetailDialog({ open, onOpenChange, sessionId }: SessionDe
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {session.access_events.map((ae) => (
+                        {(session.access_events ?? []).map((ae) => (
                           <TableRow key={ae.id}>
                             <TableCell className="tabular-nums text-xs text-muted-foreground text-left">
                               {formatDateTimeVN(ae.occurred_at, true)}
