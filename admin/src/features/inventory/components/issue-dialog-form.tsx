@@ -1,5 +1,6 @@
 'use client';
 
+import { OptionSelect } from '@/components/option-select';
 import * as React from 'react';
 import {
   Dialog,
@@ -170,72 +171,61 @@ export function IssueDialogForm({ open, onOpenChange, issue }: IssueDialogFormPr
           <form id="issue-form" onSubmit={handleSubmit} className="space-y-4 py-1">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="issue-branch">Trạm / Cửa hàng *</Label>
-                <select
+                <Label htmlFor="issue-branch">Trạm xăng *</Label>
+                <OptionSelect
                   id="issue-branch"
                   value={branchId}
-                  onChange={(e) => {
-                    setBranchId(e.target.value);
+                  onChange={(next) => {
+                    setBranchId(next);
                     setTankId('');
                     setToTankId('');
                   }}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  emptyLabel="Chọn trạm xăng"
                   required
-                >
-                  <option value="">-- Chọn trạm xăng --</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                  options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                />
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="issue-kind">Loại phiếu xuất *</Label>
-                <select
+                <OptionSelect
                   id="issue-kind"
                   value={kind}
-                  onChange={(e) => {
-                    const newKind = e.target.value as IssueKind;
+                  onChange={(next) => {
+                    const newKind = next as IssueKind;
                     setKind(newKind);
                     if (newKind !== 'transfer') {
                       setToTankId('');
                     }
                   }}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  required
-                >
-                  <option value="transfer">Điều chuyển nội bộ (Transfer)</option>
-                  <option value="loss">Hao hụt tự nhiên (Loss)</option>
-                  <option value="inspection">Kiểm định cột bơm (Inspection)</option>
-                </select>
+                  options={[
+                    { value: 'transfer', label: 'Điều chuyển nội bộ (Transfer)' },
+                    { value: 'loss', label: 'Hao hụt tự nhiên (Loss)' },
+                    { value: 'inspection', label: 'Kiểm định cột bơm (Inspection)' },
+                  ]}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="issue-tank">Bể nguồn (xuất) *</Label>
-                <select
+                <OptionSelect
                   id="issue-tank"
                   value={tankId}
-                  onChange={(e) => {
-                    setTankId(e.target.value);
-                    if (toTankId === e.target.value) {
+                  onChange={(next) => {
+                    setTankId(next);
+                    if (toTankId === next) {
                       setToTankId('');
                     }
                   }}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  emptyLabel="Chọn bể xuất"
                   required
-                >
-                  <option value="">-- Chọn bể xuất --</option>
-                  {tanks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.fuel_type_name}) - Tồn:{' '}
-                      {formatNumberVN(Math.round(t.current_stock_ml / 1000))} L
-                    </option>
-                  ))}
-                </select>
+                  options={tanks.map((t) => ({
+                    value: t.id,
+                    label: `${t.name} (${t.fuel_type_name}) - Tồn: ${formatNumberVN(Math.round(t.current_stock_ml / 1000))} L`,
+                  }))}
+                />
                 {selectedSourceTank && (
                   <p className="text-xs text-muted-foreground">
                     Loại xăng dầu: <span className="font-medium text-foreground">{selectedSourceTank.fuel_type_name}</span> | 
@@ -247,22 +237,18 @@ export function IssueDialogForm({ open, onOpenChange, issue }: IssueDialogFormPr
               {kind === 'transfer' ? (
                 <div className="space-y-1.5">
                   <Label htmlFor="issue-to-tank">Bể đích (nhận) *</Label>
-                  <select
+                  <OptionSelect
                     id="issue-to-tank"
                     value={toTankId}
-                    onChange={(e) => setToTankId(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    onChange={setToTankId}
+                    emptyLabel="Chọn bể nhận (cùng loại hàng)"
                     required
                     disabled={!tankId}
-                  >
-                    <option value="">-- Chọn bể nhận (cùng loại hàng) --</option>
-                    {availableToTanks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.fuel_type_name}) - Tồn:{' '}
-                        {formatNumberVN(Math.round(t.current_stock_ml / 1000))} L
-                      </option>
-                    ))}
-                  </select>
+                    options={availableToTanks.map((t) => ({
+                      value: t.id,
+                      label: `${t.name} (${t.fuel_type_name}) - Tồn: ${formatNumberVN(Math.round(t.current_stock_ml / 1000))} L`,
+                    }))}
+                  />
                   {!tankId && (
                     <p className="text-xs text-muted-foreground">Vui lòng chọn bể xuất trước</p>
                   )}

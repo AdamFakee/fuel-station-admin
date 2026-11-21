@@ -2,6 +2,7 @@ package iam_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"fuel-station-backend/internal/modules/iam"
@@ -120,22 +121,24 @@ func TestUserLifecycleAndProtections(t *testing.T) {
 
 	// 2. Create User
 	req := iam.CreateUserRequest{
-		EmployeeCode: "NV-TEST-99",
-		FullName:     "Nhân Viên Thử Nghiệm",
-		Email:        "test.user99@petrovn.vn",
-		Phone:        "0911223344",
-		Username:     "testuser99",
-		Password:     "Password@123456",
-		RoleID:       accRoleID,
-		BranchIDs:    []string{branch1ID},
+		FullName:  "Nhân Viên Thử Nghiệm",
+		Email:     "test.user99@petrovn.vn",
+		Phone:     "0911223344",
+		Password:  "Password@123456",
+		RoleID:    accRoleID,
+		BranchIDs: []string{branch1ID},
 	}
 
 	created, err := svc.CreateUser(ctx, req)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
-	if created.EmployeeCode != req.EmployeeCode {
-		t.Errorf("expected code %s, got %s", req.EmployeeCode, created.EmployeeCode)
+	// Mã nhân viên do hệ thống sinh; tên đăng nhập lưu chính là email.
+	if !strings.HasPrefix(created.EmployeeCode, "NV-") {
+		t.Errorf("expected generated employee code NV-..., got %s", created.EmployeeCode)
+	}
+	if created.Username != req.Email {
+		t.Errorf("expected username to equal email %s, got %s", req.Email, created.Username)
 	}
 
 	defer func() {

@@ -12,8 +12,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Fuel Station Admin - Starter Base',
-  description: 'Nền tảng Quản trị & Điều hành - Modular Monolith Base',
+  title: 'Quản lý trạm xăng',
+  description: 'Hệ thống quản lý trạm xăng',
 };
 
 export default function RootLayout({

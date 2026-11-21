@@ -26,7 +26,7 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
     return (
       <Empty
         title="Chưa có trạm Edge nào"
-        description="Chưa có trạm Edge Agent nào được cấu hình cho chi nhánh này."
+        description="Chưa có trạm Edge Agent nào được cấu hình cho trạm xăng này."
       />
     );
   }
@@ -38,7 +38,7 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
           <TableRow className="hover:bg-transparent bg-muted/50">
             <TableHead className="w-[120px] text-left">Mã trạm</TableHead>
             <TableHead className="text-left">Tên trạm / Thiết bị</TableHead>
-            <TableHead className="text-left">Chi nhánh trực thuộc</TableHead>
+            <TableHead className="text-left">Trạm xăng trực thuộc</TableHead>
             <TableHead className="text-left">Trạng thái kết nối</TableHead>
             <TableHead className="text-right justify-end">Lần thấy cuối (Heartbeat)</TableHead>
             <TableHead className="text-right justify-end">Lần đồng bộ cuối</TableHead>
@@ -60,7 +60,7 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
                 {st.name}
               </TableCell>
 
-              {/* Chi nhánh */}
+              {/* Trạm xăng */}
               <TableCell className="text-muted-foreground text-xs">
                 {st.branch_name} ({st.branch_code})
               </TableCell>

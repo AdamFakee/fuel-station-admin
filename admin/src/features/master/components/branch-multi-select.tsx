@@ -13,13 +13,13 @@ interface BranchMultiSelectProps {
   onChange: (ids: string[]) => void;
 }
 
-/** Ô chọn nhiều cửa hàng: bấm mở danh sách có ô tick, ô hiển thị tóm tắt các cửa hàng đã chọn. */
+/** Ô chọn nhiều trạm xăng: bấm mở danh sách có ô tick, ô hiển thị tóm tắt các trạm xăng đã chọn. */
 export function BranchMultiSelect({ branches, selectedIds, onChange }: BranchMultiSelectProps) {
   const selectedNames = branches.filter((b) => selectedIds.includes(b.id)).map((b) => b.name);
 
-  let summary = 'Chọn cửa hàng được phép đổ';
+  let summary = 'Chọn trạm xăng được phép đổ';
   if (selectedNames.length === 1) summary = selectedNames[0];
-  if (selectedNames.length > 1) summary = `${selectedNames[0]} và ${selectedNames.length - 1} cửa hàng khác`;
+  if (selectedNames.length > 1) summary = `${selectedNames[0]} và ${selectedNames.length - 1} trạm xăng khác`;
 
   const toggle = (branchId: string) => {
     onChange(

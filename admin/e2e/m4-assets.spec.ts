@@ -35,7 +35,7 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
       });
     });
 
-    // Mock danh sách chi nhánh
+    // Mock danh sách trạm xăng
     await page.route('**/assets/branches*', async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
@@ -218,31 +218,31 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
     });
   });
 
-  test('1. Màn hình Chi nhánh (/branches) hiển thị danh sách, tìm kiếm và mở modal tạo mới', async ({ page }) => {
+  test('1. Màn hình Trạm xăng (/branches) hiển thị danh sách, tìm kiếm và mở modal tạo mới', async ({ page }) => {
     await page.goto('/branches');
 
     // Tiêu đề trang
 
-    // Dữ liệu bảng chi nhánh
+    // Dữ liệu bảng trạm xăng
     await expect(page.getByText('TRAM-01')).toBeVisible();
     await expect(page.getByText('Trạm Xăng Dầu Số 1')).toBeVisible();
     await expect(page.getByText('123 Đường Giải Phóng, Hà Nội')).toBeVisible();
     await expect(page.getByText('0901234567')).toBeVisible();
     await expect(page.getByText('Hoạt động')).toBeVisible();
 
-    // Nút thêm chi nhánh cho Quản lý
-    const createBtn = page.getByRole('button', { name: /Thêm chi nhánh/i });
+    // Nút thêm trạm xăng cho Quản lý
+    const createBtn = page.getByRole('button', { name: /Thêm trạm xăng/i });
     await expect(createBtn).toBeVisible();
     await createBtn.click();
 
     // Kiểm tra Dialog mở ra đúng tiêu chuẩn fe-dialog-form
-    await expect(page.getByRole('heading', { name: 'Khai báo Nhà máy / Chi nhánh mới' })).toBeVisible();
-    await expect(page.locator('input#code')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Thêm trạm xăng mới' })).toBeVisible();
+    await expect(page.locator('input#code')).toHaveCount(0); // mã trạm xăng do hệ thống tự sinh
     await expect(page.locator('input#name')).toBeVisible();
 
     // Đóng dialog
     await page.getByRole('button', { name: 'Hủy' }).click();
-    await expect(page.getByRole('heading', { name: 'Khai báo Nhà máy / Chi nhánh mới' })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Thêm trạm xăng mới' })).not.toBeVisible();
   });
 
   test('2. Màn hình Bể chứa (/tanks) hiển thị số Lít tabular-nums, định mức dung tích và mở modal tạo mới', async ({ page }) => {

@@ -2,8 +2,8 @@ import { Metadata } from 'next';
 import { BranchTable } from '@/features/assets/components/branch-table';
 
 export const metadata: Metadata = {
-  title: 'Nhà máy & Chi nhánh - Fuel Station Admin',
-  description: 'Quản lý cơ cấu tổ chức, danh sách nhà máy và chi nhánh vận hành trạm nhiên liệu',
+  title: 'Trạm xăng - Fuel Station Admin',
+  description: 'Quản lý danh sách trạm xăng',
 };
 
 export default function BranchesPage() {

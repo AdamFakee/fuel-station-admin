@@ -39,7 +39,6 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
   } = useForm<BranchInput>({
     resolver: zodResolver(branchSchema),
     defaultValues: {
-      code: '',
       name: '',
       address: '',
       manager_name: '',
@@ -50,7 +49,6 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
   React.useEffect(() => {
     if (branch) {
       reset({
-        code: branch.code,
         name: branch.name,
         address: branch.address || '',
         manager_name: branch.manager_name || '',
@@ -58,8 +56,7 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
       });
     } else {
       reset({
-        code: '',
-        name: '',
+          name: '',
         address: '',
         manager_name: '',
         phone: '',
@@ -74,10 +71,10 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
           id: branch.id,
           input: data,
         });
-        toast.success('Cập nhật chi nhánh thành công');
+        toast.success('Cập nhật trạm xăng thành công');
       } else {
         await createMutation.mutateAsync(data);
-        toast.success('Thêm chi nhánh thành công');
+        toast.success('Thêm trạm xăng thành công');
       }
       onOpenChange(false);
     } catch (err: any) {
@@ -89,29 +86,18 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Chỉnh sửa Nhà máy / Chi nhánh' : 'Khai báo Nhà máy / Chi nhánh mới'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Chỉnh sửa trạm xăng' : 'Thêm trạm xăng mới'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Cập nhật thông tin chi nhánh vận hành trạm xăng dầu'
-              : 'Thêm mới chi nhánh vào hệ thống quản lý'}
+              ? 'Cập nhật thông tin trạm xăng'
+              : 'Thêm mới trạm xăng vào hệ thống quản lý'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="contents">
           <DialogBody className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="code">Mã chi nhánh *</Label>
-              <Input
-                id="code"
-                placeholder="VD: CN-01, TRAM-HN"
-                disabled={isEdit}
-                {...register('code')}
-              />
-              {errors.code && <p className="text-xs text-destructive">{errors.code.message}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="name">Tên chi nhánh *</Label>
+              <Label htmlFor="name">Tên trạm xăng *</Label>
               <Input id="name" placeholder="VD: Trạm Xăng Dầu Số 1" {...register('name')} />
               {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
@@ -138,7 +124,7 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
               Hủy
             </Button>
             <Button type="submit" disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}>
-              {isEdit ? 'Lưu thay đổi' : 'Tạo chi nhánh'}
+              {isEdit ? 'Lưu thay đổi' : 'Tạo trạm xăng'}
             </Button>
           </DialogFooter>
         </form>

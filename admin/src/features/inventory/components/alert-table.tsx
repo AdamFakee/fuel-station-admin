@@ -1,5 +1,11 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { alertDetail } from '@/lib/row-details';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatusBadge, StatusTone } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -9,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -31,15 +36,18 @@ interface AlertTableProps {
 
 const alertKindConfig: Record<
   string,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+  { label: string; tone: StatusTone }
 > = {
-  low_stock: { label: 'Tồn kho thấp', variant: 'destructive' },
-  loss_variance: { label: 'Lệch ngưỡng hao hụt', variant: 'destructive' },
-  station_offline: { label: 'Trạm mất kết nối', variant: 'default' },
-  sync_error: { label: 'Lỗi đồng bộ', variant: 'secondary' },
+  low_stock: { label: 'Tồn kho thấp', tone: 'danger' },
+  loss_variance: { label: 'Lệch ngưỡng hao hụt', tone: 'danger' },
+  station_offline: { label: 'Trạm mất kết nối', tone: 'warning' },
+  sync_error: { label: 'Lỗi đồng bộ', tone: 'warning' },
 };
 
 export function AlertTable({ branchFilter = '', onBranchFilterChange }: AlertTableProps) {
+  const [detail, setDetail] = React.useState<AlertItem | null>(null);
+  const { hasPermission } = useAuth();
+  const canResolve = hasPermission('inventory.stocktake:update');
   const [resolvedFilter, setResolvedFilter] = React.useState<string>('unresolved');
 
   const { data: branchData } = useBranches();
@@ -64,7 +72,7 @@ export function AlertTable({ branchFilter = '', onBranchFilterChange }: AlertTab
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Bộ lọc */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg border">
         <div className="flex flex-wrap items-center gap-3">
@@ -83,7 +91,7 @@ export function AlertTable({ branchFilter = '', onBranchFilterChange }: AlertTab
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Chi nhánh:</span>
+            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Trạm xăng:</span>
             <Select
               value={branchFilter || 'all'}
               onValueChange={(val) => {
@@ -93,10 +101,10 @@ export function AlertTable({ branchFilter = '', onBranchFilterChange }: AlertTab
               }}
             >
               <SelectTrigger className="w-[180px] h-9 text-xs">
-                <SelectValue placeholder="Tất cả chi nhánh" />
+                <SelectValue placeholder="Tất cả trạm xăng" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả chi nhánh</SelectItem>
+                <SelectItem value="all">Tất cả trạm xăng</SelectItem>
                 {branches.map((b) => (
                   <SelectItem key={b.id} value={b.id}>
                     {b.name}
@@ -122,13 +130,13 @@ export function AlertTable({ branchFilter = '', onBranchFilterChange }: AlertTab
       </div>
 
       {/* Bảng danh sách alerts */}
-      <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[160px]">Thời gian</TableHead>
               <TableHead className="w-[160px]">Loại cảnh báo</TableHead>
-              <TableHead className="w-[160px]">Chi nhánh</TableHead>
+              <TableHead className="w-[160px]">Trạm xăng</TableHead>
               <TableHead className="w-[160px]">Bể / Thiết bị</TableHead>
               <TableHead>Nội dung chi tiết cảnh báo</TableHead>
               <TableHead className="w-[120px] text-center">Trạng thái</TableHead>
@@ -137,41 +145,24 @@ export function AlertTable({ branchFilter = '', onBranchFilterChange }: AlertTab
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2Icon className="h-4 w-4 animate-spin text-primary" />
-                    Đang tải danh sách cảnh báo...
-                  </div>
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={7} loading title="Đang tải danh sách cảnh báo..." />
             ) : alerts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                  <div className="flex flex-col items-center justify-center gap-1.5">
-                    <CheckCircle2Icon className="h-8 w-8 text-emerald-500/80 mb-1" />
-                    <p className="text-sm font-medium">Không có cảnh báo kho nào cần xử lý</p>
-                    <p className="text-xs">Tất cả bể chứa đều an toàn và số liệu đối soát khớp ngưỡng.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={7} title="Không có cảnh báo kho nào cần xử lý" description="Tất cả bể chứa đều an toàn và số liệu đối soát khớp ngưỡng." />
             ) : (
               alerts.map((item) => {
                 const isResolved = !!item.resolved_at;
                 const kindCfg = alertKindConfig[item.kind] || {
                   label: item.kind,
-                  variant: 'outline' as const,
+                  tone: 'neutral' as const,
                 };
 
                 return (
-                  <TableRow key={item.id} className="hover:bg-muted/40 transition-colors">
+                  <TableRow key={item.id} className="hover:bg-muted/40 transition-colors" onClick={rowClick(() => setDetail(item))}>
                     <TableCell className="text-xs text-muted-foreground">
                       {formatDateTimeVN(item.created_at)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={kindCfg.variant} className="text-xs font-normal">
-                        {kindCfg.label}
-                      </Badge>
+                      <StatusBadge tone={kindCfg.tone}>{kindCfg.label}</StatusBadge>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {item.branch_name || '-'}
@@ -183,18 +174,10 @@ export function AlertTable({ branchFilter = '', onBranchFilterChange }: AlertTab
                       <div className="text-sm font-normal">{item.message}</div>
                     </TableCell>
                     <TableCell className="text-center">
-                      {isResolved ? (
-                        <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300">
-                          Đã xử lý
-                        </Badge>
-                      ) : (
-                        <Badge variant="destructive" className="text-xs">
-                          Chưa xử lý
-                        </Badge>
-                      )}
+                      <StatusBadge tone={isResolved ? 'success' : 'danger'}>{isResolved ? 'Đã xử lý' : 'Chưa xử lý'}</StatusBadge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {!isResolved && (
+                      {canResolve && !isResolved && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -212,6 +195,13 @@ export function AlertTable({ branchFilter = '', onBranchFilterChange }: AlertTab
             )}
           </TableBody>
         </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={'Cảnh báo kho'}
+        description={undefined}
+        sections={detail ? alertDetail(detail) : []}
+      />
       </div>
     </div>
   );

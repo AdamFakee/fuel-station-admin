@@ -1,4 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/** Chọn một dòng trong ô chọn tùy biến (Radix Select): mở ô rồi bấm dòng có tên khớp. */
+async function pickOption(page: Page, triggerSelector: string, optionName: string | RegExp) {
+  await page.locator(triggerSelector).click();
+  await page.getByRole('option', { name: optionName }).click();
+}
 
 test.describe('Module M11 - Xuất điều chỉnh (Stock Issues) E2E Tests', () => {
 
@@ -40,7 +46,7 @@ test.describe('Module M11 - Xuất điều chỉnh (Stock Issues) E2E Tests', ()
       });
     });
 
-    // 2. Mock Chi nhánh
+    // 2. Mock Trạm xăng
     await page.route('**/v1/assets/branches*', async (route: any) => {
       await route.fulfill({
         status: 200,
@@ -255,10 +261,10 @@ test.describe('Module M11 - Xuất điều chỉnh (Stock Issues) E2E Tests', ()
     await expect(page.getByRole('heading', { name: 'Lập phiếu xuất điều chỉnh' })).toBeVisible();
 
     // Chọn Bể xuất
-    await page.locator('#issue-tank').selectOption('tk-do-01');
+    await pickOption(page, '#issue-tank', /Bể Dầu DO Số 1/);
 
     // Chọn Bể nhận (Bể nhận chỉ xuất hiện tk-do-02 vì cùng loại DO, không có tk-a95)
-    await page.locator('#issue-to-tank').selectOption('tk-do-02');
+    await pickOption(page, '#issue-to-tank', /Bể Dầu DO Số 2/);
 
     // Nhập thể tích 1200 Lít
     await page.locator('#issue-volume').fill('1200');
@@ -312,13 +318,13 @@ test.describe('Module M11 - Xuất điều chỉnh (Stock Issues) E2E Tests', ()
     await page.getByTestId('btn-create-issue').click();
 
     // Đổi loại phiếu sang Hao hụt tự nhiên
-    await page.locator('#issue-kind').selectOption('loss');
+    await pickOption(page, '#issue-kind', /Hao hụt tự nhiên/);
 
     // Dropdown bể nhận phải biến mất
     await expect(page.locator('#issue-to-tank')).not.toBeVisible();
 
     // Chọn Bể xuất
-    await page.locator('#issue-tank').selectOption('tk-a95-01');
+    await pickOption(page, '#issue-tank', /Bể Xăng A95 Số 1/);
 
     // Nhập lượng xuất 45 Lít
     await page.locator('#issue-volume').fill('45');

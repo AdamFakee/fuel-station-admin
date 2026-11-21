@@ -14,6 +14,7 @@ import (
 	"fuel-station-backend/internal/modules/dashboard"
 	"fuel-station-backend/internal/modules/dispense"
 	"fuel-station-backend/internal/modules/edge"
+	"fuel-station-backend/internal/modules/feedback"
 	"fuel-station-backend/internal/modules/iam"
 	"fuel-station-backend/internal/modules/inventory"
 	"fuel-station-backend/internal/modules/master"
@@ -87,7 +88,18 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	iamHandler := iam.NewHandler(iamService, log)
 
 	assetsService := assets.NewService(pool)
+	if cfg.Crypto.DeviceKey != "" {
+		if len(cfg.Crypto.DeviceKey) != 32 {
+			return fmt.Errorf("DEVICE_CRYPTO_KEY phải đúng 32 ký tự, hiện có %d", len(cfg.Crypto.DeviceKey))
+		}
+		assetsService.WithCryptoKey([]byte(cfg.Crypto.DeviceKey))
+	} else if cfg.Env == "production" {
+		return fmt.Errorf("thiếu DEVICE_CRYPTO_KEY: không được dùng khóa mặc định khi chạy production")
+	}
 	assetsHandler := assets.NewHandler(assetsService, log)
+
+	feedbackService := feedback.NewService(pool)
+	feedbackHandler := feedback.NewHandler(feedbackService, log)
 
 	quotaService := quota.NewService(pool)
 	quotaHandler := quota.NewHandler(quotaService, log)
@@ -143,6 +155,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		iamHandler.RegisterRoutes(r, authMiddleware)
 		assetsHandler.RegisterRoutes(r, authMiddleware)
 		quotaHandler.RegisterRoutes(r, authMiddleware)
+		feedbackHandler.RegisterRoutes(r, authMiddleware)
 		masterHandler.RegisterRoutes(r, authMiddleware)
 		syncMonitorHandler.RegisterRoutes(r, authMiddleware)
 		dispenseHandler.RegisterRoutes(r, authMiddleware)

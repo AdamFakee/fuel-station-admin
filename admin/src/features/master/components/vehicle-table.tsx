@@ -1,5 +1,10 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { vehicleDetail } from '@/lib/row-details';
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -51,6 +56,7 @@ export function VehicleTable({
   onEdit,
   onManageCard,
 }: VehicleTableProps) {
+  const [detail, setDetail] = React.useState<VehicleListItem | null>(null);
   const updateStatus = useUpdateVehicleStatus();
   const deleteVehicle = useDeleteVehicle();
 
@@ -62,7 +68,7 @@ export function VehicleTable({
     const newStatus = statusConfirmTarget.status === 'active' ? 'banned' : 'active';
     updateStatus.mutate(
       { id: statusConfirmTarget.id, status: newStatus },
-      { onSuccess: () => setStatusConfirmTarget(null) }
+      { onSuccess: () => setStatusConfirmTarget(null) },
     );
   };
 
@@ -83,30 +89,20 @@ export function VehicleTable({
               <TableHead className="w-[140px]">Biển số</TableHead>
               <TableHead>Loại xe & Nhiên liệu</TableHead>
               <TableHead>Thẻ NFC</TableHead>
-              <TableHead>Cửa hàng được phép</TableHead>
+              <TableHead>Trạm xăng được phép</TableHead>
               <TableHead className="w-[120px]">Trạng thái</TableHead>
               <TableHead className={`${ACTION_HEAD_CLASS} w-[70px]`}>Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  Đang tải danh sách phương tiện...
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={7} loading title="Đang tải danh sách phương tiện..." />
             ) : vehicles.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  Không tìm thấy phương tiện nào phù hợp.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={7} title="Không tìm thấy phương tiện nào phù hợp." />
             ) : (
               vehicles.map((v) => (
-                <TableRow key={v.id} data-testid={`vehicle-row-${v.code}`}>
-                  <TableCell className="font-mono font-medium text-primary">
-                    {v.code}
-                  </TableCell>
+                <TableRow key={v.id} data-testid={`vehicle-row-${v.code}`} onClick={rowClick(() => setDetail(v))}>
+                  <TableCell className="font-mono font-medium text-primary">{v.code}</TableCell>
                   <TableCell>
                     <span className="inline-block rounded bg-secondary px-2 py-0.5 font-mono text-sm font-semibold tracking-wider text-secondary-foreground">
                       {v.plate}
@@ -120,7 +116,10 @@ export function VehicleTable({
                   </TableCell>
                   <TableCell>
                     {v.card_number ? (
-                      <Badge variant="secondary" className="font-mono text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400">
+                      <Badge
+                        variant="secondary"
+                        className="font-mono text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400"
+                      >
                         <CreditCardIcon className="mr-1 h-3 w-3" />
                         {v.card_number}
                       </Badge>
@@ -138,75 +137,86 @@ export function VehicleTable({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-xs text-amber-600">Chưa được phép ở cửa hàng nào</span>
+                      <span className="text-xs text-amber-600">Chưa được phép ở trạm xăng nào</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    {v.status === 'active' ? (
-                      <Badge variant="outline" className="border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                        Hoạt động
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive">
-                        Bị khóa
-                      </Badge>
-                    )}
+                    <StatusBadge tone={v.status === 'active' ? 'success' : 'danger'}>
+                      {v.status === 'active' ? 'Hoạt động' : 'Bị khóa'}
+                    </StatusBadge>
                   </TableCell>
                   <TableCell className={ACTION_CELL_CLASS}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" data-testid={`vehicle-actions-${v.code}`}>
-                          <span className="sr-only">Mở menu</span>
-                          <EllipsisHorizontalIcon className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {canEdit && (
-                          <>
-                            <DropdownMenuItem onClick={() => onEdit(v)} data-testid={`edit-vehicle-${v.code}`}>
-                              <PencilSquareIcon className="mr-2 h-4 w-4" />
-                              Sửa thông tin
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onManageCard(v)} data-testid={`card-vehicle-${v.code}`}>
-                              <CreditCardIcon className="mr-2 h-4 w-4" />
-                              Gán / Đổi thẻ NFC
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setStatusConfirmTarget(v)} data-testid={`status-vehicle-${v.code}`}>
-                              {v.status === 'active' ? (
-                                <>
-                                  <LockClosedIcon className="mr-2 h-4 w-4 text-amber-500" />
-                                  <span className="text-amber-600">Khóa quyền đổ</span>
-                                </>
-                              ) : (
-                                <>
-                                  <LockOpenIcon className="mr-2 h-4 w-4 text-emerald-500" />
-                                  <span className="text-emerald-600">Mở khóa quyền đổ</span>
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {canDelete && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => setDeleteConfirmTarget(v)}
-                              className="text-destructive focus:text-destructive"
-                              data-testid={`delete-vehicle-${v.code}`}
-                            >
-                              <TrashIcon className="mr-2 h-4 w-4" />
-                              Xóa phương tiện
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {(canEdit || canDelete) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            data-testid={`vehicle-actions-${v.code}`}
+                          >
+                            <span className="sr-only">Mở menu</span>
+                            <EllipsisHorizontalIcon className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canEdit && (
+                            <>
+                              <DropdownMenuItem onClick={() => onEdit(v)} data-testid={`edit-vehicle-${v.code}`}>
+                                <PencilSquareIcon className="mr-2 h-4 w-4" />
+                                Sửa thông tin
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onManageCard(v)} data-testid={`card-vehicle-${v.code}`}>
+                                <CreditCardIcon className="mr-2 h-4 w-4" />
+                                Gán / Đổi thẻ NFC
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setStatusConfirmTarget(v)}
+                                data-testid={`status-vehicle-${v.code}`}
+                              >
+                                {v.status === 'active' ? (
+                                  <>
+                                    <LockClosedIcon className="mr-2 h-4 w-4 text-amber-500" />
+                                    <span className="text-amber-600">Khóa quyền đổ</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <LockOpenIcon className="mr-2 h-4 w-4 text-emerald-500" />
+                                    <span className="text-emerald-600">Mở khóa quyền đổ</span>
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {canDelete && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setDeleteConfirmTarget(v)}
+                                className="text-destructive focus:text-destructive"
+                                data-testid={`delete-vehicle-${v.code}`}
+                              >
+                                <TrashIcon className="mr-2 h-4 w-4" />
+                                Xóa phương tiện
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={detail?.plate ?? ''}
+        description={'Phương tiện'}
+        sections={detail ? vehicleDetail(detail) : []}
+      />
       </div>
 
       {/* Confirm Lock / Unlock */}

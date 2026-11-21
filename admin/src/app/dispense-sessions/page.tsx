@@ -1,9 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { DetailPageHeader } from '@/components/detail-page-header';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
@@ -17,7 +15,11 @@ import {
   MagnifyingGlassIcon,
   CheckCircleIcon,
   ShieldExclamationIcon,
+  ListBulletIcon,
+  XCircleIcon,
+  BeakerIcon,
 } from '@heroicons/react/24/outline';
+import { StatCard } from '@/components/stat-card';
 import { formatNumberVN } from '@/lib/format';
 import { useBranches } from '@/features/iam/api/get-branches';
 import { useSessions } from '@/features/dispense/api/get-sessions';
@@ -89,80 +91,41 @@ export default function DispenseSessionsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
-        {/* Detail Page Header */}
-        <DetailPageHeader
-          title="Nhật ký Phiên bơm & Cấp phát Nhiên liệu" />
-
-        {/* Overview KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <Card className="shadow-xs bg-card">
-            <CardContent className="p-4">
-              <span className="text-xs font-medium text-muted-foreground uppercase">Tổng phiên</span>
-              <div className="text-2xl font-bold text-foreground tabular-nums mt-1">
-                {summary ? formatNumberVN(summary.total_sessions) : '—'}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-xs bg-card border-emerald-500/20">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-emerald-600 uppercase">Hoàn thành</span>
-                <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
-              </div>
-              <div className="text-2xl font-bold text-emerald-600 tabular-nums mt-1">
-                {summary ? formatNumberVN(summary.completed_sessions) : '—'}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-xs bg-card">
-            <CardContent className="p-4">
-              <span className="text-xs font-medium text-muted-foreground uppercase">Đã hủy / Lỗi</span>
-              <div className="text-2xl font-bold text-muted-foreground tabular-nums mt-1">
-                {summary ? formatNumberVN(summary.cancelled_sessions + summary.failed_sessions) : '—'}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-xs bg-primary/5 border-primary/20">
-            <CardContent className="p-4">
-              <span className="text-xs font-medium text-primary uppercase">Tổng thể tích cấp</span>
-              <div className="text-2xl font-bold text-primary tabular-nums mt-1 truncate">
-                {summary ? `${formatNumberVN(summary.total_dispensed_liters, 2)} L` : '—'}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-xs bg-card border-rose-500/20">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-rose-600 uppercase">Bị từ chối</span>
-                <ShieldExclamationIcon className="h-4 w-4 text-rose-600" />
-              </div>
-              <div className="text-2xl font-bold text-rose-600 tabular-nums mt-1">
-                {summary ? formatNumberVN(summary.rejected_auth_count) : '—'}
-              </div>
-            </CardContent>
-          </Card>
+        {/* Thẻ số liệu tổng quan */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard label="Tổng phiên" value={summary ? formatNumberVN(summary.total_sessions) : '—'} icon={ListBulletIcon} tone="primary" />
+          <StatCard label="Hoàn thành" value={summary ? formatNumberVN(summary.completed_sessions) : '—'} icon={CheckCircleIcon} tone="success" />
+          <StatCard
+            label="Đã hủy / lỗi"
+            value={summary ? formatNumberVN(summary.cancelled_sessions + summary.failed_sessions) : '—'}
+            icon={XCircleIcon}
+            tone="neutral"
+          />
+          <StatCard
+            label="Tổng thể tích cấp"
+            value={summary ? `${formatNumberVN(summary.total_dispensed_liters, 2)} L` : '—'}
+            icon={BeakerIcon}
+            tone="primary"
+          />
+          <StatCard label="Bị từ chối" value={summary ? formatNumberVN(summary.rejected_auth_count) : '—'} icon={ShieldExclamationIcon} tone="danger" />
         </div>
 
         {/* Main Tabs Container */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <TabsList className="grid w-full sm:w-auto grid-cols-2">
-              <TabsTrigger value="sessions" className="text-xs sm:text-sm">
-                Danh sách Phiên đổ ({sessionsData?.total ?? 0})
-              </TabsTrigger>
-              <TabsTrigger value="access" className="text-xs sm:text-sm">
-                Lượt bị từ chối & Xác thực ({accessEventsData?.total ?? 0})
-              </TabsTrigger>
-            </TabsList>
+          <TabsList>
+            <TabsTrigger value="sessions">
+              Danh sách phiên đổ
+            </TabsTrigger>
+            <TabsTrigger value="access">
+              Lượt bị từ chối & xác thực
+            </TabsTrigger>
+          </TabsList>
 
-            {/* Filter controls */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative flex-1 sm:w-64">
-                <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {/* Thanh tìm kiếm và bộ lọc, cùng kiểu với các trang danh sách khác */}
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 lg:flex-row lg:items-center">
+            <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="relative min-w-0 flex-1">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -171,7 +134,7 @@ export default function DispenseSessionsPage() {
                       ? 'Tìm biển số, tài xế, mã...'
                       : 'Tìm mã thẻ, người quẹt...'
                   }
-                  className="pl-8 h-9 text-xs"
+                  className="pl-9"
                 />
               </div>
 
@@ -183,11 +146,11 @@ export default function DispenseSessionsPage() {
                   setAccessPage(1);
                 }}
               >
-                <SelectTrigger className="w-[160px] h-9 text-xs">
-                  <SelectValue placeholder="Chi nhánh" />
+                <SelectTrigger className="w-full lg:w-[220px]">
+                  <SelectValue placeholder="Trạm xăng" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tất cả chi nhánh</SelectItem>
+                  <SelectItem value="all">Tất cả trạm xăng</SelectItem>
                   {branches.map((b) => (
                     <SelectItem key={b.id} value={b.id}>
                       {b.name}
@@ -204,7 +167,7 @@ export default function DispenseSessionsPage() {
                     setSessionPage(1);
                   }}
                 >
-                  <SelectTrigger className="w-[140px] h-9 text-xs">
+                  <SelectTrigger className="w-full lg:w-[190px]">
                     <SelectValue placeholder="Trạng thái" />
                   </SelectTrigger>
                   <SelectContent>
@@ -223,7 +186,7 @@ export default function DispenseSessionsPage() {
                       setAccessPage(1);
                     }}
                   >
-                    <SelectTrigger className="w-[130px] h-9 text-xs">
+                    <SelectTrigger className="w-full lg:w-[190px]">
                       <SelectValue placeholder="Kết quả" />
                     </SelectTrigger>
                     <SelectContent>
@@ -240,7 +203,7 @@ export default function DispenseSessionsPage() {
                       setAccessPage(1);
                     }}
                   >
-                    <SelectTrigger className="w-[120px] h-9 text-xs">
+                    <SelectTrigger className="w-full lg:w-[190px]">
                       <SelectValue placeholder="Phương thức" />
                     </SelectTrigger>
                     <SelectContent>

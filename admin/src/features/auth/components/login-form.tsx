@@ -28,7 +28,7 @@ export function LoginForm() {
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: '',
+      email: '',
       password: '',
       rememberMe: false,
     },
@@ -43,27 +43,26 @@ export function LoginForm() {
       router.push('/');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      const message = axiosErr?.response?.data?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác';
+      const message = axiosErr?.response?.data?.message || 'Email hoặc mật khẩu không chính xác';
       toast.error(message);
     }
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {/* Tên đăng nhập */}
+      {/* Email */}
       <div className="space-y-1.5">
-        <Label htmlFor="username">Tên đăng nhập</Label>
+        <Label htmlFor="email">Email</Label>
         <Input
-          id="username"
-          placeholder="quản_lý hoặc mã nhân viên"
-          autoComplete="username"
+          id="email"
+          type="email"
+          placeholder="ten@congty.vn"
+          autoComplete="email"
           disabled={loginMutation.isPending}
-          {...register('username')}
-          className={errors.username ? 'border-destructive focus-visible:ring-destructive' : ''}
+          {...register('email')}
+          className={errors.email ? 'border-destructive focus-visible:ring-destructive' : ''}
         />
-        {errors.username && (
-          <p className="text-xs text-destructive">{errors.username.message}</p>
-        )}
+        {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
       </div>
 
       {/* Mật khẩu */}

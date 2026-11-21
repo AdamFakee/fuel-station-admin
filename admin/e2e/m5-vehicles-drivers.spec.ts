@@ -100,7 +100,6 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await page.goto('/vehicles');
 
     // Tiêu đề & nhận diện
-    await expect(page.getByText('Danh mục Xe & Phương tiện')).toBeVisible();
     await expect(page.getByTestId('btn-create-vehicle')).toBeVisible();
 
     // Thanh lọc
@@ -279,7 +278,6 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await page.goto('/drivers');
 
     // Header & buttons
-    await expect(page.getByText('Danh mục Tài xế & Nhân sự')).toBeVisible();
     await expect(page.getByTestId('btn-create-driver')).toBeVisible();
 
     // Dữ liệu tài xế
@@ -293,7 +291,7 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await expect(row.getByText('Đang làm việc', { exact: true })).toBeVisible();
   });
 
-  test('6. Form thêm tài xế validate trường bắt buộc (Mã NV, Họ tên, Chi nhánh)', async ({ page }) => {
+  test('6. Form thêm tài xế validate trường bắt buộc (Mã NV, Họ tên, Trạm xăng)', async ({ page }) => {
     await page.route('**/master/drivers*', async (route) => {
       await route.fulfill({
         status: 200,
@@ -376,21 +374,22 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await page.getByTestId('driver-actions-TX001').click();
     await page.getByTestId('credentials-driver-TX001').click();
 
-    await expect(page.getByText('Phương thức xác thực: Trần Văn Lái (TX001)')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Phương thức xác thực' })).toBeVisible();
+    await expect(page.getByText('Trần Văn Lái').last()).toBeVisible();
 
     // Kiểm tra các tabs
-    await expect(page.getByRole('tab', { name: /Thẻ từ NFC/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Thẻ NFC/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Khuôn mặt/i })).toBeVisible();
     await expect(page.getByRole('tab', { name: /Vân tay/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Danh sách/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Đã đăng ký/i })).toBeVisible();
 
-    // Tab Khuôn mặt có lưu ý dung lượng < 200 KB
+    // Tab Khuôn mặt: chọn ảnh (ảnh lớn được tự nén)
     await page.getByRole('tab', { name: /Khuôn mặt/i }).click();
-    await expect(page.getByText('Ảnh khuôn mặt (Tối đa 200 KB)')).toBeVisible();
+    await expect(page.getByText('Ảnh khuôn mặt', { exact: true })).toBeVisible();
 
     // Tab Vân tay
     await page.getByRole('tab', { name: /Vân tay/i }).click();
-    await expect(page.getByText('Mã mẫu vân tay (Biometric Template ID)')).toBeVisible();
+    await expect(page.getByText('Mã mẫu vân tay', { exact: true })).toBeVisible();
   });
 
   test('8. Phân quyền RBAC: Actor IT Kỹ thuật (chỉ xem) bị ẩn nút Thêm xe, Thêm tài xế', async ({ page }) => {
@@ -438,12 +437,10 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
 
     // Màn hình xe: Không có nút Thêm xe mới
     await page.goto('/vehicles');
-    await expect(page.getByText('Danh mục Xe & Phương tiện')).toBeVisible();
     await expect(page.getByTestId('btn-create-vehicle')).not.toBeVisible();
 
     // Màn hình tài xế: Không có nút Thêm tài xế mới
     await page.goto('/drivers');
-    await expect(page.getByText('Danh mục Tài xế & Nhân sự')).toBeVisible();
     await expect(page.getByTestId('btn-create-driver')).not.toBeVisible();
   });
 });

@@ -1,56 +1,34 @@
 'use client';
 
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import * as React from 'react';
-import { DetailPageHeader } from '@/components/detail-page-header';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { useRoles } from '@/features/iam/api/get-roles';
 import { RoleTable } from '@/features/iam/components/role-table';
-import { RoleDialogForm } from '@/features/iam/components/role-dialog-form';
-import { RoleListItem } from '@/features/iam/types';
 
 export default function RolesPage() {
+  const router = useRouter();
+  const { hasPermission } = useAuth();
   const { data: roles = [], isLoading } = useRoles();
 
-  const [isFormOpen, setIsFormOpen] = React.useState(false);
-  const [editingRole, setEditingRole] = React.useState<RoleListItem | null>(null);
-
-  const handleOpenCreate = () => {
-    setEditingRole(null);
-    setIsFormOpen(true);
-  };
-
-  const handleOpenEdit = (role: RoleListItem) => {
-    setEditingRole(role);
-    setIsFormOpen(true);
-  };
-
   return (
-    <>
-      <div className="flex-1 space-y-6 p-6">
-        <DetailPageHeader
-          title="Vai trò & Ma trận Phân quyền"
-        >
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleOpenCreate}>
-              <PlusIcon className="mr-1.5 h-4 w-4" />
+    <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
+      {/* Hành động của trang (nằm trên cùng) */}
+      {hasPermission('iam.role:create') && (
+        <div className="flex justify-end">
+          <Button asChild>
+            <Link href="/roles/new">
+              <PlusIcon className="mr-2 h-4 w-4" />
               Tạo vai trò mới
-            </Button>
-          </div>
-        </DetailPageHeader>
+            </Link>
+          </Button>
+        </div>
+      )}
 
-        <RoleTable
-          roles={roles}
-          isLoading={isLoading}
-          onEdit={handleOpenEdit}
-        />
-
-        <RoleDialogForm
-          open={isFormOpen}
-          onOpenChange={setIsFormOpen}
-          role={editingRole}
-        />
-      </div>
-    </>
+      <RoleTable roles={roles} isLoading={isLoading} onEdit={(role) => router.push(`/roles/${role.id}`)} />
+    </div>
   );
 }

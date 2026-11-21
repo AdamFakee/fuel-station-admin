@@ -35,11 +35,11 @@ export function TankStockCards({
 
   return (
     <div className="space-y-4">
-      {/* Bộ lọc chi nhánh */}
+      {/* Bộ lọc trạm xăng */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg border">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-            Lọc theo chi nhánh:
+            Lọc theo trạm xăng:
           </span>
           <Select
             value={branchFilter || 'all'}
@@ -50,10 +50,10 @@ export function TankStockCards({
             }}
           >
             <SelectTrigger className="w-[200px] h-9 text-xs">
-              <SelectValue placeholder="Tất cả chi nhánh" />
+              <SelectValue placeholder="Tất cả trạm xăng" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả chi nhánh</SelectItem>
+              <SelectItem value="all">Tất cả trạm xăng</SelectItem>
               {branches.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
                   {b.name}
@@ -84,7 +84,7 @@ export function TankStockCards({
           ))}
         </div>
       ) : stocks.length === 0 ? (
-        <div className="rounded-md border border-dashed p-12 text-center text-sm text-muted-foreground">
+        <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-md border border-dashed p-12 text-center text-sm text-muted-foreground">
           Không tìm thấy bể chứa nhiên liệu nào phù hợp với bộ lọc.
         </div>
       ) : (

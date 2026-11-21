@@ -1,5 +1,9 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { accessEventDetail } from '@/lib/row-details';
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -30,6 +34,7 @@ const REASON_TRANSLATIONS: Record<string, string> = {
 };
 
 export function AccessEventTable({ events, isLoading }: AccessEventTableProps) {
+  const [detail, setDetail] = React.useState<AccessEventListItem | null>(null);
   if (isLoading) {
     return (
       <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
@@ -40,7 +45,7 @@ export function AccessEventTable({ events, isLoading }: AccessEventTableProps) {
 
   if (events.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-12 text-center text-sm text-muted-foreground">
+      <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-md border border-dashed p-12 text-center text-sm text-muted-foreground">
         Không có dữ liệu xác thực nào phù hợp.
       </div>
     );
@@ -52,7 +57,7 @@ export function AccessEventTable({ events, isLoading }: AccessEventTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[170px] text-left">Thời điểm</TableHead>
-            <TableHead className="text-left w-[130px]">Chi nhánh</TableHead>
+            <TableHead className="text-left w-[130px]">Trạm xăng</TableHead>
             <TableHead className="text-left w-[120px]">Phương thức</TableHead>
             <TableHead className="text-left">Mã định danh / Thẻ</TableHead>
             <TableHead className="text-left">Đối tượng nhận diện</TableHead>
@@ -64,7 +69,7 @@ export function AccessEventTable({ events, isLoading }: AccessEventTableProps) {
           {events.map((e) => {
             const isReject = e.decision === 'reject';
             return (
-              <TableRow key={e.id} className="hover:bg-muted/40 transition-colors">
+              <TableRow key={e.id} className="hover:bg-muted/40 transition-colors" onClick={rowClick(() => setDetail(e))}>
                 <TableCell className="tabular-nums text-xs text-muted-foreground text-left">
                   {formatDateTimeVN(e.occurred_at, true)}
                 </TableCell>
@@ -96,18 +101,7 @@ export function AccessEventTable({ events, isLoading }: AccessEventTableProps) {
                   )}
                 </TableCell>
                 <TableCell className="text-left">
-                  {isReject ? (
-                    <Badge variant="destructive" className="text-xs font-normal">
-                      Bị từ chối
-                    </Badge>
-                  ) : (
-                    <Badge
-                      variant="secondary"
-                      className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs font-normal"
-                    >
-                      Hợp lệ
-                    </Badge>
-                  )}
+                  <StatusBadge tone={isReject ? 'danger' : 'success'}>{isReject ? 'Bị từ chối' : 'Hợp lệ'}</StatusBadge>
                 </TableCell>
                 <TableCell className="text-left text-xs">
                   {e.reason ? (
@@ -123,6 +117,13 @@ export function AccessEventTable({ events, isLoading }: AccessEventTableProps) {
           })}
         </TableBody>
       </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={'Lượt xác thực'}
+        description={undefined}
+        sections={detail ? accessEventDetail(detail) : []}
+      />
     </div>
   );
 }

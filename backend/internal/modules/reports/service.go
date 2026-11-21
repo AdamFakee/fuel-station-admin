@@ -105,12 +105,13 @@ func (s *Service) GetStockLedgerReport(ctx context.Context, q StockLedgerQuery) 
 		  LEFT JOIN station.stock_ledger l ON l.tank_id = t.id AND l.tenant_id = t.tenant_id
 		 WHERE t.tenant_id = $1
 		   AND ($2::UUID IS NULL OR t.branch_id = $2)
+		   AND ($6::UUID[] IS NULL OR t.branch_id = ANY($6))
 		   AND ($3::UUID IS NULL OR t.id = $3)
 		 GROUP BY t.id, t.code, t.name, f.name, b.name, t.max_usable_capacity_ml
 		 ORDER BY b.name ASC, t.code ASC
 	`
 
-	rows, err := s.pool.Query(ctx, summaryQuery, tenantID, q.BranchID, q.TankID, q.FromDate, q.ToDate)
+	rows, err := s.pool.Query(ctx, summaryQuery, tenantID, q.BranchID, q.TankID, q.FromDate, q.ToDate, authz.BranchScope(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stock ledger summary: %w", err)
 	}
@@ -149,6 +150,7 @@ func (s *Service) GetStockLedgerReport(ctx context.Context, q StockLedgerQuery) 
 		  LEFT JOIN station.dispense_session ds ON ds.id = l.ref_id AND l.ref_type = 'dispense_session'
 		 WHERE l.tenant_id = $1
 		   AND ($2::UUID IS NULL OR t.branch_id = $2)
+		   AND ($6::UUID[] IS NULL OR t.branch_id = ANY($6))
 		   AND ($3::UUID IS NULL OR l.tank_id = $3)
 		   AND ($4::TIMESTAMPTZ IS NULL OR l.occurred_at >= $4)
 		   AND ($5::TIMESTAMPTZ IS NULL OR l.occurred_at <= $5)
@@ -156,7 +158,7 @@ func (s *Service) GetStockLedgerReport(ctx context.Context, q StockLedgerQuery) 
 		 LIMIT 1000
 	`
 
-	lRows, err := s.pool.Query(ctx, ledgerQuery, tenantID, q.BranchID, q.TankID, q.FromDate, q.ToDate)
+	lRows, err := s.pool.Query(ctx, ledgerQuery, tenantID, q.BranchID, q.TankID, q.FromDate, q.ToDate, authz.BranchScope(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stock ledger lines: %w", err)
 	}
@@ -222,6 +224,7 @@ func (s *Service) GetReceiptReport(ctx context.Context, q ReceiptReportQuery) (*
 		  LEFT JOIN station.app_user u2 ON u2.id = r.decided_by AND u2.tenant_id = r.tenant_id
 		 WHERE r.tenant_id = $1
 		   AND ($2::UUID IS NULL OR r.branch_id = $2)
+		   AND ($8::UUID[] IS NULL OR r.branch_id = ANY($8))
 		   AND ($3::UUID IS NULL OR r.supplier_id = $3)
 		   AND ($4::UUID IS NULL OR rl.tank_id = $4)
 		   AND ($5::TEXT IS NULL OR r.status = $5)
@@ -230,7 +233,7 @@ func (s *Service) GetReceiptReport(ctx context.Context, q ReceiptReportQuery) (*
 		 ORDER BY r.received_at DESC, r.code DESC
 	`
 
-	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.SupplierID, q.TankID, q.Status, q.FromDate, q.ToDate)
+	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.SupplierID, q.TankID, q.Status, q.FromDate, q.ToDate, authz.BranchScope(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query receipt report: %w", err)
 	}
@@ -296,6 +299,7 @@ func (s *Service) GetDispenseReport(ctx context.Context, q DispenseReportQuery) 
 		  FROM station.dispense_session ds
 		 WHERE ds.tenant_id = $1
 		   AND ($2::UUID IS NULL OR ds.branch_id = $2)
+		   AND ($10::UUID[] IS NULL OR ds.branch_id = ANY($10))
 		   AND ($3::UUID IS NULL OR ds.pump_id = $3)
 		   AND ($4::UUID IS NULL OR ds.tank_id = $4)
 		   AND ($5::UUID IS NULL OR ds.vehicle_id = $5)
@@ -308,7 +312,7 @@ func (s *Service) GetDispenseReport(ctx context.Context, q DispenseReportQuery) 
 	var totalSessions int
 	var totalDispensedML int64
 	err = s.pool.QueryRow(ctx, countQuery,
-		tenantID, q.BranchID, q.PumpID, q.TankID, q.VehicleID, q.DriverID, q.Status, q.FromDate, q.ToDate,
+		tenantID, q.BranchID, q.PumpID, q.TankID, q.VehicleID, q.DriverID, q.Status, q.FromDate, q.ToDate, authz.BranchScope(ctx),
 	).Scan(&totalSessions, &totalDispensedML)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count dispenses: %w", err)
@@ -329,6 +333,7 @@ func (s *Service) GetDispenseReport(ctx context.Context, q DispenseReportQuery) 
 		  LEFT JOIN station.fuel_type f ON f.id = ds.fuel_type_id AND f.tenant_id = ds.tenant_id
 		 WHERE ds.tenant_id = $1
 		   AND ($2::UUID IS NULL OR ds.branch_id = $2)
+		   AND ($12::UUID[] IS NULL OR ds.branch_id = ANY($12))
 		   AND ($3::UUID IS NULL OR ds.pump_id = $3)
 		   AND ($4::UUID IS NULL OR ds.tank_id = $4)
 		   AND ($5::UUID IS NULL OR ds.vehicle_id = $5)
@@ -342,7 +347,7 @@ func (s *Service) GetDispenseReport(ctx context.Context, q DispenseReportQuery) 
 
 	rows, err := s.pool.Query(ctx, itemsQuery,
 		tenantID, q.BranchID, q.PumpID, q.TankID, q.VehicleID, q.DriverID, q.Status, q.FromDate, q.ToDate,
-		pageSize, offset,
+		pageSize, offset, authz.BranchScope(ctx),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query dispense report: %w", err)
@@ -407,6 +412,7 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 		  LEFT JOIN station.vehicle_type vt ON vt.id = v.vehicle_type_id AND vt.tenant_id = v.tenant_id
 		  LEFT JOIN station.dispense_session ds ON ds.vehicle_id = v.id AND ds.tenant_id = v.tenant_id
 		       AND ds.status = 'completed'
+		       AND ($6::UUID[] IS NULL OR ds.branch_id = ANY($6))
 		       AND ($3::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) >= $3)
 		       AND ($4::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) <= $4)
 		  LEFT JOIN LATERAL (
@@ -418,12 +424,13 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 		  ) qr ON TRUE
 		 WHERE v.tenant_id = $1
 		   AND ($2::UUID IS NULL OR EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $2))
+		   AND ($6::UUID[] IS NULL OR EXISTS (SELECT 1 FROM station.vehicle_branch vs WHERE vs.tenant_id = v.tenant_id AND vs.vehicle_id = v.id AND vs.branch_id = ANY($6)))
 		   AND ($5::UUID IS NULL OR v.id = $5)
 		 GROUP BY v.id, v.code, v.plate, vt.name, qr.max_volume_ml, qr.period
 		 ORDER BY total_dispensed_ml DESC, v.plate ASC
 	`
 
-	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.FromDate, q.ToDate, q.VehicleID)
+	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.FromDate, q.ToDate, q.VehicleID, authz.BranchScope(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query vehicle consumption report: %w", err)
 	}
@@ -494,6 +501,7 @@ func (s *Service) GetDriverDispenseReport(ctx context.Context, q DriverDispenseQ
 		  LEFT JOIN station.dispense_session ds ON ds.driver_id = d.id AND ds.tenant_id = d.tenant_id
 		       AND ds.status = 'completed'
 		       AND ($2::UUID IS NULL OR ds.branch_id = $2)
+		       AND ($6::UUID[] IS NULL OR ds.branch_id = ANY($6))
 		       AND ($3::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) >= $3)
 		       AND ($4::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) <= $4)
 		 WHERE d.tenant_id = $1
@@ -502,7 +510,7 @@ func (s *Service) GetDriverDispenseReport(ctx context.Context, q DriverDispenseQ
 		 ORDER BY total_dispensed_ml DESC, d.full_name ASC
 	`
 
-	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.FromDate, q.ToDate, q.DriverID)
+	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.FromDate, q.ToDate, q.DriverID, authz.BranchScope(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query driver dispense report: %w", err)
 	}
@@ -578,6 +586,7 @@ func (s *Service) GetReconciliationReport(ctx context.Context, q ReconciliationR
 		  LEFT JOIN station.app_user u2 ON u2.id = rec.confirmed_by AND u2.tenant_id = rec.tenant_id
 		 WHERE rec.tenant_id = $1
 		   AND ($2::UUID IS NULL OR rec.branch_id = $2)
+		   AND ($7::UUID[] IS NULL OR rec.branch_id = ANY($7))
 		   AND ($3::UUID IS NULL OR rec.tank_id = $3)
 		   AND ($4::TEXT IS NULL OR rec.status = $4)
 		   AND ($5::DATE IS NULL OR rec.period_date >= $5::DATE)
@@ -595,7 +604,7 @@ func (s *Service) GetReconciliationReport(ctx context.Context, q ReconciliationR
 		toDateStr = &str
 	}
 
-	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.TankID, q.Status, fromDateStr, toDateStr)
+	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.TankID, q.Status, fromDateStr, toDateStr, authz.BranchScope(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query reconciliation report: %w", err)
 	}

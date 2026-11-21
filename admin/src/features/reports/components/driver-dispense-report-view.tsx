@@ -1,10 +1,12 @@
 'use client';
 
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatCard } from '@/components/stat-card';
+import { ChartBarIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import React from 'react';
 import { DriverDispenseResponse } from '../types';
 import { formatNumberVN } from '@/lib/format';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface DriverDispenseReportViewProps {
   data?: DriverDispenseResponse;
@@ -19,33 +21,31 @@ export function DriverDispenseReportView({ data, isLoading }: DriverDispenseRepo
   const items = data?.items || [];
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {/* Quick Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Tổng số tài xế nhận nhiên liệu</div>
-            <div className="text-2xl font-bold tabular-nums mt-1">{formatNumberVN(data?.total_drivers || 0)}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Tổng số lượt đổ hoàn tất</div>
-            <div className="text-2xl font-bold tabular-nums mt-1">{formatNumberVN(data?.total_sessions || 0)}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-emerald-50/50 border-emerald-100">
-          <CardContent className="pt-4">
-            <div className="text-xs text-emerald-800">Tổng nhiên liệu cấp cho tài xế</div>
-            <div className="text-2xl font-bold text-emerald-700 tabular-nums mt-1">
-              {formatNumberVN(data?.total_dispensed_liters || 0, 2)} L
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid shrink-0 grid-cols-2 gap-4 md:grid-cols-3">
+        <StatCard
+          label="Tổng số tài xế nhận nhiên liệu"
+          value={<>{formatNumberVN(data?.total_drivers || 0)}</>}
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
+        <StatCard
+          label="Tổng số lượt đổ hoàn tất"
+          value={<>{formatNumberVN(data?.total_sessions || 0)}</>}
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
+        <StatCard
+          label="Tổng nhiên liệu cấp cho tài xế"
+          value={<>{formatNumberVN(data?.total_dispensed_liters || 0, 2)} L</>}
+          icon={CheckCircleIcon}
+          tone="success"
+        />
       </div>
 
       {/* Bảng kê cấp phát theo tài xế */}
-      <div className="rounded-md border">
+      <div className="flex min-h-0 flex-1 flex-col rounded-md border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -60,11 +60,7 @@ export function DriverDispenseReportView({ data, isLoading }: DriverDispenseRepo
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                  Không có dữ liệu cấp phát tài xế trong khoảng thời gian đã chọn.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={7} title="Không có dữ liệu cấp phát tài xế trong khoảng thời gian đã chọn." />
             ) : (
               items.map((row) => (
                 <TableRow key={row.driver_id}>

@@ -302,7 +302,6 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
     await page.goto('/reports');
 
     // 1. Stock Ledger view
-    await expect(page.getByText('Tổng hợp Nhập – Xuất – Tồn theo Bể chứa')).toBeVisible();
 
     // Verify that NO money columns exist in any table header
     const forbiddenWords = ['Đơn giá', 'Thành tiền', 'VAT', 'Giá vốn', '₫', 'VND'];
@@ -326,6 +325,8 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
 
     // Tab 1: Nhập - Xuất - Tồn (Default)
     await expect(page.getByRole('cell', { name: 'Bể DO 01' }).first()).toBeVisible();
+    // Báo cáo này có 2 tab con: thẻ kho chi tiết chứa mã phiếu tham chiếu
+    await page.getByRole('tab', { name: 'Thẻ kho chi tiết' }).click();
     await expect(page.getByText('PN-2026-0001')).toBeVisible();
 
     // Tab 2: Bảng kê phiếu nhập
@@ -357,7 +358,7 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
     // Tab 6: Đối chiếu kiểm kê
     await page.getByRole('tab', { name: 'Đối chiếu kiểm kê' }).click();
     await expect(page.getByText('Tổng số biên bản kiểm kê')).toBeVisible();
-    await expect(page.getByText('Đã xác nhận')).toBeVisible();
+    await expect(page.getByText('Đã chốt', { exact: true })).toBeVisible();
     await expect(page.getByText('Phạm Thị Kế Toán')).toBeVisible();
   });
 

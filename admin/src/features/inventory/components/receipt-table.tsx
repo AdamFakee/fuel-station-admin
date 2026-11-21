@@ -1,15 +1,11 @@
 'use client';
 
+import { rowClick } from '@/lib/row-click';
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatusBadge, StatusTone } from '@/components/status-badge';
+import { OptionSelect } from '@/components/option-select';
 import * as React from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,9 +15,11 @@ import {
   TrashIcon,
   PaperAirplaneIcon,
   CheckCircleIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { StockReceipt, ReceiptStatus } from '../types';
 import { useReceipts } from '../api/get-receipts';
+import Paginator from '@/components/paginator';
 import { useDeleteReceipt } from '../api/delete-receipt';
 import { useSubmitReceipt } from '../api/submit-receipt';
 import { useBranches } from '@/features/assets/api/get-branches';
@@ -35,19 +33,33 @@ import { toast } from 'sonner';
 
 const statusConfig: Record<
   ReceiptStatus,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+  {
+    label: string;
+    tone: StatusTone;
+  }
 > = {
-  draft: { label: 'Bản nháp', variant: 'secondary' },
-  pending: { label: 'Chờ duyệt', variant: 'default' },
-  approved: { label: 'Đã duyệt', variant: 'default' },
-  rejected: { label: 'Từ chối', variant: 'destructive' },
+  draft: { label: 'Bản nháp', tone: 'neutral' },
+  pending: { label: 'Chờ duyệt', tone: 'warning' },
+  approved: { label: 'Đã duyệt', tone: 'success' },
+  rejected: { label: 'Từ chối', tone: 'danger' },
 };
 
 export function ReceiptTable() {
-  const { isManager } = useAuth();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('inventory.receipt:create');
+  const canUpdate = hasPermission('inventory.receipt:update');
+  const canDelete = hasPermission('inventory.receipt:delete');
+  const canApprove = hasPermission('inventory.receipt:approve');
   const [search, setSearch] = React.useState('');
   const [branchFilter, setBranchFilter] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('');
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(15);
+
+  // Đổi bộ lọc thì về trang đầu.
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, branchFilter, statusFilter]);
 
   const [selectedReceipt, setSelectedReceipt] = React.useState<StockReceipt | null>(null);
   const [createEditDialogOpen, setCreateEditDialogOpen] = React.useState(false);
@@ -61,6 +73,8 @@ export function ReceiptTable() {
   const branches = branchData?.data || [];
 
   const { data, isLoading } = useReceipts({
+    page,
+    page_size: pageSize,
     q: search || undefined,
     branch_id: branchFilter || undefined,
     status: statusFilter || undefined,
@@ -112,116 +126,97 @@ export function ReceiptTable() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Search & Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <Input
-            placeholder="Tìm theo mã phiếu, biển số xe, số hóa đơn..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="sm:max-w-xs"
-          />
-
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring sm:max-w-[200px]"
-            value={branchFilter}
-            onChange={(e) => setBranchFilter(e.target.value)}
-          >
-            <option value="">Tất cả trạm xăng</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring sm:max-w-[170px]"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="draft">Bản nháp</option>
-            <option value="pending">Chờ duyệt</option>
-            <option value="approved">Đã duyệt</option>
-            <option value="rejected">Từ chối</option>
-          </select>
-        </div>
-
-        {isManager && (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {/* Hành động của trang (nằm trên cùng, không chen vào thanh lọc) */}
+      {canCreate && (
+        <div className="flex justify-end">
           <Button onClick={handleCreate} className="flex items-center gap-1.5 shrink-0">
             <PlusIcon className="w-4 h-4" />
             Lập phiếu nhập
           </Button>
-        )}
+        </div>
+      )}
+
+      {/* Thanh tìm kiếm và bộ lọc */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
+        <div className="relative min-w-[240px] flex-1">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Tìm theo mã phiếu, biển số xe, số hóa đơn..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <OptionSelect
+            className="w-[210px]"
+            value={branchFilter}
+            onChange={setBranchFilter}
+            emptyLabel="Tất cả trạm xăng"
+            options={branches.map((b) => ({ value: b.id, label: b.name }))}
+          />
+
+          <OptionSelect
+            className="w-[190px]"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            emptyLabel="Tất cả trạng thái"
+            options={[
+              { value: 'draft', label: 'Bản nháp' },
+              { value: 'pending', label: 'Chờ duyệt' },
+              { value: 'approved', label: 'Đã duyệt' },
+              { value: 'rejected', label: 'Từ chối' },
+            ]}
+          />
+        </div>
       </div>
 
       {/* Main Table */}
-      <div className="rounded-md border bg-card">
+      <div className="flex min-h-0 flex-1 flex-col rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[120px]">Mã phiếu</TableHead>
               <TableHead className="w-[150px]">Ngày nhập</TableHead>
-              <TableHead>Trạm / Cửa hàng</TableHead>
+              <TableHead>Trạm xăng</TableHead>
               <TableHead>Nhà cung cấp / Xe bồn</TableHead>
               <TableHead>Số hóa đơn</TableHead>
-              <TableHead className="text-right">Tổng thực nhập (L)</TableHead>
+              <TableHead className="text-right tabular-nums text-emerald-600">Tổng thực nhập (L)</TableHead>
               <TableHead className="w-[110px]">Trạng thái</TableHead>
               <TableHead className="text-right w-[150px]">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  Đang tải danh sách phiếu nhập...
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={8} loading title="Đang tải danh sách phiếu nhập..." />
             ) : receipts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  Không tìm thấy phiếu nhập bể nào.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={8} title="Không tìm thấy phiếu nhập bể nào." />
             ) : (
               receipts.map((r) => {
                 const statusMeta = statusConfig[r.status] || {
                   label: r.status,
-                  variant: 'outline' as const,
+                  tone: 'neutral' as const,
                 };
                 const totalLiters = r.total_volume_ml / 1000;
 
                 return (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-mono font-medium text-xs">
-                      {r.code}
-                    </TableCell>
+                  <TableRow key={r.id} onClick={rowClick(() => handleView(r))}>
+                    <TableCell className="font-mono font-medium text-xs">{r.code}</TableCell>
                     <TableCell className="text-xs text-muted-foreground tabular-nums">
                       {formatDateTimeVN(r.received_at)}
                     </TableCell>
-                    <TableCell className="font-medium text-sm">
-                      {r.branch_name}
-                    </TableCell>
+                    <TableCell className="font-medium text-sm">{r.branch_name}</TableCell>
                     <TableCell className="text-xs">
                       <div>{r.supplier_name || '—'}</div>
-                      {r.tanker_plate && (
-                        <span className="font-mono text-muted-foreground">
-                          {r.tanker_plate}
-                        </span>
-                      )}
+                      {r.tanker_plate && <span className="font-mono text-muted-foreground">{r.tanker_plate}</span>}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {r.document_no || '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-bold text-primary text-sm">
+                    <TableCell className="font-mono text-xs">{r.document_no || '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums font-semibold text-emerald-600 text-sm">
                       {formatNumberVN(totalLiters)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusMeta.variant} className="text-xs">
-                        {statusMeta.label}
-                      </Badge>
+                      <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
@@ -237,8 +232,9 @@ export function ReceiptTable() {
                         </Button>
 
                         {/* Actions for draft: Submit, Edit, Delete */}
-                        {r.status === 'draft' && isManager && (
+                        {r.status === 'draft' && (
                           <>
+                            {canUpdate && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -248,6 +244,9 @@ export function ReceiptTable() {
                             >
                               <PaperAirplaneIcon className="w-4 h-4" />
                             </Button>
+                            )}
+
+                            {canUpdate && (
 
                             <Button
                               variant="ghost"
@@ -259,6 +258,10 @@ export function ReceiptTable() {
                               <PencilSquareIcon className="w-4 h-4" />
                             </Button>
 
+                            )}
+
+                            {canDelete && (
+
                             <Button
                               variant="ghost"
                               size="sm"
@@ -268,11 +271,13 @@ export function ReceiptTable() {
                             >
                               <TrashIcon className="w-4 h-4" />
                             </Button>
+
+                            )}
                           </>
                         )}
 
                         {/* Actions for pending: Approve / Reject */}
-                        {r.status === 'pending' && isManager && (
+                        {r.status === 'pending' && canApprove && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -293,24 +298,25 @@ export function ReceiptTable() {
         </Table>
       </div>
 
+      {/* Phân trang */}
+      {(data?.total ?? 0) > 0 && (
+        <Paginator
+          currentPage={page}
+          pageSize={pageSize}
+          totalItems={data?.total ?? 0}
+          onPageChange={(newPage, newPageSize) => {
+            setPage(newPage);
+            setPageSize(newPageSize);
+          }}
+        />
+      )}
+
       {/* Dialogs */}
-      <ReceiptDialog
-        open={createEditDialogOpen}
-        onOpenChange={setCreateEditDialogOpen}
-        receipt={selectedReceipt}
-      />
+      <ReceiptDialog open={createEditDialogOpen} onOpenChange={setCreateEditDialogOpen} receipt={selectedReceipt} />
 
-      <ReceiptDetailDialog
-        open={detailDialogOpen}
-        onOpenChange={setDetailDialogOpen}
-        receipt={selectedReceipt}
-      />
+      <ReceiptDetailDialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen} receipt={selectedReceipt} />
 
-      <ReceiptApproveDialog
-        open={approveDialogOpen}
-        onOpenChange={setApproveDialogOpen}
-        receipt={selectedReceipt}
-      />
+      <ReceiptApproveDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen} receipt={selectedReceipt} />
 
       {/* Confirm Delete Dialog */}
       <ConfirmDialog

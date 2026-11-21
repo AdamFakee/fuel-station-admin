@@ -26,6 +26,10 @@ type Config struct {
 	Storage struct {
 		Dir string `env:"STORAGE_DIR" envDefault:"./data/uploads"`
 	}
+	// Crypto: khóa AES (đúng 32 ký tự) mã hóa mật khẩu máy chấm công lưu trong DB. Bắt buộc khi chạy production.
+	Crypto struct {
+		DeviceKey string `env:"DEVICE_CRYPTO_KEY"`
+	}
 }
 
 // Load parses environment variables into Config and validates required fields.
@@ -37,4 +41,3 @@ func Load() (Config, error) {
 
 	return cfg, nil
 }
-

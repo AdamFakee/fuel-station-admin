@@ -11,7 +11,8 @@ interface RawLoginResponse {
 
 export async function login(data: LoginInput): Promise<LoginResponse> {
   const payload = {
-    username: data.username,
+    // Backend nhận trường `username` nhưng khớp được cả email.
+    username: data.email,
     password: data.password,
     remember_me: data.rememberMe,
   };

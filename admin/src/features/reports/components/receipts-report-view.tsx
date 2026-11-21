@@ -1,11 +1,13 @@
 'use client';
 
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatCard } from '@/components/stat-card';
+import { ChartBarIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { StatusBadge } from '@/components/status-badge';
 import React from 'react';
 import { ReceiptReportResponse } from '../types';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface ReceiptsReportViewProps {
   data?: ReceiptReportResponse;
@@ -22,59 +24,53 @@ export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps)
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved':
-        return <Badge className="bg-emerald-600 hover:bg-emerald-600">Đã duyệt</Badge>;
+        return <StatusBadge tone="success">Đã duyệt</StatusBadge>;
       case 'pending':
-        return <Badge variant="secondary" className="bg-amber-100 text-amber-800">Chờ duyệt</Badge>;
+        return <StatusBadge tone="warning">Chờ duyệt</StatusBadge>;
       case 'rejected':
-        return <Badge variant="destructive">Từ chối</Badge>;
+        return <StatusBadge tone="danger">Từ chối</StatusBadge>;
       default:
-        return <Badge variant="outline">Nháp</Badge>;
+        return <StatusBadge tone="neutral">Bản nháp</StatusBadge>;
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {/* Cards thống kê nhanh */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Tổng số chuyến nhập</div>
-            <div className="text-2xl font-bold tabular-nums mt-1">{formatNumberVN(data?.total_count || 0)}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Lít theo chứng từ</div>
-            <div className="text-2xl font-bold text-slate-800 tabular-nums mt-1">
-              {formatNumberVN(data?.total_document_liters || 0, 2)} L
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-emerald-50/50 border-emerald-100">
-          <CardContent className="pt-4">
-            <div className="text-xs text-emerald-800">Lít thực nhận vào bể</div>
-            <div className="text-2xl font-bold text-emerald-700 tabular-nums mt-1">
-              {formatNumberVN(data?.total_actual_liters || 0, 2)} L
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Tổng chênh lệch giao nhận</div>
-            <div
-              className={`text-2xl font-bold tabular-nums mt-1 ${
-                (data?.total_variance_liters || 0) < 0 ? 'text-destructive' : 'text-emerald-600'
-              }`}
-            >
+      <div className="grid shrink-0 grid-cols-2 gap-4 md:grid-cols-4">
+        <StatCard
+          label="Tổng số chuyến nhập"
+          value={<>{formatNumberVN(data?.total_count || 0)}</>}
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
+        <StatCard
+          label="Lít theo chứng từ"
+          value={<>{formatNumberVN(data?.total_document_liters || 0, 2)} L</>}
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
+        <StatCard
+          label="Lít thực nhận vào bể"
+          value={<>{formatNumberVN(data?.total_actual_liters || 0, 2)} L</>}
+          icon={CheckCircleIcon}
+          tone="success"
+        />
+        <StatCard
+          label="Tổng chênh lệch giao nhận"
+          value={
+            <span className={(data?.total_variance_liters || 0) < 0 ? 'text-red-600' : 'text-emerald-600'}>
               {(data?.total_variance_liters || 0) > 0 ? '+' : ''}
               {formatNumberVN(data?.total_variance_liters || 0, 2)} L
-            </div>
-          </CardContent>
-        </Card>
+            </span>
+          }
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
       </div>
 
       {/* Bảng kê chi tiết */}
-      <div className="rounded-md border">
+      <div className="flex min-h-0 flex-1 flex-col rounded-md border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -93,18 +89,12 @@ export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps)
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
-                  Không có phiếu nhập nào khớp với điều kiện lọc.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={11} title="Không có phiếu nhập nào khớp với điều kiện lọc." />
             ) : (
               items.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="font-mono text-xs font-semibold">{row.receipt_code}</TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">
-                    {formatDateTimeVN(row.received_at)}
-                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">{formatDateTimeVN(row.received_at)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     <div>{row.created_by_name}</div>
                     {row.decided_by_name && (

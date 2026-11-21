@@ -21,12 +21,11 @@ export interface UserDetail extends UserListItem {
   branches: BranchOption[];
 }
 
+/** Tài khoản đăng nhập là email + mật khẩu; mã nhân viên do hệ thống sinh nên không gửi lên. */
 export interface CreateUserInput {
-  employee_code: string;
   full_name: string;
   email: string;
   phone?: string;
-  username: string;
   password: string;
   role_id: string;
   branch_ids: string[];

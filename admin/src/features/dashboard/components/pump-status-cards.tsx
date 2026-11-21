@@ -23,7 +23,7 @@ interface StationSummary {
   offline: number;
 }
 
-/** Mất kết nối là chuyện của trạm Edge, nên tóm tắt theo trạm (cửa hàng): bao nhiêu trụ offline trên tổng số trụ của trạm. */
+/** Mất kết nối là chuyện của trạm Edge, nên tóm tắt theo trạm (trạm xăng): bao nhiêu trụ offline trên tổng số trụ của trạm. */
 function summarizeByStation(pumps: PumpStatusItem[]): StationSummary[] {
   const byBranch = new Map<string, StationSummary>();
   for (const pump of pumps) {

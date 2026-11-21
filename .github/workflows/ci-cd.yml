@@ -1,0 +1,177 @@
+name: CI / CD
+
+# Mọi secret nằm trên GitHub (Settings -> Secrets and variables -> Actions).
+# Workflow đẩy chúng thẳng vào phiên SSH lúc deploy, không lưu file .env nào trên VPS.
+#
+# Secrets bắt buộc:
+#   DOCKER_USERNAME, DOCKER_PASSWORD     tài khoản Docker Hub để đẩy / kéo image
+#   VPS_HOST, VPS_PORT, VPS_PASSWORD     truy cập SSH của VPS (user root)
+#   POSTGRES_PASSWORD                    mật khẩu database production
+#   DEVICE_CRYPTO_KEY                    khóa AES đúng 32 ký tự (mã hóa mật khẩu máy chấm công)
+# Variables (không bí mật, có mặc định):
+#   NEXT_PUBLIC_API_URL                  địa chỉ API mà trình duyệt gọi (mặc định http://<VPS_HOST>:8080/v1)
+#   CORS_ALLOWED_ORIGINS                 địa chỉ web admin (mặc định http://<VPS_HOST>:3000)
+#   POSTGRES_USER, POSTGRES_DB           mặc định fuel_admin, fuel_station_db
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-test:
+    name: Backend - vet & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go mod verify
+      - run: go vet ./...
+      # Test cần database sẽ tự bỏ qua khi không kết nối được (CI không có Postgres).
+      - run: go test -count=1 ./...
+
+  admin-check:
+    name: Admin - typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npx tsc --noEmit
+
+  admin-e2e:
+    name: Admin - Playwright e2e
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: admin/test-results
+          retention-days: 7
+
+  docker:
+    name: Build & push images
+    needs: [backend-test, admin-check, admin-e2e]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/fuel-station-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/fuel-station-backend:sha-${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build & push admin
+        uses: docker/build-push-action@v6
+        with:
+          context: ./admin
+          file: ./admin/Dockerfile
+          push: true
+          # NEXT_PUBLIC_API_URL được nhúng lúc build nên phải truyền ở đây (đã gồm /v1).
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || format('http://{0}:8080/v1', secrets.VPS_HOST) }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/fuel-station-admin:latest
+            ${{ secrets.DOCKER_USERNAME }}/fuel-station-admin:sha-${{ github.sha }}
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,mode=max,scope=admin
+
+  deploy:
+    name: Deploy to VPS
+    needs: docker
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: docker-compose.prod.yml
+          target: ~/app
+
+      - name: Pull & restart services
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+          DEVICE_CRYPTO_KEY: ${{ secrets.DEVICE_CRYPTO_KEY }}
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS || format('http://{0}:3000', secrets.VPS_HOST) }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,DEVICE_CRYPTO_KEY,CORS_ALLOWED_ORIGINS
+          script_stop: true
+          script: |
+            set -e
+            cd ~/app
+            cp -f docker-compose.prod.yml docker-compose.yml
+
+            # Lần đầu VPS trống: cài Docker nếu chưa có.
+            if ! command -v docker >/dev/null 2>&1; then
+              curl -fsSL https://get.docker.com | sh
+            fi
+
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+            # Biến môi trường chỉ tồn tại trong phiên SSH này; không ghi ra file trên VPS.
+            docker compose pull backend admin
+            docker compose up -d postgres
+            docker compose up -d backend admin
+
+            docker image prune -f
+            docker compose ps

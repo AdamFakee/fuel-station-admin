@@ -104,7 +104,7 @@ export default function ReportsPage() {
           { header: 'Mã bể', key: 'tank_code', width: 14 },
           { header: 'Tên bể', key: 'tank_name', width: 22 },
           { header: 'Nhiên liệu', key: 'fuel_type_name', width: 16 },
-          { header: 'Chi nhánh', key: 'branch_name', width: 20 },
+          { header: 'Trạm xăng', key: 'branch_name', width: 20 },
           { header: 'Dung tích (L)', key: 'capacity_liters', width: 16, align: 'right' as const },
           { header: 'Tồn đầu (L)', key: 'opening_liters', width: 16, align: 'right' as const },
           { header: 'Tổng nhập (L)', key: 'receipt_liters', width: 16, align: 'right' as const },
@@ -252,7 +252,7 @@ export default function ReportsPage() {
         const items = reconciliationQuery.data?.items || [];
         const columns = [
           { header: 'Ngày đối chiếu', key: 'period_date', width: 16, align: 'right' as const },
-          { header: 'Chi nhánh', key: 'branch_name', width: 18 },
+          { header: 'Trạm xăng', key: 'branch_name', width: 18 },
           { header: 'Bể chứa', key: 'tank_name', width: 18 },
           { header: 'Nhiên liệu', key: 'fuel_type_name', width: 16 },
           { header: 'Tồn đầu (L)', key: 'opening_liters', width: 16, align: 'right' as const },
@@ -309,23 +309,23 @@ export default function ReportsPage() {
       {/* Navigation Tabs for 6 Report Templates */}
       <div className="print:hidden">
         <Tabs value={template} onValueChange={(val) => setTemplate(val as ReportTemplateType)}>
-          <TabsList className="grid grid-cols-2 md:grid-cols-6 h-auto p-1 bg-muted/60">
-            <TabsTrigger value="stock-ledger" className="text-xs py-2">
+          <TabsList>
+            <TabsTrigger value="stock-ledger">
               Nhập – Xuất – Tồn
             </TabsTrigger>
-            <TabsTrigger value="receipts" className="text-xs py-2">
+            <TabsTrigger value="receipts">
               Bảng kê phiếu nhập
             </TabsTrigger>
-            <TabsTrigger value="dispenses" className="text-xs py-2">
+            <TabsTrigger value="dispenses">
               Lịch sử cấp phát
             </TabsTrigger>
-            <TabsTrigger value="vehicle-consumption" className="text-xs py-2">
+            <TabsTrigger value="vehicle-consumption">
               Tiêu hao theo xe
             </TabsTrigger>
-            <TabsTrigger value="driver-dispense" className="text-xs py-2">
+            <TabsTrigger value="driver-dispense">
               Cấp phát theo tài xế
             </TabsTrigger>
-            <TabsTrigger value="reconciliation" className="text-xs py-2">
+            <TabsTrigger value="reconciliation">
               Đối chiếu kiểm kê
             </TabsTrigger>
           </TabsList>
@@ -342,8 +342,8 @@ export default function ReportsPage() {
         />
       </div>
 
-      {/* Active Report View Body */}
-      <div className="min-h-[400px]">
+      {/* Nội dung báo cáo: chỉ các dòng của bảng cuộn, tab, bộ lọc và tiêu đề cột luôn hiện */}
+      <div className="flex min-h-0 flex-1 flex-col print:block">
         {template === 'stock-ledger' && (
           <StockLedgerReportView
             data={stockLedgerQuery.data}

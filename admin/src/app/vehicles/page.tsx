@@ -1,21 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { DetailPageHeader } from '@/components/detail-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Paginator from '@/components/paginator';
-import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, MagnifyingGlassIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { toast } from 'sonner';
+import { exportReportToExcel } from '@/features/reports/lib/export-excel';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useCatalogsSummary } from '@/features/master/api/get-catalogs-summary';
-import { useVehicles } from '@/features/master/api/get-vehicles';
+import { getVehicles, useVehicles } from '@/features/master/api/get-vehicles';
 import { VehicleTable } from '@/features/master/components/vehicle-table';
 import { VehicleDialogForm } from '@/features/master/components/vehicle-dialog-form';
 import { VehicleCardDialog } from '@/features/master/components/vehicle-card-dialog';
@@ -55,6 +50,57 @@ export default function VehiclesPage() {
     fuel_type_id: fuelTypeId !== 'all' ? fuelTypeId : undefined,
   });
 
+  const [isExporting, setIsExporting] = React.useState(false);
+
+  /** Xuất Excel toàn bộ xe theo bộ lọc hiện tại (không chỉ trang đang xem): lấy từng trang 100 xe. */
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const filters = {
+        q: debouncedSearch || undefined,
+        branch_id: branchId !== 'all' ? branchId : undefined,
+        status: status !== 'all' ? status : undefined,
+        fuel_type_id: fuelTypeId !== 'all' ? fuelTypeId : undefined,
+      };
+      const allVehicles: VehicleListItem[] = [];
+      for (let exportPage = 1; ; exportPage++) {
+        const result = await getVehicles({
+          ...filters,
+          page: exportPage,
+          page_size: 100,
+        });
+        allVehicles.push(...result.items);
+        if (allVehicles.length >= result.total || result.items.length === 0) break;
+      }
+      await exportReportToExcel({
+        filename: 'danh-sach-xe',
+        title: 'Danh sách xe và phương tiện',
+        columns: [
+          { header: 'Mã xe', key: 'code', width: 16 },
+          { header: 'Biển số', key: 'plate', width: 16 },
+          { header: 'Loại xe', key: 'vehicle_type_name', width: 22 },
+          { header: 'Nhiên liệu', key: 'fuel_type_name', width: 20 },
+          { header: 'Thẻ NFC', key: 'card_number', width: 16 },
+          { header: 'Trạm xăng được phép', key: 'branches', width: 40 },
+          { header: 'Trạng thái', key: 'status_label', width: 16 },
+        ],
+        data: allVehicles.map((vehicle) => ({
+          code: vehicle.code,
+          plate: vehicle.plate,
+          vehicle_type_name: vehicle.vehicle_type_name ?? '',
+          fuel_type_name: vehicle.fuel_type_name,
+          card_number: vehicle.card_number ?? '',
+          branches: (vehicle.branch_names ?? []).join(', '),
+          status_label: vehicle.status === 'active' ? 'Hoạt động' : 'Bị khóa quyền',
+        })),
+      });
+    } catch {
+      toast.error('Không thể xuất Excel. Vui lòng thử lại.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Dialog states
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [isCardOpen, setIsCardOpen] = React.useState(false);
@@ -78,24 +124,22 @@ export default function VehiclesPage() {
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
-        {/* Header */}
-        <DetailPageHeader
-          title="Danh mục Xe & Phương tiện"
-          headerActions={
-            <div className="flex items-center gap-2">
-              {canCreate && (
-                <Button size="sm" onClick={handleOpenCreate} data-testid="btn-create-vehicle">
-                  <PlusIcon className="mr-2 h-4 w-4" />
-                  Thêm xe mới
-                </Button>
-              )}
-            </div>
-          }
-        />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="outline" onClick={handleExportExcel} disabled={isExporting}>
+            <ArrowDownTrayIcon className="mr-2 h-4 w-4" />
+            {isExporting ? 'Đang xuất...' : 'Xuất Excel'}
+          </Button>
+          {canCreate && (
+            <Button onClick={handleOpenCreate} data-testid="btn-create-vehicle">
+              <PlusIcon className="mr-2 h-4 w-4" />
+              Thêm xe mới
+            </Button>
+          )}
+        </div>
 
         {/* Filter Toolbar */}
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
+          <div className="relative min-w-[240px] flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Tìm theo mã xe, biển số, ghi chú..."
@@ -106,8 +150,8 @@ export default function VehiclesPage() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Chi nhánh */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Trạm xăng */}
             <Select
               value={branchId}
               onValueChange={(val) => {
@@ -115,11 +159,11 @@ export default function VehiclesPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-[180px]" data-testid="filter-branch">
-                <SelectValue placeholder="Tất cả chi nhánh" />
+              <SelectTrigger className="w-[200px]" data-testid="filter-branch">
+                <SelectValue placeholder="Tất cả trạm xăng" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả chi nhánh</SelectItem>
+                <SelectItem value="all">Tất cả trạm xăng</SelectItem>
                 {catalogs?.branches?.map((b) => (
                   <SelectItem key={b.id} value={b.id}>
                     {b.name}
@@ -136,7 +180,7 @@ export default function VehiclesPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-[150px]" data-testid="filter-fuel">
+              <SelectTrigger className="w-[180px]" data-testid="filter-fuel">
                 <SelectValue placeholder="Tất cả nhiên liệu" />
               </SelectTrigger>
               <SelectContent>
@@ -157,7 +201,7 @@ export default function VehiclesPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-[140px]" data-testid="filter-status">
+              <SelectTrigger className="w-[180px]" data-testid="filter-status">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
               <SelectContent>
@@ -201,11 +245,7 @@ export default function VehiclesPage() {
         />
 
         {/* Assign / Change NFC Card Modal */}
-        <VehicleCardDialog
-          open={isCardOpen}
-          onOpenChange={setIsCardOpen}
-          vehicle={selectedVehicle}
-        />
+        <VehicleCardDialog open={isCardOpen} onOpenChange={setIsCardOpen} vehicle={selectedVehicle} />
       </div>
     </>
   );

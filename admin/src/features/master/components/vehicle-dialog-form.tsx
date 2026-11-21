@@ -139,7 +139,7 @@ export function VehicleDialogForm({
           <DialogTitle>{isEdit ? `Chỉnh sửa phương tiện: ${vehicle?.code}` : 'Khai báo phương tiện mới'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Cập nhật biển số, loại nhiên liệu và các cửa hàng được phép đổ.'
+              ? 'Cập nhật biển số, loại nhiên liệu và các trạm xăng được phép đổ.'
               : 'Thêm phương tiện mới vào hệ thống quản lý trạm. Mã xe do hệ thống tự sinh để đồng bộ xuống máy chấm công.'}
           </DialogDescription>
         </DialogHeader>
@@ -189,16 +189,16 @@ export function VehicleDialogForm({
             </div>
           </div>
 
-          {/* Cửa hàng được phép đổ */}
+          {/* Trạm xăng được phép đổ */}
           <div className="space-y-1.5">
-            <Label>Cửa hàng được phép đổ</Label>
+            <Label>Trạm xăng được phép đổ</Label>
             <BranchMultiSelect
               branches={catalogs?.branches ?? []}
               selectedIds={selectedBranches}
               onChange={setSelectedBranches}
             />
             {selectedBranches.length === 0 && (
-              <p className="text-xs text-amber-600">Chưa chọn cửa hàng nào: xe sẽ không đổ được ở đâu cho tới khi được cho phép.</p>
+              <p className="text-xs text-amber-600">Chưa chọn trạm xăng nào: xe sẽ không đổ được ở đâu cho tới khi được cho phép.</p>
             )}
           </div>
 

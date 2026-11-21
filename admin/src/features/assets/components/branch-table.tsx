@@ -1,5 +1,10 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { branchDetail } from '@/lib/row-details';
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import Paginator from '@/components/paginator';
 import {
@@ -12,7 +17,6 @@ import {
   ACTION_HEAD_CLASS,
   ACTION_CELL_CLASS,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlusIcon, PencilSquareIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
@@ -25,7 +29,12 @@ import { formatDateVN } from '@/lib/format';
 import { toast } from 'sonner';
 
 export function BranchTable() {
-  const { isManager } = useAuth();
+  const [detail, setDetail] = React.useState<Branch | null>(null);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('org.branch:create');
+  const canUpdate = hasPermission('org.branch:update');
+  const canDelete = hasPermission('org.branch:delete');
+  const showActions = canUpdate || canDelete;
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
   const [search, setSearch] = React.useState('');
@@ -52,10 +61,10 @@ export function BranchTable() {
   };
 
   const handleDeactivate = async (branch: Branch) => {
-    if (confirm(`Bạn có chắc chắn muốn ngừng hoạt động chi nhánh ${branch.name}?`)) {
+    if (confirm(`Bạn có chắc chắn muốn ngừng hoạt động trạm xăng ${branch.name}?`)) {
       try {
         await deleteMutation.mutateAsync(branch.id);
-        toast.success(`Đã ngừng hoạt động chi nhánh ${branch.name}`);
+        toast.success(`Đã ngừng hoạt động trạm xăng ${branch.name}`);
       } catch (err: any) {
         toast.error(err.response?.data?.message || 'Có lỗi xảy ra');
       }
@@ -75,10 +84,10 @@ export function BranchTable() {
           />
         </div>
 
-        {isManager && (
+        {canCreate && (
           <Button onClick={handleCreate} size="sm" className="h-9 gap-1.5 shrink-0">
             <PlusIcon className="h-4 w-4" />
-            <span>Thêm chi nhánh</span>
+            <span>Thêm trạm xăng</span>
           </Button>
         )}
       </div>
@@ -88,49 +97,41 @@ export function BranchTable() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
-              <TableHead className="w-[120px] text-left">Mã chi nhánh</TableHead>
-              <TableHead className="text-left">Tên chi nhánh</TableHead>
+              <TableHead className="w-[120px] text-left">Mã trạm xăng</TableHead>
+              <TableHead className="text-left">Tên trạm xăng</TableHead>
               <TableHead className="text-left">Địa chỉ</TableHead>
               <TableHead className="text-left">Người quản lý</TableHead>
               <TableHead className="text-right tabular-nums">Số điện thoại</TableHead>
               <TableHead className="text-center w-[110px]">Trạng thái</TableHead>
               <TableHead className="text-right tabular-nums w-[120px]">Ngày tạo</TableHead>
-              {isManager && <TableHead className={`${ACTION_HEAD_CLASS} w-[90px]`}>Thao tác</TableHead>}
+              {showActions && <TableHead className={`${ACTION_HEAD_CLASS} w-[90px]`}>Thao tác</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={isManager ? 8 : 7} className="h-24 text-center text-muted-foreground text-xs">
-                  Đang tải danh sách chi nhánh...
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={showActions ? 8 : 7} loading title="Đang tải danh sách trạm xăng..." />
             ) : branches.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={isManager ? 8 : 7} className="h-24 text-center text-muted-foreground text-xs">
-                  Chưa có chi nhánh nào được khai báo.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={showActions ? 8 : 7} title="Chưa có trạm xăng nào được khai báo." />
             ) : (
               branches.map((b) => (
-                <TableRow key={b.id} className="hover:bg-muted/20">
+                <TableRow key={b.id} className="hover:bg-muted/20" onClick={rowClick(() => setDetail(b))}>
                   <TableCell className="font-mono text-xs font-medium text-left">{b.code}</TableCell>
                   <TableCell className="text-left font-medium text-foreground">{b.name}</TableCell>
                   <TableCell className="text-left text-xs text-muted-foreground">{b.address || '—'}</TableCell>
                   <TableCell className="text-left text-xs">{b.manager_name || '—'}</TableCell>
                   <TableCell className="text-right tabular-nums text-xs font-mono">{b.phone || '—'}</TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={b.status === 'active' ? 'default' : 'secondary'} className="text-[10px] px-2 py-0">
+                    <StatusBadge tone={b.status === 'active' ? 'success' : 'warning'}>
                       {b.status === 'active' ? 'Hoạt động' : 'Tạm dừng'}
-                    </Badge>
+                    </StatusBadge>
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                     {formatDateVN(b.created_at)}
                   </TableCell>
-                  {isManager && (
+                  {showActions && (
                     <TableCell className={ACTION_CELL_CLASS}>
                       <div className="flex justify-end gap-1">
-                        {b.status === 'active' && (
+                        {canDelete && b.status === 'active' && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -141,6 +142,7 @@ export function BranchTable() {
                             <NoSymbolIcon className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        {canUpdate && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -150,6 +152,7 @@ export function BranchTable() {
                         >
                           <PencilSquareIcon className="h-3.5 w-3.5" />
                         </Button>
+                        )}
                       </div>
                     </TableCell>
                   )}
@@ -158,6 +161,13 @@ export function BranchTable() {
             )}
           </TableBody>
         </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={detail?.name ?? ''}
+        description={'Trạm xăng'}
+        sections={detail ? branchDetail(detail) : []}
+      />
       </div>
 
       <Paginator

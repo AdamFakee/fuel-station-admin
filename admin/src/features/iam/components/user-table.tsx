@@ -1,5 +1,9 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { userDetail } from '@/lib/row-details';
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -30,6 +34,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { formatDateTimeVN } from '@/lib/format';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useUpdateUserStatus } from '../api/update-user-status';
 import { useDeleteUser } from '../api/delete-user';
 import { UserListItem } from '../types';
@@ -42,13 +47,12 @@ interface UserTableProps {
   currentUserId?: string;
 }
 
-export function UserTable({
-  users,
-  isLoading,
-  onEdit,
-  onResetPassword,
-  currentUserId,
-}: UserTableProps) {
+export function UserTable({ users, isLoading, onEdit, onResetPassword, currentUserId }: UserTableProps) {
+  const [detail, setDetail] = React.useState<UserListItem | null>(null);
+  const { hasPermission } = useAuth();
+  const canUpdate = hasPermission('iam.user:update');
+  const canDelete = hasPermission('iam.user:delete');
+  const showActions = canUpdate || canDelete;
   const updateStatus = useUpdateUserStatus();
   const deleteUser = useDeleteUser();
 
@@ -65,7 +69,7 @@ export function UserTable({
     const newStatus = statusConfirmTarget.status === 'active' ? 'locked' : 'active';
     updateStatus.mutate(
       { id: statusConfirmTarget.id, status: newStatus },
-      { onSuccess: () => setStatusConfirmTarget(null) }
+      { onSuccess: () => setStatusConfirmTarget(null) },
     );
   };
 
@@ -86,7 +90,7 @@ export function UserTable({
 
   if (users.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-12 text-center text-sm text-muted-foreground">
+      <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-md border border-dashed p-12 text-center text-sm text-muted-foreground">
         Không tìm thấy tài khoản nào phù hợp với điều kiện tìm kiếm.
       </div>
     );
@@ -100,12 +104,12 @@ export function UserTable({
             <TableRow>
               <TableHead className="w-[120px] text-left">Mã NV</TableHead>
               <TableHead className="text-left">Họ và tên</TableHead>
-              <TableHead className="text-left">Tên đăng nhập / Email</TableHead>
+              <TableHead className="text-left">Email đăng nhập</TableHead>
               <TableHead className="text-left">Vai trò</TableHead>
-              <TableHead className="text-left">Chi nhánh</TableHead>
+              <TableHead className="text-left">Trạm xăng</TableHead>
               <TableHead className="text-left w-[110px]">Trạng thái</TableHead>
               <TableHead className="text-right tabular-nums w-[170px]">Đăng nhập cuối</TableHead>
-              <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>
+              {showActions && <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -114,7 +118,7 @@ export function UserTable({
               const isLocked = u.status === 'locked';
 
               return (
-                <TableRow key={u.id} className="hover:bg-muted/40 transition-colors">
+                <TableRow key={u.id} className="hover:bg-muted/40 transition-colors" onClick={rowClick(() => setDetail(u))}>
                   <TableCell className="font-mono text-xs font-semibold text-foreground text-left">
                     {u.employee_code}
                   </TableCell>
@@ -123,8 +127,7 @@ export function UserTable({
                     {u.phone && <div className="text-xs text-muted-foreground">{u.phone}</div>}
                   </TableCell>
                   <TableCell className="text-left">
-                    <div className="text-sm font-mono text-foreground">{u.username}</div>
-                    <div className="text-xs text-muted-foreground">{u.email}</div>
+                    <div className="text-sm text-foreground">{u.email}</div>
                   </TableCell>
                   <TableCell className="text-left">
                     <Badge variant="outline" className="font-normal text-xs">
@@ -132,83 +135,95 @@ export function UserTable({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-left">
-                    <div className="max-w-[200px] truncate text-xs text-muted-foreground" title={u.branch_names?.join(', ') || '—'}>
-                      {u.branch_names && u.branch_names.length > 0
-                        ? u.branch_names.join(', ')
-                        : '—'}
+                    <div
+                      className="max-w-[200px] truncate text-xs text-muted-foreground"
+                      title={u.branch_names?.join(', ') || '—'}
+                    >
+                      {u.branch_names && u.branch_names.length > 0 ? u.branch_names.join(', ') : '—'}
                     </div>
                   </TableCell>
                   <TableCell className="text-left">
-                    {isLocked ? (
-                      <Badge variant="destructive" className="text-xs font-normal">
-                        Bị khóa
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs font-normal">
-                        Hoạt động
-                      </Badge>
-                    )}
+                    <StatusBadge tone={isLocked ? 'danger' : 'success'}>
+                      {isLocked ? 'Bị khóa' : 'Hoạt động'}
+                    </StatusBadge>
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                     {formatDateTimeVN(u.last_login_at)}
                   </TableCell>
-                  <TableCell className={ACTION_CELL_CLASS}>
-                    <div className="flex justify-end gap-1">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="icon" className="h-8 w-8">
-                            <EllipsisHorizontalIcon className="h-4 w-4" />
-                            <span className="sr-only">Tùy chọn</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => onEdit(u)} className="cursor-pointer">
-                            <PencilSquareIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Sửa thông tin
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem onClick={() => onResetPassword(u)} className="cursor-pointer">
-                            <KeyIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Đặt lại mật khẩu
-                          </DropdownMenuItem>
-
-                          <DropdownMenuSeparator />
-
-                          <DropdownMenuItem
-                            onClick={() => handleToggleStatus(u)}
-                            disabled={isSelf}
-                            className={isLocked ? 'cursor-pointer text-emerald-600' : 'cursor-pointer text-amber-600'}
-                          >
-                            {isLocked ? (
+                  {showActions && (
+                    <TableCell className={ACTION_CELL_CLASS}>
+                      <div className="flex justify-end gap-1">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8">
+                              <EllipsisHorizontalIcon className="h-4 w-4" />
+                              <span className="sr-only">Tùy chọn</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            {canUpdate && (
                               <>
-                                <LockOpenIcon className="mr-2 h-4 w-4" />
-                                Mở khóa tài khoản
-                              </>
-                            ) : (
-                              <>
-                                <LockClosedIcon className="mr-2 h-4 w-4" />
-                                Khóa tài khoản
+                                <DropdownMenuItem onClick={() => onEdit(u)} className="cursor-pointer">
+                                  <PencilSquareIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  Sửa thông tin
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem onClick={() => onResetPassword(u)} className="cursor-pointer">
+                                  <KeyIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  Đặt lại mật khẩu
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator />
+
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleStatus(u)}
+                                  disabled={isSelf}
+                                  className={
+                                    isLocked ? 'cursor-pointer text-emerald-600' : 'cursor-pointer text-amber-600'
+                                  }
+                                >
+                                  {isLocked ? (
+                                    <>
+                                      <LockOpenIcon className="mr-2 h-4 w-4" />
+                                      Mở khóa tài khoản
+                                    </>
+                                  ) : (
+                                    <>
+                                      <LockClosedIcon className="mr-2 h-4 w-4" />
+                                      Khóa tài khoản
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
                               </>
                             )}
-                          </DropdownMenuItem>
 
-                          <DropdownMenuItem
-                            onClick={() => setDeleteConfirmTarget(u)}
-                            disabled={isSelf}
-                            className="cursor-pointer text-destructive focus:text-destructive"
-                          >
-                            <TrashIcon className="mr-2 h-4 w-4" />
-                            Xóa tài khoản
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
+                            {canDelete && (
+                              <DropdownMenuItem
+                                onClick={() => setDeleteConfirmTarget(u)}
+                                disabled={isSelf}
+                                className="cursor-pointer text-destructive focus:text-destructive"
+                              >
+                                <TrashIcon className="mr-2 h-4 w-4" />
+                                Xóa tài khoản
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={detail?.full_name ?? ''}
+        description={'Tài khoản người dùng'}
+        sections={detail ? userDetail(detail) : []}
+      />
       </div>
 
       {/* Lock/Unlock Confirm Dialog */}
@@ -220,8 +235,8 @@ export function UserTable({
           title={statusConfirmTarget.status === 'active' ? 'Khóa tài khoản người dùng?' : 'Mở khóa tài khoản?'}
           description={
             statusConfirmTarget.status === 'active'
-              ? `Tài khoản ${statusConfirmTarget.full_name} (${statusConfirmTarget.username}) sẽ không thể đăng nhập vào hệ thống.`
-              : `Tài khoản ${statusConfirmTarget.full_name} (${statusConfirmTarget.username}) sẽ được kích hoạt lại.`
+              ? `Tài khoản ${statusConfirmTarget.full_name} (${statusConfirmTarget.email}) sẽ không thể đăng nhập vào hệ thống.`
+              : `Tài khoản ${statusConfirmTarget.full_name} (${statusConfirmTarget.email}) sẽ được kích hoạt lại.`
           }
           consequences={
             statusConfirmTarget.status === 'active'
@@ -244,7 +259,7 @@ export function UserTable({
           onOpenChange={(open) => !open && setDeleteConfirmTarget(null)}
           level="destructive"
           title={`Xác nhận xóa tài khoản ${deleteConfirmTarget.full_name}?`}
-          description={`Tài khoản mã ${deleteConfirmTarget.employee_code} (${deleteConfirmTarget.username}) sẽ bị xóa mềm khỏi danh mục.`}
+          description={`Tài khoản mã ${deleteConfirmTarget.employee_code} (${deleteConfirmTarget.email}) sẽ bị xóa mềm khỏi danh mục.`}
           consequences={[
             'Tài khoản sẽ bị vô hiệu hóa hoàn toàn khỏi hệ thống đăng nhập.',
             'Dữ liệu lịch sử xuất nhập, giao dịch bơm và audit log liên quan vẫn được bảo lưu.',

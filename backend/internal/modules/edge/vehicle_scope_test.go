@@ -11,7 +11,7 @@ import (
 )
 
 // Test tích hợp dùng DB dev (bỏ qua nếu không nối được): danh mục xuống trạm gồm MỌI xe kèm cờ `allowed_here`
-// theo cửa hàng của từng trạm.
+// theo trạm xăng của từng trạm.
 func TestCatalogCarriesAllowedHereFlagPerStore(t *testing.T) {
 	const (
 		dbURL    = "postgres://postgres:postgres@localhost:5432/fuel_station_db?sslmode=disable"
@@ -39,7 +39,7 @@ func TestCatalogCarriesAllowedHereFlagPerStore(t *testing.T) {
 		t.Fatalf("read cursor: %v", err)
 	}
 
-	// Xe chỉ được phép ở cửa hàng A
+	// Xe chỉ được phép ở trạm xăng A
 	suffix := time.Now().UnixNano() % 1000000
 	var vehicleID string
 	if err := pool.QueryRow(ctx, `
@@ -71,7 +71,7 @@ func TestCatalogCarriesAllowedHereFlagPerStore(t *testing.T) {
 	if allowed, found := allowedAt(branchA); !found || !allowed {
 		t.Fatalf("store A must receive the vehicle with allowed_here=true (found=%v allowed=%v)", found, allowed)
 	}
-	// Cửa hàng B vẫn nhận xe (để ghi nhận lượt đổ nhầm) nhưng với cờ false.
+	// Trạm xăng B vẫn nhận xe (để ghi nhận lượt đổ nhầm) nhưng với cờ false.
 	if allowed, found := allowedAt(branchB); !found || allowed {
 		t.Fatalf("store B must receive the vehicle with allowed_here=false (found=%v allowed=%v)", found, allowed)
 	}

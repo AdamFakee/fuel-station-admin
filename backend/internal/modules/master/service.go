@@ -167,6 +167,12 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 		argIdx++
 	}
 
+	if scope := authz.BranchScope(ctx); scope != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("EXISTS (SELECT 1 FROM station.vehicle_branch vs WHERE vs.tenant_id = v.tenant_id AND vs.vehicle_id = v.id AND vs.branch_id = ANY($%d::uuid[]))", argIdx))
+		args = append(args, scope)
+		argIdx++
+	}
+
 	if q.BranchID != nil {
 		whereClauses = append(whereClauses, fmt.Sprintf("EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $%d)", argIdx))
 		args = append(args, *q.BranchID)
@@ -246,7 +252,7 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 		vehicleIDs = append(vehicleIDs, item.ID)
 	}
 
-	// Cửa hàng được phép của các xe trả về
+	// Trạm xăng được phép của các xe trả về
 	if len(vehicleIDs) > 0 {
 		branchMap, err := s.loadVehicleBranches(ctx, tenantID, vehicleIDs)
 		if err != nil {
@@ -265,13 +271,13 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 	return items, total, nil
 }
 
-// branchRef là một cửa hàng (id và tên) trong danh sách được phép của xe.
+// branchRef là một trạm xăng (id và tên) trong danh sách được phép của xe.
 type branchRef struct {
 	ID   uuid.UUID
 	Name string
 }
 
-// loadVehicleBranches trả về, với mỗi xe, các cửa hàng được phép đổ (sắp theo tên).
+// loadVehicleBranches trả về, với mỗi xe, các trạm xăng được phép đổ (sắp theo tên).
 func (s *Service) loadVehicleBranches(ctx context.Context, tenantID uuid.UUID, vehicleIDs []uuid.UUID) (map[uuid.UUID][]branchRef, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT vb.vehicle_id, b.id, b.name
@@ -297,7 +303,7 @@ func (s *Service) loadVehicleBranches(ctx context.Context, tenantID uuid.UUID, v
 	return out, rows.Err()
 }
 
-// normalizeBranchIDs bỏ trùng, và kiểm tra mọi cửa hàng đều thuộc công ty hiện tại.
+// normalizeBranchIDs bỏ trùng, và kiểm tra mọi trạm xăng đều thuộc công ty hiện tại.
 func normalizeBranchIDs(ctx context.Context, q interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }, tenantID uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error) {
@@ -326,7 +332,7 @@ func normalizeBranchIDs(ctx context.Context, q interface {
 	return unique, nil
 }
 
-// syncVehicleBranches đưa danh sách cửa hàng được phép của xe về đúng `want`, chỉ thêm hoặc xóa phần chênh lệch.
+// syncVehicleBranches đưa danh sách trạm xăng được phép của xe về đúng `want`, chỉ thêm hoặc xóa phần chênh lệch.
 // (Mỗi thêm hoặc xóa làm tăng version của xe để Edge Agent đồng bộ lại, nên không xóa rồi chèn lại toàn bộ.)
 func syncVehicleBranches(ctx context.Context, tx pgx.Tx, tenantID, vehicleID uuid.UUID, want []uuid.UUID) error {
 	rows, err := tx.Query(ctx, `SELECT branch_id FROM station.vehicle_branch WHERE tenant_id = $1 AND vehicle_id = $2`, tenantID, vehicleID)
@@ -369,6 +375,10 @@ func syncVehicleBranches(ctx context.Context, tx pgx.Tx, tenantID, vehicleID uui
 func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail, error) {
 	tenantID, _, _, err := getTenantAndActor(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := s.ensureVehicleInScope(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -415,7 +425,7 @@ func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail,
 		d.CardCredential = &cred
 	}
 
-	// Cửa hàng được phép
+	// Trạm xăng được phép
 	d.BranchIDs = make([]uuid.UUID, 0)
 	d.BranchNames = make([]string, 0)
 	if branchMap, err := s.loadVehicleBranches(ctx, tenantID, []uuid.UUID{id}); err == nil {
@@ -431,6 +441,10 @@ func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail,
 func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (*VehicleDetail, error) {
 	tenantID, actorID, actorName, err := getTenantAndActor(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := s.ensureVehicleBranchesAllowed(ctx, uuid.Nil, req.BranchIDs); err != nil {
 		return nil, err
 	}
 
@@ -553,6 +567,13 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 		return nil, err
 	}
 
+	if err := s.ensureVehicleInScope(ctx, id); err != nil {
+		return nil, err
+	}
+	if err := s.ensureVehicleBranchesAllowed(ctx, id, req.BranchIDs); err != nil {
+		return nil, err
+	}
+
 	req.Plate = strings.TrimSpace(req.Plate)
 	if req.Plate == "" {
 		return nil, fmt.Errorf("%w: license plate is required", apperr.ErrInvalidInput)
@@ -645,6 +666,10 @@ func (s *Service) UpdateVehicleStatus(ctx context.Context, id uuid.UUID, status 
 		return err
 	}
 
+	if err := s.ensureVehicleInScope(ctx, id); err != nil {
+		return err
+	}
+
 	if status != "active" && status != "banned" {
 		return fmt.Errorf("%w: status must be 'active' or 'banned'", apperr.ErrInvalidInput)
 	}
@@ -693,6 +718,10 @@ func (s *Service) UpdateVehicleStatus(ctx context.Context, id uuid.UUID, status 
 func (s *Service) AssignVehicleCard(ctx context.Context, id uuid.UUID, cardNumber string) error {
 	tenantID, actorID, actorName, err := getTenantAndActor(ctx)
 	if err != nil {
+		return err
+	}
+
+	if err := s.ensureVehicleInScope(ctx, id); err != nil {
 		return err
 	}
 
@@ -770,6 +799,10 @@ func (s *Service) RevokeVehicleCard(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
+	if err := s.ensureVehicleInScope(ctx, id); err != nil {
+		return err
+	}
+
 	var code string
 	err = s.pool.QueryRow(ctx, `
 		SELECT code FROM station.vehicle WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
@@ -809,6 +842,10 @@ func (s *Service) RevokeVehicleCard(ctx context.Context, id uuid.UUID) error {
 func (s *Service) DeleteVehicle(ctx context.Context, id uuid.UUID) error {
 	tenantID, actorID, actorName, err := getTenantAndActor(ctx)
 	if err != nil {
+		return err
+	}
+
+	if err := s.ensureVehicleInScope(ctx, id); err != nil {
 		return err
 	}
 
@@ -1612,4 +1649,63 @@ func (s *Service) ImportDrivers(ctx context.Context, req ImportDriversRequest) (
 		result.Created++
 	}
 	return result, nil
+}
+
+// ensureVehicleInScope: người thao tác bị giới hạn trạm xăng chỉ được đụng tới xe được phép đổ ở ít nhất một trạm xăng của mình.
+// Xe ngoài phạm vi trả `ErrNotFound` như thể không tồn tại.
+func (s *Service) ensureVehicleInScope(ctx context.Context, vehicleID uuid.UUID) error {
+	scope := authz.BranchScope(ctx)
+	if scope == nil {
+		return nil
+	}
+	var shared bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM station.vehicle_branch vb
+			WHERE vb.vehicle_id = $1 AND vb.branch_id = ANY($2::uuid[])
+		)
+	`, vehicleID, scope).Scan(&shared)
+	if err != nil {
+		return fmt.Errorf("check vehicle branch scope: %w", err)
+	}
+	if !shared {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
+// ensureVehicleBranchesAllowed: người thao tác bị giới hạn trạm xăng phải gán xe cho ít nhất một trạm xăng,
+// và chỉ được thêm trạm xăng nằm trong phạm vi của mình (trạm xăng xe đã có từ trước thì được giữ nguyên).
+// `vehicleID` là uuid.Nil khi tạo mới.
+func (s *Service) ensureVehicleBranchesAllowed(ctx context.Context, vehicleID uuid.UUID, requested []uuid.UUID) error {
+	if authz.BranchScope(ctx) == nil {
+		return nil
+	}
+	if len(requested) == 0 {
+		return fmt.Errorf("%w: chọn ít nhất một trạm xăng cho xe", apperr.ErrInvalidInput)
+	}
+	alreadyAssigned := map[uuid.UUID]bool{}
+	if vehicleID != uuid.Nil {
+		rows, err := s.pool.Query(ctx, `SELECT branch_id FROM station.vehicle_branch WHERE vehicle_id = $1`, vehicleID)
+		if err != nil {
+			return fmt.Errorf("load vehicle branches: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var branchID uuid.UUID
+			if err := rows.Scan(&branchID); err != nil {
+				return err
+			}
+			alreadyAssigned[branchID] = true
+		}
+	}
+	for _, branchID := range requested {
+		if alreadyAssigned[branchID] {
+			continue
+		}
+		if err := authz.EnsureBranch(ctx, branchID.String()); err != nil {
+			return err
+		}
+	}
+	return nil
 }

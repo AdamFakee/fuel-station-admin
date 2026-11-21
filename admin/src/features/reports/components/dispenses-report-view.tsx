@@ -1,11 +1,13 @@
 'use client';
 
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatCard } from '@/components/stat-card';
+import { BeakerIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { StatusBadge } from '@/components/status-badge';
 import React from 'react';
 import { DispenseReportResponse } from '../types';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface DispensesReportViewProps {
   data?: DispenseReportResponse;
@@ -22,49 +24,47 @@ export function DispensesReportView({ data, isLoading }: DispensesReportViewProp
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-emerald-600 hover:bg-emerald-600">Hoàn thành</Badge>;
+        return <StatusBadge tone="success">Hoàn thành</StatusBadge>;
       case 'cancelled':
-        return <Badge variant="secondary">Đã hủy</Badge>;
+        return <StatusBadge tone="neutral">Đã hủy</StatusBadge>;
       case 'failed':
-        return <Badge variant="destructive">Lỗi</Badge>;
+        return <StatusBadge tone="danger">Lỗi</StatusBadge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <StatusBadge tone="neutral">{status}</StatusBadge>;
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {/* Quick Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Tổng số lượt đổ nhiên liệu</div>
-            <div className="text-2xl font-bold tabular-nums mt-1">{formatNumberVN(data?.total_sessions || 0)}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-50/50 border-blue-100">
-          <CardContent className="pt-4">
-            <div className="text-xs text-blue-800">Tổng thể tích cấp phát thực tế</div>
-            <div className="text-2xl font-bold text-blue-700 tabular-nums mt-1">
-              {formatNumberVN(data?.total_dispensed_liters || 0, 2)} L
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Thể tích trung bình / lượt</div>
-            <div className="text-2xl font-bold tabular-nums mt-1">
-              {data?.total_sessions
-                ? formatNumberVN((data.total_dispensed_liters || 0) / data.total_sessions, 2)
-                : '0'}{' '}
+      <div className="grid shrink-0 grid-cols-2 gap-4 md:grid-cols-3">
+        <StatCard
+          label="Tổng số lượt đổ nhiên liệu"
+          value={<>{formatNumberVN(data?.total_sessions || 0)}</>}
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
+        <StatCard
+          label="Tổng thể tích cấp phát thực tế"
+          value={<>{formatNumberVN(data?.total_dispensed_liters || 0, 2)} L</>}
+          icon={BeakerIcon}
+          tone="primary"
+        />
+        <StatCard
+          label="Thể tích trung bình / lượt"
+          value={
+            <>
+              {data?.total_sessions ? formatNumberVN((data.total_dispensed_liters || 0) / data.total_sessions, 2) : '0'}{' '}
               L
-            </div>
-          </CardContent>
-        </Card>
+            </>
+          }
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
       </div>
 
       {/* Chi tiết danh sách phiên đổ */}
-      <div className="rounded-md border">
+      <div className="flex min-h-0 flex-1 flex-col rounded-md border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -83,11 +83,7 @@ export function DispensesReportView({ data, isLoading }: DispensesReportViewProp
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
-                  Không tìm thấy phiên đổ nhiên liệu nào khớp với bộ lọc.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={11} title="Không tìm thấy phiên đổ nhiên liệu nào khớp với bộ lọc." />
             ) : (
               items.map((row) => (
                 <TableRow key={row.id}>

@@ -186,7 +186,7 @@ type CreatePumpRequest struct {
 	Note       *string `json:"note,omitempty"`
 	TankID     string  `json:"tank_id"` // initial nozzle connected tank
 
-	// Bộ số Montech của trụ. Cổng COM là bắt buộc (mỗi trụ một cổng riêng trong cửa hàng); serial mặc định 1234 và được phép trùng giữa các trụ.
+	// Bộ số Montech của trụ. Cổng COM là bắt buộc (mỗi trụ một cổng riêng trong trạm xăng); serial mặc định 1234 và được phép trùng giữa các trụ.
 	SensorName    *string `json:"sensor_name,omitempty"`
 	SensorComPort *string `json:"sensor_com_port,omitempty"`
 	SensorSerial  *uint32 `json:"sensor_serial,omitempty"`

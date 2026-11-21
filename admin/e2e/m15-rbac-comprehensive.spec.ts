@@ -78,7 +78,7 @@ test.describe('Module M15 - Hoàn thiện & Phân quyền toàn diện 3 Actor (
       });
     });
 
-    // 2. Mock Chi nhánh
+    // 2. Mock Trạm xăng
     await page.route('**/v1/assets/branches*', async (route: any) => {
       await route.fulfill({
         status: 200,

@@ -45,7 +45,7 @@ type VehicleListItem struct {
 	Status          string     `json:"status"` // 'active' | 'banned'
 	Note            string     `json:"note,omitempty"`
 	CardNumber      string     `json:"card_number,omitempty"`
-	// Cửa hàng mà xe được phép đổ. Rỗng nghĩa là xe chưa được đổ ở cửa hàng nào.
+	// Trạm xăng mà xe được phép đổ. Rỗng nghĩa là xe chưa được đổ ở trạm xăng nào.
 	BranchIDs   []uuid.UUID `json:"branch_ids"`
 	BranchNames []string    `json:"branch_names"`
 	Version     int64       `json:"version"`
@@ -59,7 +59,7 @@ type VehicleDetail struct {
 }
 
 type CreateVehicleRequest struct {
-	// Cửa hàng được phép đổ (tùy chọn; không chọn thì xe chưa đổ được ở đâu).
+	// Trạm xăng được phép đổ (tùy chọn; không chọn thì xe chưa đổ được ở đâu).
 	BranchIDs     []uuid.UUID `json:"branch_ids"`
 	Code          string      `json:"code"`
 	Plate         string      `json:"plate"`

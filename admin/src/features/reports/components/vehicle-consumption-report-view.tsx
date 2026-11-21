@@ -1,11 +1,13 @@
 'use client';
 
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatCard } from '@/components/stat-card';
+import { BeakerIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { StatusBadge } from '@/components/status-badge';
 import React from 'react';
 import { VehicleConsumptionResponse } from '../types';
 import { formatNumberVN } from '@/lib/format';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface VehicleConsumptionReportViewProps {
   data?: VehicleConsumptionResponse;
@@ -22,42 +24,40 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'over_quota':
-        return <Badge variant="destructive">Vượt định mức</Badge>;
+        return <StatusBadge tone="danger">Vượt định mức</StatusBadge>;
       case 'normal':
-        return <Badge className="bg-emerald-600 hover:bg-emerald-600">Trong định mức</Badge>;
+        return <StatusBadge tone="success">Trong định mức</StatusBadge>;
       default:
-        return <Badge variant="outline" className="text-muted-foreground">Chưa có định mức</Badge>;
+        return <StatusBadge tone="neutral">Chưa có định mức</StatusBadge>;
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {/* Quick Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Tổng số phương tiện trong danh sách</div>
-            <div className="text-2xl font-bold tabular-nums mt-1">{formatNumberVN(data?.total_vehicles || 0)}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Tổng số phiên đổ hoàn thành</div>
-            <div className="text-2xl font-bold tabular-nums mt-1">{formatNumberVN(data?.total_sessions || 0)}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-indigo-50/50 border-indigo-100">
-          <CardContent className="pt-4">
-            <div className="text-xs text-indigo-800">Tổng nhiên liệu tiêu thụ toàn đội xe</div>
-            <div className="text-2xl font-bold text-indigo-700 tabular-nums mt-1">
-              {formatNumberVN(data?.total_dispensed_liters || 0, 2)} L
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid shrink-0 grid-cols-2 gap-4 md:grid-cols-3">
+        <StatCard
+          label="Tổng số phương tiện trong danh sách"
+          value={<>{formatNumberVN(data?.total_vehicles || 0)}</>}
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
+        <StatCard
+          label="Tổng số phiên đổ hoàn thành"
+          value={<>{formatNumberVN(data?.total_sessions || 0)}</>}
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
+        <StatCard
+          label="Tổng nhiên liệu tiêu thụ toàn đội xe"
+          value={<>{formatNumberVN(data?.total_dispensed_liters || 0, 2)} L</>}
+          icon={BeakerIcon}
+          tone="primary"
+        />
       </div>
 
       {/* Bảng kê tiêu hao theo xe */}
-      <div className="rounded-md border">
+      <div className="flex min-h-0 flex-1 flex-col rounded-md border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -73,11 +73,7 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                  Không có dữ liệu tiêu hao phương tiện trong khoảng thời gian đã chọn.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={8} title="Không có dữ liệu tiêu hao phương tiện trong khoảng thời gian đã chọn." />
             ) : (
               items.map((row) => (
                 <TableRow key={row.vehicle_id}>
@@ -94,7 +90,13 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
                         <span className="font-medium">{formatNumberVN(row.quota_liters, 2)}</span>
                         {row.quota_period && (
                           <span className="text-[10px] text-muted-foreground block">
-                            ({row.quota_period === 'day' ? 'ngày' : row.quota_period === 'month' ? 'tháng' : row.quota_period})
+                            (
+                            {row.quota_period === 'day'
+                              ? 'ngày'
+                              : row.quota_period === 'month'
+                                ? 'tháng'
+                                : row.quota_period}
+                            )
                           </span>
                         )}
                       </div>

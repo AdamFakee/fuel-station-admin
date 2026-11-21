@@ -7,12 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogBody,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   CreditCardIcon,
   UserCircleIcon,
@@ -22,6 +22,8 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { formatDateTimeVN } from '@/lib/format';
+import { compressFaceImage } from '@/lib/compress-image';
+import { StatusBadge } from '@/components/status-badge';
 import { toast } from 'sonner';
 import { DriverListItem } from '../types';
 import { useDriver } from '../api/get-driver';
@@ -57,6 +59,7 @@ export function DriverCredentialsDialog({
   const [faceFile, setFaceFile] = React.useState<File | null>(null);
   const [facePreview, setFacePreview] = React.useState<string | null>(null);
   const [faceError, setFaceError] = React.useState('');
+  const [faceOriginalSize, setFaceOriginalSize] = React.useState(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Fingerprint Tab state
@@ -98,22 +101,22 @@ export function DriverCredentialsDialog({
     );
   };
 
-  // Face File change
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Chọn ảnh: lớn hơn 200 KB thì tự nén xuống, không bắt người dùng đổi ảnh
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 200 * 1024) {
-      setFaceError('Ảnh vượt quá dung lượng tối đa 200 KB theo quy chuẩn máy chấm công.');
+    setFaceError('');
+    setFaceOriginalSize(file.size);
+    try {
+      const prepared = await compressFaceImage(file);
+      setFaceFile(prepared);
+      setFacePreview(URL.createObjectURL(prepared));
+    } catch {
+      setFaceError('Không xử lý được ảnh này. Vui lòng chọn ảnh JPG hoặc PNG khác.');
       setFaceFile(null);
       setFacePreview(null);
-      return;
     }
-
-    setFaceError('');
-    setFaceFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setFacePreview(objectUrl);
   };
 
   // Face Upload
@@ -164,44 +167,46 @@ export function DriverCredentialsDialog({
     );
   };
 
+  const methodLabel = (method: string) => (method === 'card' ? 'Thẻ NFC' : method === 'face' ? 'Khuôn mặt' : 'Vân tay');
+  const compressed = faceFile && faceOriginalSize > faceFile.size;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent size="lg" className="max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserCircleIcon className="h-6 w-6 text-primary" />
-            Phương thức xác thực: {driver?.full_name} ({driver?.code})
+            <UserCircleIcon className="h-6 w-6 shrink-0 text-primary" />
+            Phương thức xác thực
           </DialogTitle>
           <DialogDescription>
-            Quản lý thẻ NFC, nhận diện khuôn mặt và vân tay được đồng bộ trực tiếp xuống máy chấm công Hikvision ISAPI.
+            {driver?.full_name} <span className="font-mono">({driver?.code})</span> — đồng bộ xuống máy chấm công
+            Hikvision.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="card" className="w-full pt-2">
-          <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="card" className="text-xs">
-              <CreditCardIcon className="mr-1.5 h-4 w-4" />
-              Thẻ từ NFC
-            </TabsTrigger>
-            <TabsTrigger value="face" className="text-xs">
-              <UserCircleIcon className="mr-1.5 h-4 w-4" />
-              Khuôn mặt
-            </TabsTrigger>
-            <TabsTrigger value="fingerprint" className="text-xs">
-              <FingerPrintIcon className="mr-1.5 h-4 w-4" />
-              Vân tay
-            </TabsTrigger>
-            <TabsTrigger value="history" className="text-xs">
-              Danh sách ({detail?.credentials?.length || 0})
-            </TabsTrigger>
-          </TabsList>
+        <DialogBody>
+          <Tabs defaultValue="card" className="gap-6 pt-2">
+            <TabsList>
+              <TabsTrigger value="card">
+                <CreditCardIcon className="mr-1.5 h-4 w-4" />
+                Thẻ NFC
+              </TabsTrigger>
+              <TabsTrigger value="face">
+                <UserCircleIcon className="mr-1.5 h-4 w-4" />
+                Khuôn mặt
+              </TabsTrigger>
+              <TabsTrigger value="fingerprint">
+                <FingerPrintIcon className="mr-1.5 h-4 w-4" />
+                Vân tay
+              </TabsTrigger>
+              <TabsTrigger value="history">Đã đăng ký ({detail?.credentials?.length || 0})</TabsTrigger>
+            </TabsList>
 
-          {/* TAB 1: CARD */}
-          <TabsContent value="card" className="space-y-4 pt-3">
-            <form onSubmit={handleAssignCard} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="driver-card-number">Số thẻ NFC (cardNo)</Label>
-                <div className="flex gap-2">
+            {/* THẺ NFC */}
+            <TabsContent value="card">
+              <form onSubmit={handleAssignCard} className="space-y-3 rounded-lg border bg-card p-5">
+                <Label htmlFor="driver-card-number">Số thẻ NFC</Label>
+                <div className="flex gap-3">
                   <Input
                     id="driver-card-number"
                     placeholder="VD: 3862658937"
@@ -220,48 +225,52 @@ export function DriverCredentialsDialog({
                 {cardError ? (
                   <p className="text-xs text-destructive">{cardError}</p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Nhập đúng định dạng chuỗi số thập phân được đọc từ thẻ NFC MIFARE.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Chuỗi số thập phân đọc từ thẻ NFC MIFARE.</p>
                 )}
-              </div>
-            </form>
-          </TabsContent>
+              </form>
+            </TabsContent>
 
-          {/* TAB 2: FACE */}
-          <TabsContent value="face" className="space-y-4 pt-3">
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Ảnh khuôn mặt (Tối đa 200 KB)</Label>
+            {/* KHUÔN MẶT */}
+            <TabsContent value="face" className="space-y-4">
+              <div className="space-y-3 rounded-lg border bg-card p-5">
+                <Label>Ảnh khuôn mặt</Label>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/jpg"
                   ref={fileInputRef}
                   onChange={handleFileChange}
-                  className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+                  className="sr-only"
                   data-testid="input-driver-face-file"
                 />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full flex-col items-center gap-1.5 rounded-lg border border-dashed border-input px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary-subtle-foreground"
+                >
+                  <ArrowUpTrayIcon className="h-6 w-6" />
+                  <span className="font-medium">{faceFile ? 'Chọn ảnh khác' : 'Chọn ảnh từ máy tính'}</span>
+                  <span className="text-xs">JPG hoặc PNG, ảnh chính diện, nền sáng, rõ nét</span>
+                </button>
                 {faceError && <p className="text-xs text-destructive">{faceError}</p>}
-                <p className="text-xs text-muted-foreground">
-                  Chuẩn Hikvision ISAPI: Ảnh chụp chính diện, nền sáng, rõ nét, dung lượng &lt; 200 KB.
-                </p>
               </div>
 
               {facePreview && (
-                <div className="flex items-center gap-4 rounded-md border border-border p-3 bg-muted/30">
+                <div className="flex items-center gap-5 rounded-lg border bg-card p-5">
                   <img
                     src={facePreview}
-                    alt="Preview khuôn mặt"
-                    className="h-24 w-24 rounded-md object-cover border border-border"
+                    alt="Xem trước khuôn mặt"
+                    className="h-28 w-28 shrink-0 rounded-md border object-cover"
                   />
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">{faceFile?.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Kích thước: {Math.round((faceFile?.size || 0) / 1024)} KB
-                    </p>
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="space-y-1">
+                      <p className="truncate text-sm font-medium">{faceFile?.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {Math.round((faceFile?.size || 0) / 1024)} KB
+                        {compressed && ` (đã tự giảm từ ${Math.round(faceOriginalSize / 1024)} KB)`}
+                      </p>
+                    </div>
                     <Button
                       type="button"
-                      size="sm"
                       onClick={handleUploadFace}
                       disabled={uploadFace.isPending}
                       data-testid="upload-face-btn"
@@ -272,15 +281,13 @@ export function DriverCredentialsDialog({
                   </div>
                 </div>
               )}
-            </div>
-          </TabsContent>
+            </TabsContent>
 
-          {/* TAB 3: FINGERPRINT */}
-          <TabsContent value="fingerprint" className="space-y-4 pt-3">
-            <form onSubmit={handleRegisterFingerprint} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="driver-fingerprint-template">Mã mẫu vân tay (Biometric Template ID)</Label>
-                <div className="flex gap-2">
+            {/* VÂN TAY */}
+            <TabsContent value="fingerprint">
+              <form onSubmit={handleRegisterFingerprint} className="space-y-3 rounded-lg border bg-card p-5">
+                <Label htmlFor="driver-fingerprint-template">Mã mẫu vân tay</Label>
+                <div className="flex gap-3">
                   <Input
                     id="driver-fingerprint-template"
                     placeholder="VD: FP-TEMP-001"
@@ -296,74 +303,68 @@ export function DriverCredentialsDialog({
                     {registerFingerprint.isPending ? 'Đang lưu...' : 'Đăng ký mẫu'}
                   </Button>
                 </div>
-                {fingerprintError && <p className="text-xs text-destructive">{fingerprintError}</p>}
-                <p className="text-xs text-muted-foreground">
-                  Mã mẫu sinh trắc học vân tay từ máy chấm công Hikvision hoặc đầu đọc USB.
-                </p>
-              </div>
-            </form>
-          </TabsContent>
+                {fingerprintError ? (
+                  <p className="text-xs text-destructive">{fingerprintError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Mã mẫu lấy từ máy chấm công Hikvision hoặc đầu đọc USB.
+                  </p>
+                )}
+              </form>
+            </TabsContent>
 
-          {/* TAB 4: CREDENTIALS LIST */}
-          <TabsContent value="history" className="space-y-3 pt-3">
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground text-center py-6">Đang tải danh sách...</p>
-            ) : !detail?.credentials || detail.credentials.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">Chưa có phương thức xác thực nào.</p>
-            ) : (
-              <div className="space-y-2">
-                {detail.credentials.map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between p-2.5 rounded-md border border-border bg-card text-sm"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {c.method === 'card' && <CreditCardIcon className="h-4 w-4 text-emerald-500" />}
-                      {c.method === 'face' && <UserCircleIcon className="h-4 w-4 text-blue-500" />}
-                      {c.method === 'fingerprint' && <FingerPrintIcon className="h-4 w-4 text-purple-500" />}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium capitalize">
-                            {c.method === 'card' ? 'Thẻ NFC' : c.method === 'face' ? 'Khuôn mặt' : 'Vân tay'}
-                          </span>
-                          <span className="font-mono text-xs text-muted-foreground">({c.external_id})</span>
-                          {c.status === 'active' ? (
-                            <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300">
-                              Đang hiệu lực
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-[10px]">
-                              Đã thu hồi
-                            </Badge>
-                          )}
+            {/* DANH SÁCH */}
+            <TabsContent value="history">
+              {isLoading ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">Đang tải danh sách...</p>
+              ) : !detail?.credentials || detail.credentials.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">Chưa có phương thức xác thực nào.</p>
+              ) : (
+                <div className="space-y-3">
+                  {detail.credentials.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        {c.method === 'card' && <CreditCardIcon className="h-5 w-5 shrink-0 text-muted-foreground" />}
+                        {c.method === 'face' && <UserCircleIcon className="h-5 w-5 shrink-0 text-muted-foreground" />}
+                        {c.method === 'fingerprint' && (
+                          <FingerPrintIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+                        )}
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{methodLabel(c.method)}</span>
+                            <span className="font-mono text-xs text-muted-foreground">{c.external_id}</span>
+                            <StatusBadge tone={c.status === 'active' ? 'success' : 'neutral'}>
+                              {c.status === 'active' ? 'Đang hiệu lực' : 'Đã thu hồi'}
+                            </StatusBadge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Tạo {formatDateTimeVN(c.created_at)}
+                            {c.revoked_at && ` · Thu hồi ${formatDateTimeVN(c.revoked_at)}`}
+                          </p>
                         </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Tạo ngày: {formatDateTimeVN(c.created_at)}
-                          {c.revoked_at && ` • Thu hồi: ${formatDateTimeVN(c.revoked_at)}`}
-                        </p>
                       </div>
-                    </div>
 
-                    {c.status === 'active' && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-destructive hover:bg-destructive/10 h-8"
-                        onClick={() => handleRevoke(c.id)}
-                        disabled={revokeCred.isPending}
-                        data-testid={`revoke-cred-${c.id}`}
-                      >
-                        <TrashIcon className="mr-1 h-3.5 w-3.5" />
-                        Thu hồi
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+                      {c.status === 'active' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 text-destructive hover:bg-destructive/10"
+                          onClick={() => handleRevoke(c.id)}
+                          disabled={revokeCred.isPending}
+                          data-testid={`revoke-cred-${c.id}`}
+                        >
+                          <TrashIcon className="mr-1 h-3.5 w-3.5" />
+                          Thu hồi
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

@@ -62,7 +62,7 @@ export function QuotaExtraTable({ extras, isLoading }: QuotaExtraTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[140px] text-left">Phương tiện (Xe)</TableHead>
-            <TableHead className="w-[140px] text-right">Lít bổ sung</TableHead>
+            <TableHead className="w-[140px] text-right text-emerald-600">Lít bổ sung</TableHead>
             <TableHead className="w-[260px] text-left">Thời gian hiệu lực</TableHead>
             <TableHead className="text-left">Lý do cấp bổ sung</TableHead>
             <TableHead className="w-[160px] text-left">Người phê duyệt</TableHead>
@@ -85,7 +85,7 @@ export function QuotaExtraTable({ extras, isLoading }: QuotaExtraTableProps) {
               </TableCell>
 
               {/* Số lít bổ sung (Căn phải) */}
-              <TableCell className="text-right font-mono font-bold text-primary">
+              <TableCell className="text-right font-mono font-semibold text-emerald-600">
                 +{formatLiters(extra.extra_volume_liters)} L
               </TableCell>
 

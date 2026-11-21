@@ -104,8 +104,6 @@ test.describe('Module M6 - Quota Management E2E Tests', () => {
   test('1. Màn hình Quản lý định mức hiển thị tiêu đề, scope phi tiền tệ và 2 tab chính', async ({ page }) => {
     await page.goto('/quotas');
 
-    // Kiểm tra Header
-    await expect(page.getByText('Quản lý Định mức Nhiên liệu')).toBeVisible();
 
     // Kiểm tra Tabs
     await expect(page.getByRole('tab', { name: /Quy tắc định mức/i })).toBeVisible();

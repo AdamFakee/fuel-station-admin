@@ -41,13 +41,8 @@ export function useAuth() {
   const isAccountant = role === 'ACCOUNTANT';
   const isIT = role === 'IT';
 
-  const hasPermission = (permissionCode: string): boolean => {
-    // Manager has all permissions except accountant-specific approvals
-    if (isManager && !['inventory.issue:approve', 'inventory.stocktake:approve'].includes(permissionCode)) {
-      return true;
-    }
-    return user.permissions?.includes(permissionCode) ?? false;
-  };
+  // Quyền chỉ dựa vào danh sách quyền backend trả về (đã gồm quyền do vai trò tùy chỉnh): không có quyền thì ẩn nút.
+  const hasPermission = (permissionCode: string): boolean => user.permissions?.includes(permissionCode) ?? false;
 
   const hasAnyPermission = (permissionCodes: string[]): boolean => {
     if (permissionCodes.length === 0) return true;

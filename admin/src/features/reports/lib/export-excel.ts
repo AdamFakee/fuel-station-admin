@@ -35,7 +35,7 @@ export async function exportReportToExcel(options: ExportExcelOptions): Promise<
   if (options.dateRangeStr || options.branchStr) {
     const metaParts = [];
     if (options.dateRangeStr) metaParts.push(`Thời gian: ${options.dateRangeStr}`);
-    if (options.branchStr) metaParts.push(`Chi nhánh: ${options.branchStr}`);
+    if (options.branchStr) metaParts.push(`Trạm xăng: ${options.branchStr}`);
     const metaRow = worksheet.addRow([metaParts.join('  |  ')]);
     metaRow.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF64748B' } };
     worksheet.mergeCells(2, 1, 2, options.columns.length);

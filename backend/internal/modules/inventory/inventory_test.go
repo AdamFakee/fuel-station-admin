@@ -58,7 +58,7 @@ func ensureTestTank(t *testing.T, ctx context.Context, pool *pgxpool.Pool) (stri
 	if err != nil {
 		err = pool.QueryRow(ctx, `
 			INSERT INTO station.branch (tenant_id, code, name, status)
-			VALUES ($1, 'BR-TEST-M10', 'Chi nhánh Test M10', 'active')
+			VALUES ($1, 'BR-TEST-M10', 'Trạm xăng Test M10', 'active')
 			RETURNING id
 		`, defaultTenantID).Scan(&branchID)
 		if err != nil {

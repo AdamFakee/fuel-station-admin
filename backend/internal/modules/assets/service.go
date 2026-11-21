@@ -29,6 +29,12 @@ func NewService(pool *pgxpool.Pool) *Service {
 	}
 }
 
+// WithCryptoKey đổi khóa mã hóa mật khẩu máy chấm công (mặc định là khóa dev, chỉ dùng khi chạy local).
+func (s *Service) WithCryptoKey(key []byte) *Service {
+	s.cryptoKey = key
+	return s
+}
+
 func getTenant(ctx context.Context) (string, error) {
 	tenantID, ok := middleware.TenantIDFromContext(ctx)
 	if !ok || tenantID == "" {
@@ -68,6 +74,7 @@ func (s *Service) ListBranches(ctx context.Context, q BranchListQuery) ([]Branch
 	where := []string{"tenant_id = $1"}
 	args := []any{tenantID}
 	argIdx := 2
+	authz.AddBranchScope(ctx, "id", &where, &args, &argIdx)
 
 	if q.Search != "" {
 		where = append(where, fmt.Sprintf("(code ILIKE $%d OR name ILIKE $%d OR address ILIKE $%d)", argIdx, argIdx, argIdx))
@@ -125,6 +132,10 @@ func (s *Service) GetBranch(ctx context.Context, id string) (*Branch, error) {
 		return nil, err
 	}
 
+	if err := authz.EnsureBranchVisible(ctx, id); err != nil {
+		return nil, err
+	}
+
 	var b Branch
 	query := `
 		SELECT id, tenant_id, code, name, address, manager_name, phone, status, created_at, updated_at
@@ -151,8 +162,13 @@ func (s *Service) CreateBranch(ctx context.Context, req CreateBranchRequest) (*B
 		return nil, err
 	}
 
-	if strings.TrimSpace(req.Code) == "" || strings.TrimSpace(req.Name) == "" {
-		return nil, fmt.Errorf("%w: code and name are required", apperr.ErrInvalidInput)
+	if strings.TrimSpace(req.Name) == "" {
+		return nil, fmt.Errorf("%w: name is required", apperr.ErrInvalidInput)
+	}
+
+	// Mã trạm xăng do hệ thống sinh (không nhận từ client), dạng CN-2026-0001.
+	if err := s.pool.QueryRow(ctx, `SELECT station.next_code($1, 'CN')`, tenantID).Scan(&req.Code); err != nil {
+		return nil, fmt.Errorf("generate branch code: %w", err)
 	}
 
 	var b Branch
@@ -173,6 +189,16 @@ func (s *Service) CreateBranch(ctx context.Context, req CreateBranchRequest) (*B
 		return nil, fmt.Errorf("insert branch: %w", err)
 	}
 
+	// Người tạo bị giới hạn trạm xăng thì tự được gán trạm xăng mới, nếu không họ sẽ không thấy trạm xăng vừa tạo.
+	if p, ok := authz.FromContext(ctx); ok && p.Restricted() {
+		if _, err := s.pool.Exec(ctx, `
+			INSERT INTO station.user_branch (tenant_id, user_id, branch_id) VALUES ($1, $2, $3)
+			ON CONFLICT DO NOTHING
+		`, tenantID, p.UserID, b.ID); err != nil {
+			return nil, fmt.Errorf("assign new branch to creator: %w", err)
+		}
+	}
+
 	parsedID, _ := uuid.Parse(b.ID)
 	_ = audit.Record(ctx, s.pool, audit.Entry{
 		Action:     audit.ActionCreate,
@@ -188,6 +214,10 @@ func (s *Service) CreateBranch(ctx context.Context, req CreateBranchRequest) (*B
 func (s *Service) UpdateBranch(ctx context.Context, id string, req UpdateBranchRequest) (*Branch, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := authz.EnsureBranchVisible(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -231,6 +261,10 @@ func (s *Service) UpdateBranch(ctx context.Context, id string, req UpdateBranchR
 func (s *Service) DeleteBranch(ctx context.Context, id string) error {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
+		return err
+	}
+
+	if err := authz.EnsureBranchVisible(ctx, id); err != nil {
 		return err
 	}
 
@@ -342,6 +376,7 @@ func (s *Service) ListTanks(ctx context.Context, q TankListQuery) ([]Tank, int, 
 	where := []string{"t.tenant_id = $1"}
 	args := []any{tenantID}
 	argIdx := 2
+	authz.AddBranchScope(ctx, "t.branch_id", &where, &args, &argIdx)
 
 	if q.Search != "" {
 		where = append(where, fmt.Sprintf("(t.code ILIKE $%d OR t.name ILIKE $%d)", argIdx, argIdx))
@@ -420,6 +455,10 @@ func (s *Service) GetTank(ctx context.Context, id string) (*Tank, error) {
 		return nil, err
 	}
 
+	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.tank", id); err != nil {
+		return nil, err
+	}
+
 	query := `
 		SELECT t.id, t.tenant_id, t.branch_id, b.name AS branch_name,
 		       t.code, t.name, t.fuel_type_id, ft.name AS fuel_type_name,
@@ -458,6 +497,10 @@ func (s *Service) GetTank(ctx context.Context, id string) (*Tank, error) {
 func (s *Service) CreateTank(ctx context.Context, req CreateTankRequest) (*Tank, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := authz.EnsureBranch(ctx, req.BranchID); err != nil {
 		return nil, err
 	}
 
@@ -554,6 +597,10 @@ func (s *Service) UpdateTank(ctx context.Context, id string, req UpdateTankReque
 		return nil, err
 	}
 
+	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.tank", id); err != nil {
+		return nil, err
+	}
+
 	if strings.TrimSpace(req.Name) == "" {
 		return nil, fmt.Errorf("%w: name is required", apperr.ErrInvalidInput)
 	}
@@ -600,6 +647,10 @@ func (s *Service) UpdateTank(ctx context.Context, id string, req UpdateTankReque
 func (s *Service) DeleteTank(ctx context.Context, id string) error {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
+		return err
+	}
+
+	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.tank", id); err != nil {
 		return err
 	}
 
@@ -650,6 +701,7 @@ func (s *Service) ListPumps(ctx context.Context, q PumpListQuery) ([]PumpDetail,
 	where := []string{"p.tenant_id = $1"}
 	args := []any{tenantID}
 	argIdx := 2
+	authz.AddBranchScope(ctx, "p.branch_id", &where, &args, &argIdx)
 
 	if q.Search != "" {
 		where = append(where, fmt.Sprintf("(p.code ILIKE $%d OR p.name ILIKE $%d)", argIdx, argIdx))
@@ -761,6 +813,10 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 		return nil, err
 	}
 
+	if err := authz.EnsureBranch(ctx, req.BranchID); err != nil {
+		return nil, err
+	}
+
 	if strings.TrimSpace(req.Name) == "" || req.BranchID == "" || req.TankID == "" {
 		return nil, fmt.Errorf("%w: name, branch_id and tank_id are required", apperr.ErrInvalidInput)
 	}
@@ -818,7 +874,7 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 	}
 	p.Nozzles = append(p.Nozzles, n)
 
-	// Bộ số: cổng COM bắt buộc (mỗi trụ một cổng riêng trong cửa hàng), serial mặc định 1234, baud mặc định 9600
+	// Bộ số: cổng COM bắt buộc (mỗi trụ một cổng riêng trong trạm xăng), serial mặc định 1234, baud mặc định 9600
 	if req.SensorComPort == nil || strings.TrimSpace(*req.SensorComPort) == "" {
 		return nil, fmt.Errorf("%w: sensor_com_port is required (each pump needs its own COM port)", apperr.ErrInvalidInput)
 	}
@@ -851,8 +907,9 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 	}
 	p.Sensor = &ps
 
-	// Create terminal (default T1, 192.168.1.100, 80, admin)
-	termCode := fmt.Sprintf("T%d", req.EdgePumpID)
+	// Create terminal (mặc định: mã theo mã trụ, 192.168.1.100, 80, admin).
+	// Mã máy chấm công là duy nhất toàn công ty nên không thể dùng số thứ tự trụ (trụ 1 của trạm xăng khác sẽ trùng).
+	termCode := "T-" + req.Code
 	if req.TerminalCode != nil && *req.TerminalCode != "" {
 		termCode = *req.TerminalCode
 	}
@@ -917,6 +974,10 @@ func (s *Service) UpdatePump(ctx context.Context, id string, req UpdatePumpReque
 		return nil, err
 	}
 
+	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.pump", id); err != nil {
+		return nil, err
+	}
+
 	if strings.TrimSpace(req.Name) == "" {
 		return nil, fmt.Errorf("%w: name is required", apperr.ErrInvalidInput)
 	}
@@ -952,6 +1013,10 @@ func (s *Service) UpdatePump(ctx context.Context, id string, req UpdatePumpReque
 func (s *Service) DeletePump(ctx context.Context, id string) error {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
+		return err
+	}
+
+	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.pump", id); err != nil {
 		return err
 	}
 
@@ -993,8 +1058,10 @@ func (s *Service) ListDevices(ctx context.Context, branchID string) ([]DeviceVie
 
 	where := []string{"p.tenant_id = $1"}
 	args := []any{tenantID}
+	argIdx := 2
+	authz.AddBranchScope(ctx, "p.branch_id", &where, &args, &argIdx)
 	if branchID != "" {
-		where = append(where, "p.branch_id = $2")
+		where = append(where, fmt.Sprintf("p.branch_id = $%d", argIdx))
 		args = append(args, branchID)
 	}
 
@@ -1056,6 +1123,10 @@ func (s *Service) UpdateSensor(ctx context.Context, pumpID string, req UpdateSen
 		return nil, err
 	}
 
+	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.pump", pumpID); err != nil {
+		return nil, err
+	}
+
 	if strings.TrimSpace(req.ComPort) == "" {
 		return nil, fmt.Errorf("%w: com_port is required", apperr.ErrInvalidInput)
 	}
@@ -1098,6 +1169,10 @@ func (s *Service) UpdateSensor(ctx context.Context, pumpID string, req UpdateSen
 func (s *Service) UpdateTerminal(ctx context.Context, pumpID string, req UpdateTerminalRequest) (*AccessTerminal, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.pump", pumpID); err != nil {
 		return nil, err
 	}
 

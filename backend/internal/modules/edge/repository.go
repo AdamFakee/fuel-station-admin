@@ -185,8 +185,8 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["version"] = version
 
 	case "vehicle":
-		// Đẩy MỌI xe của công ty kèm cờ `allowed_here` (xe có được đổ ở cửa hàng của trạm này không). Edge Agent dựa vào cờ để từ chối
-		// với lý do riêng, thay vì coi xe đổ nhầm cửa hàng là "thẻ lạ".
+		// Đẩy MỌI xe của công ty kèm cờ `allowed_here` (xe có được đổ ở trạm xăng của trạm này không). Edge Agent dựa vào cờ để từ chối
+		// với lý do riêng, thay vì coi xe đổ nhầm trạm xăng là "thẻ lạ".
 		query := `
 			SELECT v.id, v.code, v.plate, v.fuel_type_id, v.status, v.version,
 			       EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $3)
@@ -445,7 +445,7 @@ func (r *postgresRepository) CreateDispenseSession(ctx context.Context, station 
 			INSERT INTO station.stock_ledger (
 				tenant_id, tank_id, occurred_at, kind, delta_ml, ref_type, ref_id, note
 			) VALUES (
-				$1, $2, COALESCE($3, now()), 'dispense', -$4, 'dispense_session', $5, $6
+				$1, $2, COALESCE($3, now()), 'dispense', -($4::bigint), 'dispense_session', $5, $6
 			)
 		`
 		var occurredAt any

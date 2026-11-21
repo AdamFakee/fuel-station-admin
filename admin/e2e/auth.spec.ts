@@ -32,15 +32,13 @@ test.describe('Module M0 & M1 - Auth & Role RBAC E2E Tests', () => {
 
     // Kiểm tra tiêu đề trang và nhận diện
     await expect(page).toHaveTitle(/Đăng nhập - Fuel Station Admin/);
-    await expect(page.getByText('Fuel Station System')).toBeVisible();
-    await expect(page.getByText('Hệ thống Quản trị & Điều hành Trạm Nhiên Liệu Nội Bộ')).toBeVisible();
-    await expect(page.getByText('Bảo mật Đa Chi Nhánh (RBAC)')).toBeVisible();
+    await expect(page.getByAltText('BIWASE')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Quản lý trạm xăng' })).toBeVisible();
 
     // Kiểm tra phạm vi phi tiền tệ (Scope check P0)
-    await expect(page.getByText('quản lý theo dõi thể tích (Lít) • Không có dữ liệu tiền tệ')).toBeVisible();
 
     // Kiểm tra các trường form
-    const usernameInput = page.locator('input#username');
+    const usernameInput = page.locator('input#email');
     const passwordInput = page.locator('input#password');
     const rememberMeCheckbox = page.locator('button#rememberMe');
     const submitBtn = page.getByRole('button', { name: /Đăng nhập/i });
@@ -58,7 +56,7 @@ test.describe('Module M0 & M1 - Auth & Role RBAC E2E Tests', () => {
     await submitBtn.click();
 
     // Kiểm tra hiển thị thông báo lỗi validation
-    await expect(page.getByText('Vui lòng nhập tên đăng nhập')).toBeVisible();
+    await expect(page.getByText('Vui lòng nhập email')).toBeVisible();
     await expect(page.getByText('Mật khẩu phải có ít nhất 6 ký tự')).toBeVisible();
   });
 

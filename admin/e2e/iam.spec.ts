@@ -196,9 +196,9 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
     // Kiểm tra các cột bảng chuẩn admin-table-format
     await expect(page.getByRole('columnheader', { name: 'Mã NV' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Họ và tên' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Tên đăng nhập / Email' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Email đăng nhập' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Vai trò' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Chi nhánh' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Trạm xăng' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Trạng thái' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Đăng nhập cuối' })).toBeVisible();
 
@@ -217,7 +217,7 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
   test('2. Tìm kiếm và lọc danh sách tài khoản', async ({ page }) => {
     await page.goto('/users');
 
-    const searchInput = page.getByPlaceholder('Tìm theo mã NV, tên, username, email...');
+    const searchInput = page.getByPlaceholder('Tìm theo mã NV, tên, email...');
     await expect(searchInput).toBeVisible();
 
     await searchInput.fill('NV-0002');
@@ -241,15 +241,16 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
     await expect(page.getByText('Tạo tài khoản quản trị/vận hành và thiết lập quyền truy cập cho nhân sự')).toBeVisible();
 
     // Các trường form
-    await expect(page.locator('#employee_code')).toBeVisible();
+    // Mã nhân viên do hệ thống sinh và tài khoản đăng nhập là email nên không có ô nhập mã hay tên đăng nhập
+    await expect(page.locator('#employee_code')).toHaveCount(0);
+    await expect(page.locator('#username')).toHaveCount(0);
     await expect(page.locator('#full_name')).toBeVisible();
-    await expect(page.locator('#username')).toBeVisible();
     await expect(page.locator('#password')).toBeVisible();
     await expect(page.locator('#email')).toBeVisible();
     await expect(page.locator('#phone')).toBeVisible();
     await expect(page.locator('#role_id')).toBeVisible();
 
-    // Danh sách chi nhánh phân bổ bên trong form
+    // Danh sách trạm xăng phân bổ bên trong form
     await expect(page.locator('#user-form').getByText('Trạm Xăng Cầu Giấy')).toBeVisible();
     await expect(page.locator('#user-form').getByText('Kho Nhiên Liệu Hải Phòng')).toBeVisible();
 
@@ -318,8 +319,7 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
   test('6. Màn hình Vai trò & Ma trận quyền (/roles) hiển thị 3 vai trò hệ thống', async ({ page }) => {
     await page.goto('/roles');
 
-    await expect(page.getByText('Vai trò & Ma trận Phân quyền')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Tạo vai trò mới/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Tạo vai trò mới/i })).toBeVisible();
 
     // Kiểm tra 3 vai trò hệ thống
     await expect(page.getByText('MANAGER')).toBeVisible();
@@ -335,31 +335,30 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
     await expect(page.getByText('18', { exact: true })).toBeVisible();
   });
 
-  test('7. Modal Tạo vai trò mới hiển thị đầy đủ Ma trận phân quyền nhóm theo Phân hệ', async ({ page }) => {
+  test('7. Trang Tạo vai trò mới (toàn màn hình) hiển thị đầy đủ Ma trận phân quyền nhóm theo Phân hệ', async ({ page }) => {
     await page.goto('/roles');
 
-    await page.getByRole('button', { name: /Tạo vai trò mới/i }).click();
+    await page.getByRole('link', { name: /Tạo vai trò mới/i }).click();
+    await expect(page).toHaveURL(/\/roles\/new$/);
 
     await expect(page.getByRole('heading', { name: 'Tạo vai trò mới' })).toBeVisible();
     await expect(page.locator('#role_code')).toBeVisible();
     await expect(page.locator('#role_name')).toBeVisible();
     await expect(page.locator('#role_desc')).toBeVisible();
 
-    // Kiểm tra Ma trận phân quyền
-    await expect(page.getByText(/Ma trận quyền truy cập/)).toBeVisible();
+    // Ma trận phân quyền chia theo phân hệ
+    await expect(page.getByText(/đã chọn\)/)).toBeVisible();
     await expect(page.getByText('Xem tài khoản người dùng')).toBeVisible();
-    await expect(page.getByText('(master.vehicle)')).toBeVisible();
+    await expect(page.locator('form').getByText('Danh mục Xe', { exact: true })).toBeVisible();
 
     // Nút chọn tất cả / bỏ chọn
     await expect(page.getByRole('button', { name: 'Chọn tất cả', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Bỏ chọn tất cả' })).toBeVisible();
-
-    // Thử chọn tất cả
     await page.getByRole('button', { name: 'Chọn tất cả', exact: true }).click();
-    await expect(page.getByText(/Ma trận quyền truy cập \(10\/10\)/)).toBeVisible();
+    await expect(page.getByText(/\(10\/10 đã chọn\)/)).toBeVisible();
 
-    // Đóng
+    // Hủy thì quay về danh sách
     await page.getByRole('button', { name: 'Hủy' }).click();
-    await expect(page.getByRole('heading', { name: 'Tạo vai trò mới' })).not.toBeVisible();
+    await expect(page).toHaveURL(/\/roles$/);
   });
 });

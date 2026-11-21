@@ -79,6 +79,13 @@ func (s *Service) ListUsers(ctx context.Context, q UserListQuery) (*PagedRespons
 	args := []any{tenantID}
 	argIdx := 2
 
+	if scope := authz.BranchScope(ctx); scope != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM station.user_branch ub WHERE ub.user_id = u.id AND ub.branch_id = ANY($%d::uuid[]))", argIdx))
+		args = append(args, scope)
+		argIdx++
+	}
+
 	if q.Search != "" {
 		searchPattern := "%" + strings.TrimSpace(q.Search) + "%"
 		whereClauses = append(whereClauses, fmt.Sprintf(
@@ -142,11 +149,11 @@ func (s *Service) ListUsers(ctx context.Context, q UserListQuery) (*PagedRespons
 	var items []UserListItem
 	for rows.Next() {
 		var (
-			item         UserListItem
-			userUUID     uuid.UUID
-			roleUUID     uuid.UUID
-			branchUUIDs  []uuid.UUID
-			branchNames  []string
+			item        UserListItem
+			userUUID    uuid.UUID
+			roleUUID    uuid.UUID
+			branchUUIDs []uuid.UUID
+			branchNames []string
 		)
 
 		err := rows.Scan(
@@ -188,6 +195,10 @@ func (s *Service) GetUser(ctx context.Context, idStr string) (*UserDetail, error
 	userUUID, err := uuid.Parse(idStr)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
+	}
+
+	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
+		return nil, err
 	}
 
 	var (
@@ -265,17 +276,11 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 		return nil, err
 	}
 
+	if err := ensureAssignableBranches(ctx, req.BranchIDs); err != nil {
+		return nil, err
+	}
+
 	// Validations
-	req.EmployeeCode = strings.TrimSpace(req.EmployeeCode)
-	if !rxEmployeeCode.MatchString(req.EmployeeCode) {
-		return nil, fmt.Errorf("%w: mã nhân viên không hợp lệ (1-32 ký tự chữ, số, gạch ngang, gạch dưới)", apperr.ErrInvalidInput)
-	}
-
-	req.Username = strings.TrimSpace(req.Username)
-	if !rxUsername.MatchString(req.Username) {
-		return nil, fmt.Errorf("%w: tên đăng nhập không hợp lệ (3-64 ký tự)", apperr.ErrInvalidInput)
-	}
-
 	req.FullName = strings.TrimSpace(req.FullName)
 	if req.FullName == "" {
 		return nil, fmt.Errorf("%w: họ và tên không được để trống", apperr.ErrInvalidInput)
@@ -284,6 +289,11 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 	req.Email = strings.TrimSpace(req.Email)
 	if _, err := mail.ParseAddress(req.Email); err != nil {
 		return nil, fmt.Errorf("%w: email không đúng định dạng", apperr.ErrInvalidInput)
+	}
+	// Đăng nhập bằng email: tên đăng nhập lưu trong DB chính là email (không nhận từ client).
+	req.Username = strings.ToLower(req.Email)
+	if !rxUsername.MatchString(req.Username) {
+		return nil, fmt.Errorf("%w: email chỉ được gồm chữ, số và các ký tự . _ @ - (tối đa 64 ký tự)", apperr.ErrInvalidInput)
 	}
 
 	if len(req.Password) < 8 {
@@ -302,18 +312,8 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 		return nil, fmt.Errorf("%w: vai trò không tồn tại trong hệ thống", apperr.ErrNotFound)
 	}
 
-	// Check duplicates (code, username, email)
-	var dupCode, dupUsername, dupEmail bool
-	_ = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM station.app_user WHERE tenant_id = $1 AND employee_code = $2 AND deleted_at IS NULL)`, tenantID, req.EmployeeCode).Scan(&dupCode)
-	if dupCode {
-		return nil, fmt.Errorf("%w: mã nhân viên '%s' đã được sử dụng", apperr.ErrConflict, req.EmployeeCode)
-	}
-
-	_ = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM station.app_user WHERE tenant_id = $1 AND lower(username) = lower($2) AND deleted_at IS NULL)`, tenantID, req.Username).Scan(&dupUsername)
-	if dupUsername {
-		return nil, fmt.Errorf("%w: tên đăng nhập '%s' đã tồn tại", apperr.ErrConflict, req.Username)
-	}
-
+	// Email là tài khoản đăng nhập nên phải duy nhất.
+	var dupEmail bool
 	_ = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM station.app_user WHERE tenant_id = $1 AND lower(email) = lower($2) AND deleted_at IS NULL)`, tenantID, req.Email).Scan(&dupEmail)
 	if dupEmail {
 		return nil, fmt.Errorf("%w: email '%s' đã được đăng ký", apperr.ErrConflict, req.Email)
@@ -333,6 +333,11 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	// Mã nhân viên do hệ thống sinh (NV-năm-số thứ tự), không nhận từ client.
+	if err := tx.QueryRow(ctx, `SELECT station.next_code($1, 'NV')`, tenantID).Scan(&req.EmployeeCode); err != nil {
+		return nil, fmt.Errorf("generate employee code: %w", err)
+	}
 
 	insertQuery := `
 		INSERT INTO station.app_user (
@@ -404,9 +409,17 @@ func (s *Service) UpdateUser(ctx context.Context, idStr string, req UpdateUserRe
 		return nil, err
 	}
 
+	if err := ensureAssignableBranches(ctx, req.BranchIDs); err != nil {
+		return nil, err
+	}
+
 	userUUID, err := uuid.Parse(idStr)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
+	}
+
+	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
+		return nil, err
 	}
 
 	req.FullName = strings.TrimSpace(req.FullName)
@@ -565,6 +578,10 @@ func (s *Service) UpdateUserStatus(ctx context.Context, idStr, newStatus string)
 		return fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
 	}
 
+	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
+		return err
+	}
+
 	if newStatus != "active" && newStatus != "locked" {
 		return fmt.Errorf("%w: trạng thái phải là 'active' hoặc 'locked'", apperr.ErrInvalidInput)
 	}
@@ -675,6 +692,10 @@ func (s *Service) ResetPassword(ctx context.Context, idStr, newPassword string) 
 		return fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
 	}
 
+	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
+		return err
+	}
+
 	if len(newPassword) < 8 {
 		return fmt.Errorf("%w: mật khẩu mới phải từ 8 ký tự trở lên", apperr.ErrInvalidInput)
 	}
@@ -747,6 +768,10 @@ func (s *Service) DeleteUser(ctx context.Context, idStr string) error {
 	userUUID, err := uuid.Parse(idStr)
 	if err != nil {
 		return fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
+	}
+
+	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
+		return err
 	}
 
 	// SAFETY RULE: cannot delete self
@@ -1020,10 +1045,10 @@ func (s *Service) UpdateRole(ctx context.Context, idStr string, req UpdateRoleRe
 	}
 
 	var (
-		oldCode     string
-		oldName     string
-		oldDesc     string
-		isSystem    bool
+		oldCode  string
+		oldName  string
+		oldDesc  string
+		isSystem bool
 	)
 	err = s.pool.QueryRow(ctx, `
 		SELECT code, name, COALESCE(description, ''), is_system
@@ -1215,12 +1240,16 @@ func (s *Service) ListBranches(ctx context.Context) ([]BranchOption, error) {
 		return nil, err
 	}
 
+	where := []string{"tenant_id = $1", "status = 'active'"}
+	args := []any{tenantID}
+	argIdx := 2
+	authz.AddBranchScope(ctx, "id", &where, &args, &argIdx)
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, code, name, COALESCE(address, '')
 		FROM station.branch
-		WHERE tenant_id = $1 AND status = 'active'
+		WHERE `+strings.Join(where, " AND ")+`
 		ORDER BY code ASC
-	`, tenantID)
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list branches: %w", err)
 	}
@@ -1245,4 +1274,44 @@ func (s *Service) ListBranches(ctx context.Context) ([]BranchOption, error) {
 		})
 	}
 	return branches, nil
+}
+
+// ensureUserInScope: người thao tác bị giới hạn trạm xăng chỉ được đụng tới tài khoản chung ít nhất một trạm xăng.
+// Tài khoản ngoài phạm vi trả `ErrNotFound` như thể không tồn tại.
+func (s *Service) ensureUserInScope(ctx context.Context, userID uuid.UUID) error {
+	scope := authz.BranchScope(ctx)
+	if scope == nil {
+		return nil
+	}
+	var shared bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM station.user_branch ub
+			WHERE ub.user_id = $1 AND ub.branch_id = ANY($2::uuid[])
+		)
+	`, userID, scope).Scan(&shared)
+	if err != nil {
+		return fmt.Errorf("check user branch scope: %w", err)
+	}
+	if !shared {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
+// ensureAssignableBranches: người thao tác bị giới hạn trạm xăng phải gán cho tài khoản ít nhất một trạm xăng
+// và chỉ được gán trạm xăng nằm trong phạm vi của mình (không được tạo tài khoản toàn công ty hay trạm xăng khác).
+func ensureAssignableBranches(ctx context.Context, branchIDs []string) error {
+	if authz.BranchScope(ctx) == nil {
+		return nil
+	}
+	if len(branchIDs) == 0 {
+		return fmt.Errorf("%w: chọn ít nhất một trạm xăng cho tài khoản", apperr.ErrInvalidInput)
+	}
+	for _, id := range branchIDs {
+		if err := authz.EnsureBranch(ctx, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }

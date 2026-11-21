@@ -50,14 +50,17 @@ func seedTestData(t *testing.T, pool *pgxpool.Pool) (sessionID uuid.UUID, cleanu
 	tenantUUID := uuid.MustParse(defaultTenantID)
 	branchUUID := uuid.MustParse(branch1ID)
 
-	// 1. Ensure an edge_station exists
+	// 1. Dùng trạm Edge sẵn có của trạm xăng (mỗi trạm chỉ có một), chưa có thì tạo
 	var edgeStationID uuid.UUID
-	err := pool.QueryRow(ctx, `
-		INSERT INTO station.edge_station (tenant_id, branch_id, code, name, api_key_hash)
-		VALUES ($1, $2, 'ES-TEST-01', 'Trạm Edge Test', 'hash_test_m9')
-		ON CONFLICT (tenant_id, code) DO UPDATE SET name = EXCLUDED.name
-		RETURNING id
-	`, tenantUUID, branchUUID).Scan(&edgeStationID)
+	err := pool.QueryRow(ctx, `SELECT id FROM station.edge_station WHERE tenant_id = $1 AND branch_id = $2`, tenantUUID, branchUUID).Scan(&edgeStationID)
+	if err != nil {
+		err = pool.QueryRow(ctx, `
+			INSERT INTO station.edge_station (tenant_id, branch_id, code, name, api_key_hash)
+			VALUES ($1, $2, 'ES-TEST-01', 'Trạm Edge Test', 'hash_test_m9')
+			ON CONFLICT (tenant_id, code) DO UPDATE SET name = EXCLUDED.name
+			RETURNING id
+		`, tenantUUID, branchUUID).Scan(&edgeStationID)
+	}
 	if err != nil {
 		t.Fatalf("seed edge_station: %v", err)
 	}

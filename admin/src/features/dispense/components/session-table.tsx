@@ -1,5 +1,7 @@
 'use client';
 
+import { rowClick } from '@/lib/row-click';
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -9,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EyeIcon } from '@heroicons/react/24/outline';
 import { formatDateTimeVN, formatNumberVN } from '@/lib/format';
@@ -32,7 +33,7 @@ export function SessionTable({ sessions, isLoading, onViewDetail }: SessionTable
 
   if (sessions.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-12 text-center text-sm text-muted-foreground">
+      <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-md border border-dashed p-12 text-center text-sm text-muted-foreground">
         Không có phiên bơm nào phù hợp với điều kiện tìm kiếm.
       </div>
     );
@@ -41,25 +42,13 @@ export function SessionTable({ sessions, isLoading, onViewDetail }: SessionTable
   const statusBadge = (status: string, edgeState: string) => {
     switch (status) {
       case 'completed':
-        return (
-          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs font-normal">
-            Hoàn thành
-          </Badge>
-        );
+        return <StatusBadge tone="success">Hoàn thành</StatusBadge>;
       case 'cancelled':
-        return (
-          <Badge variant="outline" className="text-muted-foreground text-xs font-normal">
-            Đã hủy ({edgeState === 'timed_out' ? 'Hết giờ' : 'Hủy bỏ'})
-          </Badge>
-        );
+        return <StatusBadge tone="neutral">Đã hủy ({edgeState === 'timed_out' ? 'Hết giờ' : 'Hủy bỏ'})</StatusBadge>;
       case 'failed':
-        return (
-          <Badge variant="destructive" className="text-xs font-normal">
-            Lỗi bơm
-          </Badge>
-        );
+        return <StatusBadge tone="danger">Lỗi bơm</StatusBadge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <StatusBadge tone="neutral">{status}</StatusBadge>;
     }
   };
 
@@ -72,7 +61,7 @@ export function SessionTable({ sessions, isLoading, onViewDetail }: SessionTable
             <TableHead className="text-left w-[130px]">Trụ / Bể</TableHead>
             <TableHead className="text-left">Phương tiện (Xe)</TableHead>
             <TableHead className="text-left">Tài xế</TableHead>
-            <TableHead className="text-right tabular-nums w-[120px]">Đã đổ (Lít)</TableHead>
+            <TableHead className="text-right tabular-nums w-[120px] text-blue-600">Đã đổ (Lít)</TableHead>
             <TableHead className="text-right tabular-nums w-[120px]">Hạn mức (Lít)</TableHead>
             <TableHead className="text-left w-[120px]">Trạng thái</TableHead>
             <TableHead className="text-right tabular-nums w-[170px]">Thời điểm hoàn tất</TableHead>
@@ -81,7 +70,7 @@ export function SessionTable({ sessions, isLoading, onViewDetail }: SessionTable
         </TableHeader>
         <TableBody>
           {sessions.map((s) => (
-            <TableRow key={s.id} className="hover:bg-muted/40 transition-colors">
+            <TableRow key={s.id} className="hover:bg-muted/40 transition-colors" onClick={rowClick(() => onViewDetail(s))}>
               <TableCell className="font-mono text-xs font-semibold text-foreground text-left">
                 {s.code}
               </TableCell>
@@ -101,7 +90,7 @@ export function SessionTable({ sessions, isLoading, onViewDetail }: SessionTable
                   <div className="text-[11px] font-mono text-muted-foreground">({s.driver_code})</div>
                 )}
               </TableCell>
-              <TableCell className="text-right tabular-nums text-xs font-bold text-foreground">
+              <TableCell className="text-right tabular-nums text-xs font-semibold text-blue-600">
                 {formatNumberVN(s.dispensed_liters, 2)} L
               </TableCell>
               <TableCell className="text-right tabular-nums text-xs text-muted-foreground">

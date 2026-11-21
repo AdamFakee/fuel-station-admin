@@ -1,16 +1,11 @@
 'use client';
 
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import * as React from 'react';
 import { DetailPageHeader } from '@/components/detail-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Paginator from '@/components/paginator';
 import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useUsers } from '@/features/iam/api/get-users';
@@ -22,6 +17,7 @@ import { ResetPasswordDialog } from '@/features/iam/components/reset-password-di
 import { UserListItem } from '@/features/iam/types';
 
 export default function UsersPage() {
+  const { hasPermission } = useAuth();
   const { data: me } = useMe();
   const { data: roles = [] } = useRoles();
 
@@ -72,15 +68,15 @@ export default function UsersPage() {
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
         {/* Header */}
-        <DetailPageHeader
-          title="Quản lý Tài khoản & Nhân sự"
-        >
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleOpenCreate}>
-              <PlusIcon className="mr-1.5 h-4 w-4" />
-              Thêm tài khoản
-            </Button>
-          </div>
+        <DetailPageHeader title="Quản lý Tài khoản & Nhân sự">
+          {hasPermission('iam.user:create') && (
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={handleOpenCreate}>
+                <PlusIcon className="mr-1.5 h-4 w-4" />
+                Thêm tài khoản
+              </Button>
+            </div>
+          )}
         </DetailPageHeader>
 
         {/* Filter & Search Bar */}
@@ -90,7 +86,7 @@ export default function UsersPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo mã NV, tên, username, email..."
+              placeholder="Tìm theo mã NV, tên, email..."
               className="pl-9"
             />
           </div>
@@ -158,11 +154,7 @@ export default function UsersPage() {
         )}
 
         {/* Create / Edit Dialog */}
-        <UserDialogForm
-          open={isFormOpen}
-          onOpenChange={setIsFormOpen}
-          user={editingUser}
-        />
+        <UserDialogForm open={isFormOpen} onOpenChange={setIsFormOpen} user={editingUser} />
 
         {/* Reset Password Dialog */}
         <ResetPasswordDialog

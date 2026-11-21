@@ -137,7 +137,7 @@ func (h *Handler) DeleteBranch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, map[string]string{
-		"message": "Chi nhánh đã được ngừng hoạt động",
+		"message": "Trạm xăng đã được ngừng hoạt động",
 	})
 }
 

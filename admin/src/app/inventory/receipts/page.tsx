@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function StockReceiptsPage() {
   return (
-    <div className="flex-1 flex flex-col p-6 space-y-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
       <ReceiptTable />
     </div>
   );

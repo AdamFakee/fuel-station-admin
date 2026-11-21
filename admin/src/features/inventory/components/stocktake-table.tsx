@@ -1,26 +1,18 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { stocktakeDetail } from '@/lib/row-details';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatusBadge, StatusTone } from '@/components/status-badge';
 import { DatePicker } from '@/components/date-picker';
 import * as React from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -30,14 +22,7 @@ import {
   DialogFooter,
   DialogBody,
 } from '@/components/ui/dialog';
-import {
-  RulerIcon,
-  ShieldCheckIcon,
-  BookOpenIcon,
-  RotateCcwIcon,
-  PlusIcon,
-  Loader2Icon,
-} from 'lucide-react';
+import { RulerIcon, ShieldCheckIcon, BookOpenIcon, RotateCcwIcon, PlusIcon, Loader2Icon } from 'lucide-react';
 import { StockReconciliationItem, StocktakeStatus } from '../types';
 import { useReconciliations } from '../api/get-reconciliations';
 import { useGenerateReconciliation } from '../api/generate-reconciliation';
@@ -51,12 +36,12 @@ import { toast } from 'sonner';
 
 const statusConfig: Record<
   StocktakeStatus,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+  { label: string; tone: StatusTone }
 > = {
-  open: { label: 'Chờ đo', variant: 'secondary' },
-  matched: { label: 'Khớp sổ', variant: 'default' },
-  alert: { label: 'Lệch ngưỡng', variant: 'destructive' },
-  confirmed: { label: 'Đã chốt', variant: 'outline' },
+  open: { label: 'Chờ đo', tone: 'warning' },
+  matched: { label: 'Khớp sổ', tone: 'success' },
+  alert: { label: 'Lệch ngưỡng', tone: 'danger' },
+  confirmed: { label: 'Đã chốt', tone: 'info' },
 };
 
 interface StocktakeTableProps {
@@ -67,9 +52,11 @@ interface StocktakeTableProps {
 }
 
 export function StocktakeTable({ branchFilter = '', onBranchFilterChange, createRequestId = 0 }: StocktakeTableProps) {
-  const [dateFilter, setDateFilter] = React.useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [detail, setDetail] = React.useState<StockReconciliationItem | null>(null);
+  const { hasPermission } = useAuth();
+  const canMeasure = hasPermission('inventory.stocktake:update');
+  const canConfirm = hasPermission('inventory.stocktake:approve');
+  const [dateFilter, setDateFilter] = React.useState<string>(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
 
   // Modals state
@@ -86,9 +73,7 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
   const [createOpen, setCreateOpen] = React.useState<boolean>(false);
   const [selectedBranchId, setSelectedBranchId] = React.useState<string>('');
   const [selectedTankId, setSelectedTankId] = React.useState<string>('');
-  const [periodDate, setPeriodDate] = React.useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [periodDate, setPeriodDate] = React.useState<string>(new Date().toISOString().split('T')[0]);
 
   // Queries & Mutations
   const { data: branchData } = useBranches();
@@ -96,7 +81,11 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
 
   const { data: tankData = [] } = useTankStocks(selectedBranchId || branchFilter || undefined);
 
-  const { data: recData, isLoading, refetch } = useReconciliations({
+  const {
+    data: recData,
+    isLoading,
+    refetch,
+  } = useReconciliations({
     branch_id: branchFilter || undefined,
     period_date: dateFilter || undefined,
     status: statusFilter !== 'all' ? statusFilter : undefined,
@@ -107,7 +96,7 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
   const generateMutation = useGenerateReconciliation();
 
   const handleOpenCreate = () => {
-    setSelectedBranchId(branchFilter || (branches[0]?.id || ''));
+    setSelectedBranchId(branchFilter || branches[0]?.id || '');
     setPeriodDate(new Date().toISOString().split('T')[0]);
     setCreateOpen(true);
   };
@@ -122,7 +111,7 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId || !selectedTankId) {
-      toast.error('Vui lòng chọn chi nhánh và bể chứa để khởi tạo');
+      toast.error('Vui lòng chọn trạm xăng và bể chứa để khởi tạo');
       return;
     }
 
@@ -142,22 +131,15 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Thanh bộ lọc */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg border">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Ngày đối chiếu:</span>
-            <DatePicker
-              value={dateFilter}
-              onChange={setDateFilter}
-              clearable
-              className="h-9 w-[160px] text-xs"
-            />
+            <DatePicker value={dateFilter} onChange={setDateFilter} clearable className="w-[180px]" />
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Chi nhánh:</span>
             <Select
               value={branchFilter || 'all'}
               onValueChange={(val) => {
@@ -166,11 +148,11 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
                 }
               }}
             >
-              <SelectTrigger className="w-[180px] h-9 text-xs">
-                <SelectValue placeholder="Tất cả chi nhánh" />
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Tất cả trạm xăng" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả chi nhánh</SelectItem>
+                <SelectItem value="all">Tất cả trạm xăng</SelectItem>
                 {branches.map((b) => (
                   <SelectItem key={b.id} value={b.id}>
                     {b.name}
@@ -181,13 +163,12 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Trạng thái:</span>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px] h-9 text-xs">
-                <SelectValue placeholder="Tất cả" />
+              <SelectTrigger className="w-[190px]">
+                <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
+                <SelectItem value="all">Tất cả trạng thái</SelectItem>
                 <SelectItem value="open">Chờ đo</SelectItem>
                 <SelectItem value="matched">Khớp sổ</SelectItem>
                 <SelectItem value="alert">Lệch ngưỡng</SelectItem>
@@ -198,32 +179,30 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
 
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => {
               setDateFilter(new Date().toISOString().split('T')[0]);
               setStatusFilter('all');
               if (onBranchFilterChange) onBranchFilterChange('');
             }}
-            className="h-9 px-2 text-xs text-muted-foreground"
+            className="text-muted-foreground"
           >
             <RotateCcwIcon className="h-3.5 w-3.5 mr-1" />
             Đặt lại
           </Button>
         </div>
-
       </div>
 
       {/* Bảng danh sách phiếu đối chiếu */}
-      <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[110px]">Ngày</TableHead>
               <TableHead className="w-[180px]">Bể chứa</TableHead>
-              <TableHead className="w-[160px]">Chi nhánh</TableHead>
+              <TableHead className="w-[160px]">Trạm xăng</TableHead>
               <TableHead className="text-right">Tồn đầu kỳ</TableHead>
-              <TableHead className="text-right">Nhập kỳ</TableHead>
-              <TableHead className="text-right">Xuất bơm</TableHead>
+              <TableHead className="text-right text-emerald-600">Nhập kỳ</TableHead>
+              <TableHead className="text-right text-blue-600">Xuất bơm</TableHead>
               <TableHead className="text-right font-semibold">Tồn cuối sổ</TableHead>
               <TableHead className="text-right font-semibold">Thực đo (que)</TableHead>
               <TableHead className="text-right">Lệch (Lít / %)</TableHead>
@@ -233,34 +212,26 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2Icon className="h-4 w-4 animate-spin text-primary" />
-                    Đang tải danh sách đối chiếu kiểm kê...
-                  </div>
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={11} loading title="Đang tải danh sách đối chiếu kiểm kê..." />
             ) : reconciliations.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
-                  <p className="text-sm font-medium">Chưa có phiếu đối chiếu nào trong ngày hoặc bộ lọc đã chọn</p>
-                  <p className="text-xs mt-1">Bấm &quot;Khởi tạo kỳ đối chiếu&quot; để tạo danh sách đối soát cho các bể.</p>
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow
+                colSpan={11}
+                title="Chưa có phiếu đối chiếu nào trong ngày hoặc bộ lọc đã chọn"
+                description='Bấm "Khởi tạo kỳ đối chiếu" để tạo danh sách đối soát cho các bể.'
+              />
             ) : (
               reconciliations.map((item) => {
                 const isConfirmed = item.status === 'confirmed';
                 const hasMeasured = item.measured_liters !== undefined && item.measured_liters !== null;
                 const statusCfg = statusConfig[item.status] || {
                   label: item.status,
-                  variant: 'outline' as const,
+                  tone: 'neutral' as const,
                 };
                 const varianceL = item.variance_liters ?? 0;
                 const varianceP = item.variance_pct ?? 0;
 
                 return (
-                  <TableRow key={item.id} className="hover:bg-muted/40 transition-colors">
+                  <TableRow key={item.id} className="hover:bg-muted/40 transition-colors" onClick={rowClick(() => setDetail(item))}>
                     <TableCell className="font-mono text-xs">{item.period_date}</TableCell>
                     <TableCell>
                       <div className="font-medium text-sm">{item.tank_name}</div>
@@ -273,23 +244,29 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
                     <TableCell className="text-right tabular-nums text-xs text-emerald-600 font-medium">
                       +{formatNumberVN(item.receipts_liters)} L
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs text-amber-600 font-medium">
+                    <TableCell className="text-right tabular-nums text-xs text-blue-600 font-medium">
                       -{formatNumberVN(item.dispensed_liters)} L
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-semibold text-sm">
                       {formatNumberVN(item.book_closing_liters)} L
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-medium text-sm">
-                      {hasMeasured ? `${formatNumberVN(item.measured_liters!)} L` : (
+                      {hasMeasured ? (
+                        `${formatNumberVN(item.measured_liters!)} L`
+                      ) : (
                         <span className="text-xs text-muted-foreground italic">Chưa đo</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-xs">
                       {hasMeasured ? (
                         <div className={item.status === 'alert' ? 'text-rose-600 font-bold' : 'text-foreground'}>
-                          <span>{varianceL > 0 ? '+' : ''}{formatNumberVN(varianceL)} L</span>
+                          <span>
+                            {varianceL > 0 ? '+' : ''}
+                            {formatNumberVN(varianceL)} L
+                          </span>
                           <span className="text-[11px] block opacity-80">
-                            ({varianceP > 0 ? '+' : ''}{varianceP.toFixed(2)}%)
+                            ({varianceP > 0 ? '+' : ''}
+                            {varianceP.toFixed(2)}%)
                           </span>
                         </div>
                       ) : (
@@ -297,14 +274,12 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant={statusCfg.variant} className="text-xs whitespace-nowrap">
-                        {statusCfg.label}
-                      </Badge>
+                      <StatusBadge tone={statusCfg.tone}>{statusCfg.label}</StatusBadge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         {/* Nút nhập số đo: Hiện khi chưa confirmed */}
-                        {!isConfirmed && (
+                        {canMeasure && !isConfirmed && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -320,7 +295,7 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
                         )}
 
                         {/* Nút xác nhận kiểm kê: Hiện khi matched hoặc alert */}
-                        {(item.status === 'matched' || item.status === 'alert') && (
+                        {canConfirm && (item.status === 'matched' || item.status === 'alert') && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -359,6 +334,13 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
             )}
           </TableBody>
         </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={detail?.tank_name ?? ''}
+        description={'Phiếu đối chiếu kiểm kê'}
+        sections={detail ? stocktakeDetail(detail) : []}
+      />
       </div>
 
       {/* Dialog tạo kỳ đối chiếu */}
@@ -370,15 +352,15 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
                 <PlusIcon className="h-5 w-5 text-primary" />
                 <DialogTitle>Khởi tạo kỳ đối chiếu kiểm kê</DialogTitle>
               </div>
-              <DialogDescription>
-                Tạo bản ghi đối soát sổ sách tự động theo ngày cho bể chứa
-              </DialogDescription>
+              <DialogDescription>Tạo bản ghi đối soát sổ sách tự động theo ngày cho bể chứa</DialogDescription>
             </DialogHeader>
 
             <DialogBody>
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>Chi nhánh <span className="text-destructive">*</span></Label>
+                  <Label>
+                    Trạm xăng <span className="text-destructive">*</span>
+                  </Label>
                   <Select
                     value={selectedBranchId}
                     onValueChange={(val) => {
@@ -387,7 +369,7 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Chọn chi nhánh" />
+                      <SelectValue placeholder="Chọn trạm xăng" />
                     </SelectTrigger>
                     <SelectContent>
                       {branches.map((b) => (
@@ -400,11 +382,10 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Bể chứa <span className="text-destructive">*</span></Label>
-                  <Select
-                    value={selectedTankId}
-                    onValueChange={setSelectedTankId}
-                  >
+                  <Label>
+                    Bể chứa <span className="text-destructive">*</span>
+                  </Label>
+                  <Select value={selectedTankId} onValueChange={setSelectedTankId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn bể chứa" />
                     </SelectTrigger>
@@ -419,7 +400,9 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Ngày đối chiếu <span className="text-destructive">*</span></Label>
+                  <Label>
+                    Ngày đối chiếu <span className="text-destructive">*</span>
+                  </Label>
                   <DatePicker value={periodDate} onChange={setPeriodDate} />
                 </div>
               </div>
@@ -443,17 +426,9 @@ export function StocktakeTable({ branchFilter = '', onBranchFilterChange, create
       </Dialog>
 
       {/* Dialogs */}
-      <StocktakeMeasureDialog
-        open={measureOpen}
-        onOpenChange={setMeasureOpen}
-        reconciliation={measureItem}
-      />
+      <StocktakeMeasureDialog open={measureOpen} onOpenChange={setMeasureOpen} reconciliation={measureItem} />
 
-      <StocktakeConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        reconciliation={confirmItem}
-      />
+      <StocktakeConfirmDialog open={confirmOpen} onOpenChange={setConfirmOpen} reconciliation={confirmItem} />
 
       <TankLedgerDialog
         open={ledgerOpen}

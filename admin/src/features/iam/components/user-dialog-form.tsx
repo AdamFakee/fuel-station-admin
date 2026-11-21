@@ -43,7 +43,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
   const updateUser = useUpdateUser();
 
   const [employeeCode, setEmployeeCode] = React.useState('');
-  const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [fullName, setFullName] = React.useState('');
   const [email, setEmail] = React.useState('');
@@ -55,7 +54,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
   React.useEffect(() => {
     if (user) {
       setEmployeeCode(user.employee_code);
-      setUsername(user.username);
       setPassword('');
       setFullName(user.full_name);
       setEmail(user.email);
@@ -65,7 +63,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
       setError(null);
     } else {
       setEmployeeCode('');
-      setUsername('');
       setPassword('');
       setFullName('');
       setEmail('');
@@ -125,14 +122,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
         }
       );
     } else {
-      if (!employeeCode.trim()) {
-        setError('Mã nhân viên không được để trống');
-        return;
-      }
-      if (!username.trim()) {
-        setError('Tên đăng nhập không được để trống');
-        return;
-      }
       if (password.length < 8) {
         setError('Mật khẩu khởi tạo phải từ 8 ký tự trở lên');
         return;
@@ -140,8 +129,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
 
       createUser.mutate(
         {
-          employee_code: employeeCode.trim(),
-          username: username.trim(),
           password,
           full_name: fullName.trim(),
           email: email.trim(),
@@ -166,7 +153,7 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
           <DialogTitle>{isEdit ? 'Chỉnh sửa tài khoản' : 'Thêm tài khoản mới'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? `Cập nhật thông tin nhân sự và phân bổ chi nhánh cho ${user?.full_name} (${user?.employee_code})`
+              ? `Cập nhật thông tin nhân sự và phân bổ trạm xăng cho ${user?.full_name} (${user?.employee_code})`
               : 'Tạo tài khoản quản trị/vận hành và thiết lập quyền truy cập cho nhân sự'}
           </DialogDescription>
         </DialogHeader>
@@ -180,17 +167,12 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="employee_code">Mã nhân viên *</Label>
-                <Input
-                  id="employee_code"
-                  value={employeeCode}
-                  onChange={(e) => setEmployeeCode(e.target.value)}
-                  placeholder="Ví dụ: NV-0004"
-                  disabled={isEdit || isPending}
-                  required
-                />
-              </div>
+              {isEdit && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="employee_code">Mã nhân viên</Label>
+                  <Input id="employee_code" value={employeeCode} disabled />
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label htmlFor="full_name">Họ và tên *</Label>
@@ -203,17 +185,30 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
                   required
                 />
               </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="phone">Số điện thoại</Label>
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Ví dụ: 0912345678"
+                  disabled={isPending}
+                />
+              </div>
             </div>
 
+            {/* Tài khoản đăng nhập = email + mật khẩu. Mã nhân viên do hệ thống tự sinh. */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="username">Tên đăng nhập *</Label>
+                <Label htmlFor="email">Email đăng nhập *</Label>
                 <Input
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Ví dụ: nguyenvana"
-                  disabled={isEdit || isPending}
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@petrovn.vn"
+                  disabled={isPending}
                   required
                 />
               </div>
@@ -232,32 +227,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
                   />
                 </div>
               )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@petrovn.vn"
-                  disabled={isPending}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">Số điện thoại</Label>
-                <Input
-                  id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Ví dụ: 0912345678"
-                  disabled={isPending}
-                />
-              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -284,13 +253,13 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
               </Select>
             </div>
 
-            {/* Chi nhánh phân bổ */}
+            {/* Trạm xăng phân bổ */}
             <div className="space-y-2 pt-2 border-t">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-semibold">Phạm vi Chi nhánh / Nhà máy</Label>
+                  <Label className="text-sm font-semibold">Phạm vi Trạm xăng / Trạm xăng</Label>
                   <p className="text-xs text-muted-foreground">
-                    Người dùng chỉ có thể xem và thao tác dữ liệu thuộc các chi nhánh được gán
+                    Người dùng chỉ có thể xem và thao tác dữ liệu thuộc các trạm xăng được gán
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

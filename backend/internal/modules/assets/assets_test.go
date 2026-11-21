@@ -2,12 +2,14 @@ package assets_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"fuel-station-backend/internal/modules/assets"
+	"fuel-station-backend/internal/shared/apperr"
 	"fuel-station-backend/internal/shared/authz"
 	"fuel-station-backend/internal/shared/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,7 +39,7 @@ func setupTest(t *testing.T) (*assets.Service, *pgxpool.Pool, context.Context) {
 		adminUserID,
 		defaultTenantID,
 		"MANAGER",
-		[]string{branch1ID},
+		nil, // toàn công ty; phạm vi trạm xăng được kiểm riêng ở TestBranchScopeIsolation
 		[]authz.Permission{
 			"org.branch:view", "org.branch:create", "org.branch:update", "org.branch:delete",
 			"asset.tank:view", "asset.tank:create", "asset.tank:update", "asset.tank:delete",
@@ -56,15 +58,13 @@ func TestBranchLifecycle(t *testing.T) {
 	svc, pool, ctx := setupTest(t)
 	defer pool.Close()
 
-	uniqueCode := fmt.Sprintf("BR-%d", time.Now().UnixNano()%100000)
 	addr := "123 Đường Test"
 	mgr := "Quản lý Test"
 	phone := "0912345678"
 
 	// 1. Create Branch
 	created, err := svc.CreateBranch(ctx, assets.CreateBranchRequest{
-		Code:        uniqueCode,
-		Name:        "Chi nhánh Test M4",
+		Name:        "Trạm xăng Test M4",
 		Address:     &addr,
 		ManagerName: &mgr,
 		Phone:       &phone,
@@ -72,8 +72,8 @@ func TestBranchLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateBranch failed: %v", err)
 	}
-	if created.Code != uniqueCode {
-		t.Fatalf("expected code %s, got %s", uniqueCode, created.Code)
+	if !strings.HasPrefix(created.Code, "CN-") {
+		t.Fatalf("expected a generated code starting with CN-, got %s", created.Code)
 	}
 
 	// 2. Get Branch
@@ -81,12 +81,12 @@ func TestBranchLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetBranch failed: %v", err)
 	}
-	if found.Name != "Chi nhánh Test M4" {
+	if found.Name != "Trạm xăng Test M4" {
 		t.Fatalf("unexpected branch name: %s", found.Name)
 	}
 
 	// 3. Update Branch
-	updatedName := "Chi nhánh Test M4 - Updated"
+	updatedName := "Trạm xăng Test M4 - Updated"
 	updated, err := svc.UpdateBranch(ctx, created.ID, assets.UpdateBranchRequest{
 		Name:        updatedName,
 		Address:     &addr,
@@ -190,7 +190,7 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 
 	// 2. Create Pump
 	pumpCode := fmt.Sprintf("P-%d", time.Now().UnixNano()%100000)
-	// Cổng COM phải duy nhất trong cửa hàng: dùng số ngẫu nhiên theo từng lần chạy, kẻo đụng dữ liệu thật trong DB dùng chung.
+	// Cổng COM phải duy nhất trong trạm xăng: dùng số ngẫu nhiên theo từng lần chạy, kẻo đụng dữ liệu thật trong DB dùng chung.
 	comSuffix := time.Now().UnixNano() % 800000
 	comPort := fmt.Sprintf("COM%d", 100+comSuffix)
 	var serial uint32 = 4567
@@ -261,5 +261,35 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 	// 5. Delete pump
 	if err := svc.DeletePump(ctx, pump.ID); err != nil {
 		t.Fatalf("DeletePump failed: %v", err)
+	}
+}
+
+// Người thao tác chỉ có trạm xăng B không được xem hay sửa bể thuộc trạm xăng A.
+func TestBranchScopeIsolation(t *testing.T) {
+	svc, pool, ctx := setupTest(t)
+	defer pool.Close()
+
+	otherBranch := "00000000-0000-0000-0000-00000000dead"
+	restricted := authz.WithPrincipal(ctx, authz.NewPrincipal(adminUserID, defaultTenantID, "MANAGER", []string{otherBranch}, nil))
+
+	if _, err := svc.GetBranch(restricted, branch1ID); !errors.Is(err, apperr.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for an out-of-scope branch, got %v", err)
+	}
+	branches, _, err := svc.ListBranches(restricted, assets.BranchListQuery{})
+	if err != nil {
+		t.Fatalf("ListBranches failed: %v", err)
+	}
+	if len(branches) != 0 {
+		t.Fatalf("expected no visible branches, got %d", len(branches))
+	}
+	tanks, _, err := svc.ListTanks(restricted, assets.TankListQuery{BranchID: branch1ID})
+	if err != nil {
+		t.Fatalf("ListTanks failed: %v", err)
+	}
+	if len(tanks) != 0 {
+		t.Fatalf("expected no visible tanks, got %d", len(tanks))
+	}
+	if _, err := svc.CreateTank(restricted, assets.CreateTankRequest{BranchID: branch1ID, Code: "X", Name: "X", FuelTypeID: "x", DesignCapacityML: 1}); !errors.Is(err, apperr.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden when creating a tank in an out-of-scope branch, got %v", err)
 	}
 }

@@ -453,3 +453,55 @@
     color: var(--selection-foreground);
   }
 }
+
+/* ---- Trang đăng nhập: nền gradient nhạt và các khối trôi (màu thương hiệu BIWASE) ---- */
+.login-backdrop {
+  background:
+    radial-gradient(60rem 40rem at 10% 0%, rgb(0 174 239 / 0.14), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 100%, rgb(64 65 150 / 0.16), transparent 60%),
+    #f6f8fb;
+}
+
+.login-block {
+  position: absolute;
+  bottom: -120px;
+  border-radius: 18%;
+  opacity: 0;
+  animation-name: login-block-float;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.login-block-indigo {
+  background: rgb(64 65 150 / 0.16);
+}
+.login-block-cyan {
+  background: rgb(0 174 239 / 0.18);
+}
+.login-block-orange {
+  background: rgb(245 134 52 / 0.2);
+}
+
+@keyframes login-block-float {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-115vh) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-block {
+    animation: none;
+    opacity: 0.6;
+    bottom: 30%;
+  }
+}

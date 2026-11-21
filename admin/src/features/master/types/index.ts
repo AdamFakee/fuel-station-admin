@@ -38,7 +38,7 @@ export interface VehicleListItem {
   status: 'active' | 'banned';
   note?: string;
   card_number?: string;
-  /** Cửa hàng được phép đổ. Rỗng: xe chưa đổ được ở cửa hàng nào. */
+  /** Trạm xăng được phép đổ. Rỗng: xe chưa đổ được ở trạm xăng nào. */
   branch_ids: string[];
   branch_names: string[];
   version: number;

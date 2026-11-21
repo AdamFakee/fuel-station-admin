@@ -1,5 +1,6 @@
 'use client';
 
+import { OptionSelect } from '@/components/option-select';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,6 +43,8 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<TankInput>({
     resolver: zodResolver(tankSchema),
@@ -134,37 +137,27 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="branch_id">Thuộc Chi nhánh *</Label>
-                <select
+                <Label htmlFor="branch_id">Thuộc Trạm xăng *</Label>
+                <OptionSelect
                   id="branch_id"
                   disabled={isEdit}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                  {...register('branch_id')}
-                >
-                  <option value="">-- Chọn chi nhánh --</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} ({b.code})
-                    </option>
-                  ))}
-                </select>
+                  emptyLabel="Chọn trạm xăng"
+                  value={watch('branch_id') ?? ''}
+                  onChange={(next) => setValue('branch_id', next, { shouldValidate: true })}
+                  options={branches.map((b) => ({ value: b.id, label: `${b.name} (${b.code})` }))}
+                />
                 {errors.branch_id && <p className="text-xs text-destructive">{errors.branch_id.message}</p>}
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="fuel_type_id">Loại nhiên liệu *</Label>
-                <select
+                <OptionSelect
                   id="fuel_type_id"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-                  {...register('fuel_type_id')}
-                >
-                  <option value="">-- Chọn nhiên liệu --</option>
-                  {fuelTypes?.map((ft) => (
-                    <option key={ft.id} value={ft.id}>
-                      {ft.name} ({ft.code})
-                    </option>
-                  ))}
-                </select>
+                  emptyLabel="Chọn nhiên liệu"
+                  value={watch('fuel_type_id') ?? ''}
+                  onChange={(next) => setValue('fuel_type_id', next, { shouldValidate: true })}
+                  options={(fuelTypes ?? []).map((ft) => ({ value: ft.id, label: `${ft.name} (${ft.code})` }))}
+                />
                 {errors.fuel_type_id && <p className="text-xs text-destructive">{errors.fuel_type_id.message}</p>}
               </div>
             </div>

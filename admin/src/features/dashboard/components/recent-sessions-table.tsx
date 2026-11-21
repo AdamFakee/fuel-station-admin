@@ -1,5 +1,6 @@
 'use client';
 
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -9,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { RecentSessionItem } from '../types';
 import { formatDateTimeVN, formatNumberVN } from '@/lib/format';
 import { Empty } from '@/components/empty';
@@ -39,7 +39,7 @@ export function RecentSessionsTable({ sessions, isLoading }: RecentSessionsTable
             <TableHead className="text-left">Biển số xe</TableHead>
             <TableHead className="text-left">Tài xế</TableHead>
             <TableHead className="text-left">Trạng thái</TableHead>
-            <TableHead className="text-right justify-end">Lượng đổ (Lít)</TableHead>
+            <TableHead className="text-right justify-end text-blue-600">Lượng đổ (Lít)</TableHead>
             <TableHead className="text-right justify-end">Thời gian</TableHead>
           </TableRow>
         </TableHeader>
@@ -68,25 +68,13 @@ export function RecentSessionsTable({ sessions, isLoading }: RecentSessionsTable
 
               {/* Trạng thái */}
               <TableCell>
-                {sess.status === 'completed' && (
-                  <Badge variant="outline" className="border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 font-normal text-[10px] px-1.5 py-0">
-                    Thành công
-                  </Badge>
-                )}
-                {sess.status === 'failed' && (
-                  <Badge variant="destructive" className="font-normal text-[10px] px-1.5 py-0">
-                    Lỗi
-                  </Badge>
-                )}
-                {sess.status === 'cancelled' && (
-                  <Badge variant="outline" className="border-zinc-300 text-zinc-600 font-normal text-[10px] px-1.5 py-0">
-                    Đã hủy
-                  </Badge>
-                )}
+                {sess.status === 'completed' && <StatusBadge tone="success">Thành công</StatusBadge>}
+                {sess.status === 'failed' && <StatusBadge tone="danger">Lỗi</StatusBadge>}
+                {sess.status === 'cancelled' && <StatusBadge tone="neutral">Đã hủy</StatusBadge>}
               </TableCell>
 
               {/* Lượng đổ (right, tabular-nums) */}
-              <TableCell className="text-right tabular-nums text-xs font-semibold text-foreground">
+              <TableCell className="text-right tabular-nums text-xs font-semibold text-blue-600">
                 {formatNumberVN(sess.dispensed_liters, 2)}
               </TableCell>
 

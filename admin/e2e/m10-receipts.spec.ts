@@ -35,7 +35,7 @@ test.describe('Module M10 - Nhập bể (Stock Receipts) & Kiểm soát Sức ch
       });
     });
 
-    // 2. Mock danh sách chi nhánh
+    // 2. Mock danh sách trạm xăng
     await page.route('**/assets/branches*', async (route) => {
       await route.fulfill({
         status: 200,
@@ -342,7 +342,8 @@ test.describe('Module M10 - Nhập bể (Stock Receipts) & Kiểm soát Sức ch
 
     // Chọn Bể TK-A95-01 (Bể này chỉ còn trống 1,000 L trong mock check-capacity)
     const tankSelect = page.getByTestId('line-tank-select');
-    await tankSelect.selectOption('tk-02');
+    await tankSelect.click();
+    await page.getByRole('option', { name: /TK-A95-01/ }).click();
 
     // Nhập chứng từ 5,000 Lít và thực tế 5,000 Lít (vượt quá 1,000 Lít còn trống)
     const numberInputs = page.locator('input[type="number"]');

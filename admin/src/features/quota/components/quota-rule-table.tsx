@@ -1,5 +1,9 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { quotaRuleDetail } from '@/lib/row-details';
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -38,6 +42,7 @@ const targetTypeLabels: Record<string, { label: string; className: string }> = {
 };
 
 export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps) {
+  const [detail, setDetail] = React.useState<QuotaRule | null>(null);
   const { hasPermission } = useAuth();
   const canUpdate = hasPermission('master.quota:update');
   const canDelete = hasPermission('master.quota:delete');
@@ -111,7 +116,7 @@ export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps
               const isActive = rule.status === 'active';
 
               return (
-                <TableRow key={rule.id}>
+                <TableRow key={rule.id} onClick={rowClick(() => setDetail(rule))}>
                   {/* Mã định mức */}
                   <TableCell className="font-mono text-xs font-semibold text-foreground text-left">
                     {rule.code}
@@ -155,12 +160,7 @@ export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps
 
                   {/* Trạng thái */}
                   <TableCell className="text-center">
-                    <Badge
-                      variant={isActive ? 'default' : 'secondary'}
-                      className={isActive ? 'bg-success/15 text-success hover:bg-success/20 border-transparent text-xs' : 'text-xs text-muted-foreground'}
-                    >
-                      {isActive ? 'Hiệu lực' : 'Đã hủy'}
-                    </Badge>
+                    <StatusBadge tone={isActive ? 'success' : 'neutral'}>{isActive ? 'Hiệu lực' : 'Đã hủy'}</StatusBadge>
                   </TableCell>
 
                   {/* Thao tác */}
@@ -197,6 +197,13 @@ export function QuotaRuleTable({ rules, onEdit, isLoading }: QuotaRuleTableProps
             })}
           </TableBody>
         </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={detail?.code ?? ''}
+        description={'Quy tắc định mức'}
+        sections={detail ? quotaRuleDetail(detail) : []}
+      />
       </div>
 
       {/* Confirm Dialog Hủy Định mức (theo confirm-dialog skill) */}

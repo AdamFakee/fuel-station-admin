@@ -1,0 +1,86 @@
+name: Seed dữ liệu lên server
+
+# Chạy thủ công (Actions -> Seed dữ liệu lên server -> Run workflow) sau khi deploy xong.
+# Nạp dữ liệu nền (công ty, vai trò, tài khoản, trạm xăng) rồi dữ liệu vận hành (bể, trụ, xe, tài xế, phiếu, phiên đổ)
+# qua đúng API của hệ thống. Chỉ chạy khi server CHƯA có dữ liệu vận hành, không ghi đè dữ liệu thật.
+#
+# Cần thêm secret SEED_PASSWORD: mật khẩu chung cho mọi tài khoản mẫu (nên là mật khẩu mạnh, đổi sau khi đăng nhập).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Gõ SEED để xác nhận nạp dữ liệu lên server'
+        required: true
+
+jobs:
+  seed:
+    name: Seed
+    if: github.event.inputs.confirm == 'SEED'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy script nạp dữ liệu lên VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: backend/scripts/seed_operational.py
+          target: ~/app
+          strip_components: 2
+
+      - name: Seed trên VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+          DEVICE_CRYPTO_KEY: ${{ secrets.DEVICE_CRYPTO_KEY }}
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS || format('http://{0}:3000', secrets.VPS_HOST) }}
+          SEED_PASSWORD: ${{ secrets.SEED_PASSWORD }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          envs: DOCKER_USERNAME,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,DEVICE_CRYPTO_KEY,CORS_ALLOWED_ORIGINS,SEED_PASSWORD
+          script_stop: true
+          script: |
+            set -e
+            cd ~/app
+            if [ -z "$SEED_PASSWORD" ]; then echo "Thiếu secret SEED_PASSWORD"; exit 1; fi
+            command -v python3 >/dev/null 2>&1 || (apt-get update -y && apt-get install -y python3)
+            command -v curl >/dev/null 2>&1 || (apt-get update -y && apt-get install -y curl)
+
+            PG_USER="${POSTGRES_USER:-fuel_admin}"
+            PG_DB="${POSTGRES_DB:-fuel_station_db}"
+            PSQL="docker compose exec -T postgres psql -U $PG_USER -d $PG_DB"
+
+            # Backend phải đang chạy (migration đã áp dụng)
+            for i in $(seq 1 30); do
+              curl -fsS http://localhost:8080/v1/health >/dev/null 2>&1 && break
+              sleep 2
+            done
+            curl -fsS http://localhost:8080/v1/health >/dev/null
+
+            # Không ghi đè: đã có bể / phiên đổ thì dừng
+            EXISTING=$($PSQL -At -c "SELECT (SELECT count(*) FROM station.tank) + (SELECT count(*) FROM station.dispense_session)")
+            if [ "${EXISTING:-0}" != "0" ]; then
+              echo "Server đã có dữ liệu vận hành ($EXISTING bản ghi), không nạp thêm để tránh trùng."
+              exit 1
+            fi
+
+            # Khóa API Edge chỉ dùng trong lần nạp này: ngẫu nhiên, không ai biết sau đó.
+            export SEED_EDGE_KEY_PREFIX="seed_$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+
+            echo ">>> 1. Dữ liệu nền (công ty, vai trò, tài khoản, trạm xăng) <<<"
+            docker compose exec -T -e SEED_PASSWORD="$SEED_PASSWORD" -e SEED_EDGE_KEY_PREFIX="$SEED_EDGE_KEY_PREFIX" backend ./seed
+
+            echo ">>> 2. Dữ liệu vận hành qua API <<<"
+            SEED_API=http://localhost:8080 SEED_PSQL="$PSQL" python3 seed_operational.py
+
+            echo ">>> Hoàn tất. Đăng nhập admin@petrovn.vn bằng mật khẩu trong secret SEED_PASSWORD. <<<"

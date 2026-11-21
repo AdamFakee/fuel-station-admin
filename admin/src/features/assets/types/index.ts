@@ -120,11 +120,7 @@ export interface DeviceView {
 // ------------------------------------------------------------------------------------------------
 
 export const branchSchema = z.object({
-  code: z
-    .string()
-    .min(1, 'Mã chi nhánh không được để trống')
-    .regex(/^[A-Za-z0-9_-]{1,32}$/, 'Mã chỉ gồm chữ, số, gạch ngang (tối đa 32 ký tự)'),
-  name: z.string().min(1, 'Tên chi nhánh không được để trống'),
+  name: z.string().min(1, 'Tên trạm xăng không được để trống'),
   address: z.string().optional(),
   manager_name: z.string().optional(),
   phone: z.string().optional(),
@@ -137,7 +133,7 @@ export const tankSchema = z.object({
     .min(1, 'Mã bể không được để trống')
     .regex(/^[A-Za-z0-9_-]{1,32}$/, 'Mã chỉ gồm chữ, số, gạch ngang (tối đa 32 ký tự)'),
   name: z.string().min(1, 'Tên bể không được để trống'),
-  branch_id: z.string().min(1, 'Vui lòng chọn chi nhánh'),
+  branch_id: z.string().min(1, 'Vui lòng chọn trạm xăng'),
   fuel_type_id: z.string().min(1, 'Vui lòng chọn loại nhiên liệu'),
   design_capacity_liters: z.coerce.number().min(100, 'Dung tích thiết kế tối thiểu 100 Lít'),
   max_usable_capacity_liters: z.coerce.number().min(100, 'Dung tích khả dụng tối thiểu 100 Lít'),
@@ -151,7 +147,7 @@ export const pumpSchema = z.object({
   // Mã trụ do hệ thống sinh; chỉ có giá trị khi sửa (hiển thị, không gửi đi).
   code: z.string().optional(),
   name: z.string().min(1, 'Tên trụ không được để trống'),
-  branch_id: z.string().min(1, 'Vui lòng chọn chi nhánh'),
+  branch_id: z.string().min(1, 'Vui lòng chọn trạm xăng'),
   tank_id: z.string().min(1, 'Vui lòng chọn bể kết nối vòi bơm'),
   edge_pump_id: z.coerce.number().min(0).optional(),
   note: z.string().optional(),

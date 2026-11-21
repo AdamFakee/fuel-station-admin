@@ -6,7 +6,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full flex-1 min-h-0 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="relative w-full flex-1 min-h-0 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&:has([data-table-empty])>table]:h-full"
     >
       <table
         data-slot="table"
@@ -56,6 +56,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
       data-slot="table-row"
       className={cn(
         "group/row hover:bg-muted/40 data-[state=selected]:bg-muted border-b border-border/60 transition-colors",
+        props.onClick && "cursor-pointer",
         className
       )}
       {...props}

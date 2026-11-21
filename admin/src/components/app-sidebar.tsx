@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -27,6 +28,7 @@ import {
   ChartBarIcon,
   SignalIcon,
   ShieldCheckIcon,
+  ChatBubbleLeftEllipsisIcon,
   BuildingOffice2Icon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
@@ -45,6 +47,8 @@ interface NavItem {
 
 interface NavGroup {
   label: string;
+  /** Nhóm chỉ có một mục (Dashboard): không cần tiêu đề nhóm. */
+  hideLabel?: boolean;
   items: NavItem[];
 }
 
@@ -55,6 +59,7 @@ export function AppSidebar() {
   const navigationGroups: NavGroup[] = [
     {
       label: 'Tổng quan',
+      hideLabel: true,
       items: [
         {
           title: 'Dashboard',
@@ -160,7 +165,7 @@ export function AppSidebar() {
           permission: 'audit.log:view',
         },
         {
-          title: 'Nhà máy & Chi nhánh',
+          title: 'Trạm xăng',
           href: '/branches',
           icon: BuildingOffice2Icon,
           permission: 'org.branch:view',
@@ -176,6 +181,12 @@ export function AppSidebar() {
           href: '/roles',
           icon: ShieldCheckIcon,
           permission: 'iam.role:view',
+        },
+        {
+          title: 'Góp ý & Phản hồi',
+          href: '/feedback',
+          icon: ChatBubbleLeftEllipsisIcon,
+          permission: 'feedback.item:view',
         },
       ],
     },
@@ -193,15 +204,13 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-border">
       {/* Sidebar Header */}
       <SidebarHeader className="h-14 border-b border-border/60 px-4 flex flex-row items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shadow-xs">
-          FS
-        </div>
+        <Image src="/biwase-logo.png" alt="BIWASE" width={28} height={34} className="h-8 w-auto shrink-0" />
         <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
           <span className="text-sm font-semibold text-foreground tracking-tight">
             Fuel Station System
           </span>
           <span className="text-xs text-muted-foreground font-mono">
-            Quản trị Vận hành Trạm
+            Quản lý trạm xăng
           </span>
         </div>
       </SidebarHeader>
@@ -219,9 +228,11 @@ export function AppSidebar() {
 
           return (
             <SidebarGroup key={group.label}>
-              <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {group.label}
-              </SidebarGroupLabel>
+              {!group.hideLabel && (
+                <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {group.label}
+                </SidebarGroupLabel>
+              )}
               <SidebarMenu>
                 {visibleItems.map((item) => {
                   const isActive =

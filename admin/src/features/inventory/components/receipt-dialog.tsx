@@ -1,5 +1,6 @@
 'use client';
 
+import { OptionSelect } from '@/components/option-select';
 import { DatePicker } from '@/components/date-picker';
 import * as React from 'react';
 import {
@@ -300,22 +301,17 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
             {/* General Info Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="branch_id">Trạm / Cửa hàng *</Label>
-                <select
+                <Label htmlFor="branch_id">Trạm xăng *</Label>
+                <OptionSelect
                   id="branch_id"
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring mt-1.5"
+                  className="mt-1.5"
                   value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
+                  onChange={setBranchId}
                   disabled={isEditing}
                   required
-                >
-                  <option value="">-- Chọn trạm --</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} ({b.code})
-                    </option>
-                  ))}
-                </select>
+                  emptyLabel="Chọn trạm"
+                  options={branches.map((b) => ({ value: b.id, label: `${b.name} (${b.code})` }))}
+                />
               </div>
 
               <div>
@@ -331,19 +327,14 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
 
               <div>
                 <Label htmlFor="supplier_id">Nhà cung cấp</Label>
-                <select
+                <OptionSelect
                   id="supplier_id"
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring mt-1.5"
+                  className="mt-1.5"
                   value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                >
-                  <option value="">-- Không chọn --</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSupplierId}
+                  emptyLabel="Không chọn"
+                  options={suppliers.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` }))}
+                />
               </div>
 
               <div>
@@ -435,19 +426,14 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                           <div>
                             <Label className="text-xs">Bể chứa *</Label>
-                            <select
+                            <OptionSelect
                               data-testid="line-tank-select"
-                              className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm mt-1"
+                              className="mt-1 h-8 text-xs"
                               value={line.tank_id}
-                              onChange={(e) => handleTankChange(idx, e.target.value)}
+                              onChange={(next) => handleTankChange(idx, next)}
                               required
-                            >
-                              {tanks.map((t) => (
-                                <option key={t.id} value={t.id}>
-                                  {t.name} ({t.code}) - {t.fuel_type_name}
-                                </option>
-                              ))}
-                            </select>
+                              options={tanks.map((t) => ({ value: t.id, label: `${t.name} (${t.code}) - ${t.fuel_type_name}` }))}
+                            />
                           </div>
 
                           <div>

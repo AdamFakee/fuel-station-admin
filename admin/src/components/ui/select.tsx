@@ -52,6 +52,7 @@ function SelectContent({
   className,
   children,
   position = "popper",
+  style,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
@@ -65,6 +66,8 @@ function SelectContent({
           className
         )}
         position={position}
+        // Giới hạn chiều cao 20rem (hoặc vừa khoảng trống còn lại của màn hình) để danh sách dài cuộn được.
+        style={{ maxHeight: "min(20rem, var(--radix-select-content-available-height))", ...style }}
         {...props}
       >
         <SelectScrollUpButton />

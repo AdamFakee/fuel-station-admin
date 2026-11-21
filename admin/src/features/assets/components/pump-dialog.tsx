@@ -1,5 +1,6 @@
 'use client';
 
+import { OptionSelect } from '@/components/option-select';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -67,12 +68,9 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
   const updateTerminal = useUpdateTerminal();
 
   const { data: branchData } = useBranches();
-  // Lấy đủ bể để chọn (mặc định API chỉ trả một trang đầu, bể ở trang sau sẽ không hiện trong ô chọn).
-  const { data: tankData } = useTanks({ page_size: 200 });
 
-  const branches = branchData?.data || [];
-  const tanks = tankData?.data || [];
-
+  // useMemo giữ nguyên tham chiếu mảng giữa các lần render (mảng mới mỗi lần sẽ làm các effect bên dưới chạy lặp vô hạn).
+  const branches = React.useMemo(() => branchData?.data ?? [], [branchData]);
   const {
     register,
     handleSubmit,
@@ -87,13 +85,16 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
   });
 
   const selectedBranchId = watch('branch_id');
+  // Chỉ lấy bể của trạm xăng đang chọn (API trả tối đa 100 bể mỗi trang).
+  const { data: tankData } = useTanks({ branch_id: selectedBranchId || undefined, page_size: 100 });
   const selectedTankId = watch('tank_id');
+  const tanks = React.useMemo(() => tankData?.data ?? [], [tankData]);
   const availableTanks = React.useMemo(() => {
     if (!selectedBranchId) return tanks;
     return tanks.filter((t) => t.branch_id === selectedBranchId);
   }, [tanks, selectedBranchId]);
 
-  // Đổi cửa hàng thì bể phải thuộc cửa hàng đó: bể đang chọn không hợp lệ thì chọn bể đầu tiên của cửa hàng (hoặc để trống nếu chưa có).
+  // Đổi trạm xăng thì bể phải thuộc trạm xăng đó: bể đang chọn không hợp lệ thì chọn bể đầu tiên của trạm xăng (hoặc để trống nếu chưa có).
   React.useEffect(() => {
     if (isEdit || !selectedBranchId) return;
     if (!availableTanks.some((t) => t.id === selectedTankId)) {
@@ -122,13 +123,16 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
         terminal_password: '',
       });
     } else {
-      reset({
-        ...EMPTY_VALUES,
-        branch_id: branches[0]?.id || '',
-        tank_id: tanks[0]?.id || '',
-      });
+      // Tạo mới: form trống; trạm xăng và bể mặc định do hai effect bên trên/dưới điền khi dữ liệu về.
+      reset(EMPTY_VALUES);
     }
-  }, [pump, branches, tanks, reset, open]);
+  }, [pump, reset, open]);
+
+  // Tạo mới: chọn sẵn trạm xăng đầu tiên khi danh sách trạm xăng đã tải và form chưa chọn trạm xăng nào.
+  React.useEffect(() => {
+    if (isEdit || !open || selectedBranchId || branches.length === 0) return;
+    setValue('branch_id', branches[0].id);
+  }, [isEdit, open, selectedBranchId, branches, setValue]);
 
   const onSubmit = async (data: PumpInput) => {
     try {
@@ -173,8 +177,6 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
     }
   };
 
-  const selectClass =
-    'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -208,33 +210,35 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="branch_id">Cửa hàng *</Label>
-                <select id="branch_id" disabled={isEdit} className={selectClass} {...register('branch_id')}>
-                  <option value="">-- Chọn cửa hàng --</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                <Label htmlFor="branch_id">Trạm xăng *</Label>
+                <OptionSelect
+                  id="branch_id"
+                  disabled={isEdit}
+                  emptyLabel="Chọn trạm xăng"
+                  value={watch('branch_id') ?? ''}
+                  onChange={(next) => setValue('branch_id', next, { shouldValidate: true })}
+                  options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                />
                 {errors.branch_id && <p className="text-xs text-destructive">{errors.branch_id.message}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="tank_id">Bể chứa cấp cho vòi *</Label>
-                <select id="tank_id" disabled={isEdit} className={selectClass} {...register('tank_id')}>
-                  <option value="">-- Chọn bể chứa --</option>
-                  {/* Bể hiện tại của vòi luôn có trong danh sách, kể cả khi chưa tải về. */}
-                  {pump?.nozzles?.[0] && !availableTanks.some((t) => t.id === pump.nozzles?.[0]?.tank_id) && (
-                    <option value={pump.nozzles[0].tank_id}>{pump.nozzles[0].tank_name}</option>
-                  )}
-                  {availableTanks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.fuel_type_name})
-                    </option>
-                  ))}
-                </select>
+                <OptionSelect
+                  id="tank_id"
+                  disabled={isEdit}
+                  emptyLabel="Chọn bể chứa"
+                  value={selectedTankId ?? ''}
+                  onChange={(next) => setValue('tank_id', next, { shouldValidate: true })}
+                  options={[
+                    // Bể hiện tại của vòi luôn có trong danh sách, kể cả khi chưa tải về.
+                    ...(pump?.nozzles?.[0] && !availableTanks.some((t) => t.id === pump.nozzles?.[0]?.tank_id)
+                      ? [{ value: pump.nozzles[0].tank_id, label: pump.nozzles[0].tank_name }]
+                      : []),
+                    ...availableTanks.map((t) => ({ value: t.id, label: `${t.name} (${t.fuel_type_name})` })),
+                  ]}
+                />
                 {!isEdit && selectedBranchId && availableTanks.length === 0 && (
-                  <p className="text-xs text-amber-600">Cửa hàng này chưa có bể chứa. Hãy tạo bể trước ở màn Bể chứa nhiên liệu.</p>
+                  <p className="text-xs text-amber-600">Trạm xăng này chưa có bể chứa. Hãy tạo bể trước ở màn Bể chứa nhiên liệu.</p>
                 )}
                 {errors.tank_id && <p className="text-xs text-destructive">{errors.tank_id.message}</p>}
               </div>

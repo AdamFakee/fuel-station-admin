@@ -1,11 +1,13 @@
 'use client';
 
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatCard } from '@/components/stat-card';
+import { BeakerIcon, ChartBarIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { StatusBadge } from '@/components/status-badge';
 import React from 'react';
 import { ReconciliationReportResponse } from '../types';
 import { formatNumberVN, formatDateVN } from '@/lib/format';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface ReconciliationReportViewProps {
   data?: ReconciliationReportResponse;
@@ -22,54 +24,48 @@ export function ReconciliationReportView({ data, isLoading }: ReconciliationRepo
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'confirmed':
-        return <Badge className="bg-emerald-600 hover:bg-emerald-600">Đã xác nhận</Badge>;
+        return <StatusBadge tone="info">Đã chốt</StatusBadge>;
       case 'matched':
-        return <Badge className="bg-blue-600 hover:bg-blue-600">Khớp chuẩn</Badge>;
+        return <StatusBadge tone="success">Khớp sổ</StatusBadge>;
       case 'alert':
-        return <Badge variant="destructive">Vượt ngưỡng</Badge>;
+        return <StatusBadge tone="danger">Lệch ngưỡng</StatusBadge>;
       default:
-        return <Badge variant="outline">Mở</Badge>;
+        return <StatusBadge tone="warning">Chờ đo</StatusBadge>;
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {/* Quick Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="text-xs text-muted-foreground">Tổng số biên bản kiểm kê</div>
-            <div className="text-2xl font-bold tabular-nums mt-1">{formatNumberVN(data?.total_count || 0)}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-50/50 border-blue-100">
-          <CardContent className="pt-4">
-            <div className="text-xs text-blue-800">Khớp trong dung sai</div>
-            <div className="text-2xl font-bold text-blue-700 tabular-nums mt-1">
-              {formatNumberVN(data?.matched_count || 0)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-red-50/50 border-red-100">
-          <CardContent className="pt-4">
-            <div className="text-xs text-red-800">Cảnh báo vượt ngưỡng hao hụt</div>
-            <div className="text-2xl font-bold text-destructive tabular-nums mt-1">
-              {formatNumberVN(data?.alert_count || 0)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-emerald-50/50 border-emerald-100">
-          <CardContent className="pt-4">
-            <div className="text-xs text-emerald-800">Kế toán đã phê duyệt</div>
-            <div className="text-2xl font-bold text-emerald-700 tabular-nums mt-1">
-              {formatNumberVN(data?.confirmed_count || 0)}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid shrink-0 grid-cols-2 gap-4 md:grid-cols-4">
+        <StatCard
+          label="Tổng số biên bản kiểm kê"
+          value={<>{formatNumberVN(data?.total_count || 0)}</>}
+          icon={ChartBarIcon}
+          tone="neutral"
+        />
+        <StatCard
+          label="Khớp trong dung sai"
+          value={<>{formatNumberVN(data?.matched_count || 0)}</>}
+          icon={BeakerIcon}
+          tone="primary"
+        />
+        <StatCard
+          label="Cảnh báo vượt ngưỡng hao hụt"
+          value={<>{formatNumberVN(data?.alert_count || 0)}</>}
+          icon={ExclamationTriangleIcon}
+          tone="danger"
+        />
+        <StatCard
+          label="Kế toán đã phê duyệt"
+          value={<>{formatNumberVN(data?.confirmed_count || 0)}</>}
+          icon={CheckCircleIcon}
+          tone="success"
+        />
       </div>
 
       {/* Bảng kê đối chiếu kiểm kê */}
-      <div className="rounded-md border">
+      <div className="flex min-h-0 flex-1 flex-col rounded-md border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -89,11 +85,7 @@ export function ReconciliationReportView({ data, isLoading }: ReconciliationRepo
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
-                  Không có biên bản kiểm kê nào trong khoảng thời gian đã chọn.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={12} title="Không có biên bản kiểm kê nào trong khoảng thời gian đã chọn." />
             ) : (
               items.map((row) => (
                 <TableRow key={row.id}>
@@ -132,7 +124,9 @@ export function ReconciliationReportView({ data, isLoading }: ReconciliationRepo
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-xs">
-                    {row.variance_pct !== null ? `${row.variance_pct > 0 ? '+' : ''}${formatNumberVN(row.variance_pct, 2)}%` : '—'}
+                    {row.variance_pct !== null
+                      ? `${row.variance_pct > 0 ? '+' : ''}${formatNumberVN(row.variance_pct, 2)}%`
+                      : '—'}
                   </TableCell>
                   <TableCell>{getStatusBadge(row.status)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">

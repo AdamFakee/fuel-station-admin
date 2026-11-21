@@ -1,5 +1,10 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { tankDetail } from '@/lib/row-details';
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -14,9 +19,17 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusIcon, PencilSquareIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
+import {
+  PlusIcon,
+  PencilSquareIcon,
+  NoSymbolIcon,
+  MagnifyingGlassIcon,
+  ArrowDownTrayIcon,
+} from '@heroicons/react/24/outline';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { exportReportToExcel } from '@/features/reports/lib/export-excel';
 import { Tank } from '../types';
-import { useTanks } from '../api/get-tanks';
+import { getTanks, useTanks } from '../api/get-tanks';
 import { useDeleteTank } from '../api/delete-tank';
 import { useBranches } from '../api/get-branches';
 import { TankDialog } from './tank-dialog';
@@ -26,29 +39,109 @@ import { toast } from 'sonner';
 import Paginator from '@/components/paginator';
 
 export function TankTable() {
-  const { isManager } = useAuth();
+  const [detail, setDetail] = React.useState<Tank | null>(null);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('asset.tank:create');
+  const canUpdate = hasPermission('asset.tank:update');
+  const canDelete = hasPermission('asset.tank:delete');
+  const showActions = canUpdate || canDelete;
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
   const [search, setSearch] = React.useState('');
-  const [branchFilter, setBranchFilter] = React.useState('');
+  const [branchFilter, setBranchFilter] = React.useState('all');
+  const [statusFilter, setStatusFilter] = React.useState('all');
+  const [isExporting, setIsExporting] = React.useState(false);
   const [selectedTank, setSelectedTank] = React.useState<Tank | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
   React.useEffect(() => {
     setPage(1);
-  }, [search, branchFilter]);
+  }, [search, branchFilter, statusFilter]);
 
   const { data: branchData } = useBranches();
   const { data, isLoading } = useTanks({
     page,
     page_size: pageSize,
     q: search || undefined,
-    branch_id: branchFilter || undefined,
+    branch_id: branchFilter !== 'all' ? branchFilter : undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
   });
   const deleteMutation = useDeleteTank();
 
   const tanks = data?.data || [];
   const branches = branchData?.data || [];
+
+  /** Xuất Excel toàn bộ bể theo bộ lọc hiện tại (không chỉ trang đang xem): lấy từng trang 100 bể. */
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const filters = {
+        q: search || undefined,
+        branch_id: branchFilter !== 'all' ? branchFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+      };
+      const allTanks: Tank[] = [];
+      for (let exportPage = 1; ; exportPage++) {
+        const result = await getTanks({
+          ...filters,
+          page: exportPage,
+          page_size: 100,
+        });
+        allTanks.push(...result.data);
+        if (allTanks.length >= result.total || result.data.length === 0) break;
+      }
+      await exportReportToExcel({
+        filename: 'danh-sach-be-chua',
+        title: 'Danh sách bể chứa nhiên liệu',
+        columns: [
+          { header: 'Mã bể', key: 'code', width: 16 },
+          { header: 'Tên bể', key: 'name', width: 26 },
+          { header: 'Trạm xăng', key: 'branch_name', width: 26 },
+          { header: 'Nhiên liệu', key: 'fuel_type_name', width: 18 },
+          {
+            header: 'Dung tích thiết kế (L)',
+            key: 'design_capacity_l',
+            width: 20,
+            align: 'right',
+          },
+          {
+            header: 'Dung tích khả dụng (L)',
+            key: 'usable_capacity_l',
+            width: 20,
+            align: 'right',
+          },
+          {
+            header: 'Tồn hiện tại (L)',
+            key: 'current_stock_l',
+            width: 18,
+            align: 'right',
+          },
+          {
+            header: 'Hao hụt cho phép (%)',
+            key: 'loss_tolerance_pct',
+            width: 18,
+            align: 'right',
+          },
+          { header: 'Trạng thái', key: 'status_label', width: 14 },
+        ],
+        data: allTanks.map((tank) => ({
+          code: tank.code,
+          name: tank.name,
+          branch_name: tank.branch_name,
+          fuel_type_name: tank.fuel_type_name,
+          design_capacity_l: tank.design_capacity_ml / 1000,
+          usable_capacity_l: tank.max_usable_capacity_ml / 1000,
+          current_stock_l: tank.current_stock_ml / 1000,
+          loss_tolerance_pct: tank.loss_tolerance_pct,
+          status_label: tank.status === 'active' ? 'Vận hành' : 'Ngừng',
+        })),
+      });
+    } catch {
+      toast.error('Không thể xuất Excel. Vui lòng thử lại.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleCreate = () => {
     setSelectedTank(null);
@@ -73,36 +166,56 @@ export function TankTable() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 max-w-lg flex-1">
+      {/* Hành động của trang: xuất Excel, thêm mới (nằm trên cùng, không chen vào thanh lọc) */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button variant="outline" onClick={handleExportExcel} disabled={isExporting}>
+          <ArrowDownTrayIcon className="mr-2 h-4 w-4" />
+          {isExporting ? 'Đang xuất...' : 'Xuất Excel'}
+        </Button>
+        {canCreate && (
+          <Button onClick={handleCreate}>
+            <PlusIcon className="mr-2 h-4 w-4" />
+            Khai báo bể mới
+          </Button>
+        )}
+      </div>
+
+      {/* Thanh tìm kiếm và bộ lọc */}
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 lg:flex-row lg:items-center">
+        <div className="relative min-w-0 flex-1">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Tìm theo mã bể, tên bể..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-9 w-48 text-xs"
+            className="pl-9"
           />
-
-          <select
-            value={branchFilter}
-            onChange={(e) => setBranchFilter(e.target.value)}
-            className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <option value="">-- Tất cả chi nhánh --</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
         </div>
 
-        {isManager && (
-          <Button onClick={handleCreate} size="sm" className="h-9 gap-1.5 shrink-0">
-            <PlusIcon className="h-4 w-4" />
-            <span>Khai báo bể mới</span>
-          </Button>
-        )}
+        <Select value={branchFilter} onValueChange={setBranchFilter}>
+          <SelectTrigger className="w-full lg:w-[220px]">
+            <SelectValue placeholder="Trạm xăng" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả trạm xăng</SelectItem>
+            {branches.map((b) => (
+              <SelectItem key={b.id} value={b.id}>
+                {b.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full lg:w-[190px]">
+            <SelectValue placeholder="Trạng thái" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả trạng thái</SelectItem>
+            <SelectItem value="active">Vận hành</SelectItem>
+            <SelectItem value="inactive">Ngừng</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Data Table */}
@@ -112,29 +225,21 @@ export function TankTable() {
             <TableRow className="bg-muted/40">
               <TableHead className="w-[100px] text-left">Mã bể</TableHead>
               <TableHead className="text-left">Tên bể chứa</TableHead>
-              <TableHead className="text-left">Chi nhánh</TableHead>
+              <TableHead className="text-left">Trạm xăng</TableHead>
               <TableHead className="text-left">Nhiên liệu</TableHead>
               <TableHead className="text-right tabular-nums">Dung tích TK (Lít)</TableHead>
               <TableHead className="text-right tabular-nums">Khả dụng (Lít)</TableHead>
               <TableHead className="text-right tabular-nums font-semibold">Tồn hiện tại (Lít)</TableHead>
               <TableHead className="text-right tabular-nums">Hao hụt (%)</TableHead>
               <TableHead className="text-center w-[100px]">Trạng thái</TableHead>
-              {isManager && <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>}
+              {showActions && <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={isManager ? 10 : 9} className="h-24 text-center text-muted-foreground text-xs">
-                  Đang tải danh sách bể chứa...
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={showActions ? 10 : 9} loading title="Đang tải danh sách bể chứa..." />
             ) : tanks.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={isManager ? 10 : 9} className="h-24 text-center text-muted-foreground text-xs">
-                  Chưa có bể chứa nào được khai báo.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={showActions ? 10 : 9} title="Chưa có bể chứa nào được khai báo." />
             ) : (
               tanks.map((t) => {
                 const currentStockL = t.current_stock_ml / 1000;
@@ -144,7 +249,7 @@ export function TankTable() {
                 const isLow = currentStockL <= lowStockL;
 
                 return (
-                  <TableRow key={t.id} className="hover:bg-muted/20">
+                  <TableRow key={t.id} className="hover:bg-muted/20" onClick={rowClick(() => setDetail(t))}>
                     <TableCell className="font-mono text-xs font-medium text-left">{t.code}</TableCell>
                     <TableCell className="text-left font-medium text-foreground">{t.name}</TableCell>
                     <TableCell className="text-left text-xs text-muted-foreground">{t.branch_name}</TableCell>
@@ -153,32 +258,23 @@ export function TankTable() {
                         {t.fuel_type_name}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatNumberVN(designCapL)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatNumberVN(usableCapL)}
-                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">{formatNumberVN(designCapL)}</TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">{formatNumberVN(usableCapL)}</TableCell>
                     <TableCell className="text-right tabular-nums text-xs font-semibold">
                       <span className={isLow ? 'text-destructive font-bold' : 'text-foreground'}>
                         {formatNumberVN(currentStockL)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs font-mono">
-                      {t.loss_tolerance_pct}%
-                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs font-mono">{t.loss_tolerance_pct}%</TableCell>
                     <TableCell className="text-center">
-                      <Badge
-                        variant={t.status === 'active' ? 'default' : 'secondary'}
-                        className="text-[10px] px-2 py-0"
-                      >
+                      <StatusBadge tone={t.status === 'active' ? 'success' : 'danger'}>
                         {t.status === 'active' ? 'Vận hành' : 'Ngừng'}
-                      </Badge>
+                      </StatusBadge>
                     </TableCell>
-                    {isManager && (
+                    {showActions && (
                       <TableCell className={ACTION_CELL_CLASS}>
                         <div className="flex justify-end gap-1">
-                          {t.status === 'active' && (
+                          {canDelete && t.status === 'active' && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -189,6 +285,7 @@ export function TankTable() {
                               <NoSymbolIcon className="h-3.5 w-3.5" />
                             </Button>
                           )}
+                          {canUpdate && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -198,6 +295,7 @@ export function TankTable() {
                           >
                             <PencilSquareIcon className="h-3.5 w-3.5" />
                           </Button>
+                          )}
                         </div>
                       </TableCell>
                     )}
@@ -207,6 +305,13 @@ export function TankTable() {
             )}
           </TableBody>
         </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={detail?.name ?? ''}
+        description={'Bể chứa nhiên liệu'}
+        sections={detail ? tankDetail(detail) : []}
+      />
       </div>
 
       <Paginator

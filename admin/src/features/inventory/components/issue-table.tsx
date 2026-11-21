@@ -1,15 +1,11 @@
 'use client';
 
+import { rowClick } from '@/lib/row-click';
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatusBadge, StatusTone } from '@/components/status-badge';
+import { OptionSelect } from '@/components/option-select';
 import * as React from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,6 +15,7 @@ import {
   TrashIcon,
   PaperAirplaneIcon,
   CheckCircleIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { StockIssue, IssueStatus, IssueKind } from '../types';
 import { useIssues } from '../api/get-issues';
@@ -36,22 +33,34 @@ import { toast } from 'sonner';
 
 const statusConfig: Record<
   IssueStatus,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+  {
+    label: string;
+    tone: StatusTone;
+  }
 > = {
-  draft: { label: 'Bản nháp', variant: 'secondary' },
-  pending: { label: 'Chờ duyệt', variant: 'default' },
-  approved: { label: 'Đã duyệt', variant: 'default' },
-  rejected: { label: 'Từ chối', variant: 'destructive' },
+  draft: { label: 'Bản nháp', tone: 'neutral' },
+  pending: { label: 'Chờ duyệt', tone: 'warning' },
+  approved: { label: 'Đã duyệt', tone: 'success' },
+  rejected: { label: 'Từ chối', tone: 'danger' },
 };
 
 const kindBadgeConfig: Record<IssueKind, { label: string; className: string }> = {
-  transfer: { label: 'Điều chuyển', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  loss: { label: 'Hao hụt', className: 'bg-amber-100 text-amber-800 border-amber-200' },
-  inspection: { label: 'Kiểm định', className: 'bg-purple-100 text-purple-800 border-purple-200' },
+  transfer: {
+    label: 'Điều chuyển',
+    className: 'bg-blue-100 text-blue-800 border-blue-200',
+  },
+  loss: {
+    label: 'Hao hụt',
+    className: 'bg-amber-100 text-amber-800 border-amber-200',
+  },
+  inspection: {
+    label: 'Kiểm định',
+    className: 'bg-purple-100 text-purple-800 border-purple-200',
+  },
 };
 
 export function IssueTable() {
-  const { isManager, isAccountant, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const [search, setSearch] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [branchFilter, setBranchFilter] = React.useState('');
@@ -134,86 +143,90 @@ export function IssueTable() {
     }
   };
 
-  const canCreate = isManager || hasPermission('inventory.issue:create');
-  const canApprove = isAccountant || hasPermission('inventory.issue:approve');
+  const canCreate = hasPermission('inventory.issue:create');
+  const canUpdate = hasPermission('inventory.issue:update');
+  const canDelete = hasPermission('inventory.issue:delete');
+  const canApprove = hasPermission('inventory.issue:approve');
 
   return (
-    <div className="space-y-4">
-      {/* Search & Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex flex-1 flex-wrap items-center gap-2">
-          <Input
-            placeholder="Tìm theo mã phiếu, lý do..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="sm:max-w-xs"
-          />
-
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring sm:max-w-[200px]"
-            value={branchFilter}
-            onChange={(e) => {
-              setBranchFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Tất cả trạm xăng</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring sm:max-w-[170px]"
-            value={kindFilter}
-            onChange={(e) => {
-              setKindFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Tất cả loại xuất</option>
-            <option value="transfer">Điều chuyển nội bộ</option>
-            <option value="loss">Hao hụt tự nhiên</option>
-            <option value="inspection">Kiểm định cột bơm</option>
-          </select>
-
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring sm:max-w-[170px]"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="draft">Bản nháp</option>
-            <option value="pending">Chờ duyệt</option>
-            <option value="approved">Đã duyệt</option>
-            <option value="rejected">Từ chối</option>
-          </select>
-        </div>
-
-        {canCreate && (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {/* Hành động của trang (nằm trên cùng, không chen vào thanh lọc) */}
+      {canCreate && (
+        <div className="flex justify-end">
           <Button onClick={handleCreate} className="flex items-center gap-1.5 shrink-0" data-testid="btn-create-issue">
             <PlusIcon className="w-4 h-4" />
             Lập phiếu xuất mới
           </Button>
-        )}
+        </div>
+      )}
+
+      {/* Thanh tìm kiếm và bộ lọc */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
+        <div className="relative min-w-[240px] flex-1">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Tìm theo mã phiếu, lý do..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <OptionSelect
+            className="w-[210px]"
+            value={branchFilter}
+            onChange={(next) => {
+              setBranchFilter(next);
+              setPage(1);
+            }}
+            emptyLabel="Tất cả trạm xăng"
+            options={branches.map((b) => ({ value: b.id, label: b.name }))}
+          />
+
+          <OptionSelect
+            className="w-[190px]"
+            value={kindFilter}
+            onChange={(next) => {
+              setKindFilter(next);
+              setPage(1);
+            }}
+            emptyLabel="Tất cả loại xuất"
+            options={[
+              { value: 'transfer', label: 'Điều chuyển nội bộ' },
+              { value: 'loss', label: 'Hao hụt tự nhiên' },
+              { value: 'inspection', label: 'Kiểm định cột bơm' },
+            ]}
+          />
+
+          <OptionSelect
+            className="w-[190px]"
+            value={statusFilter}
+            onChange={(next) => {
+              setStatusFilter(next);
+              setPage(1);
+            }}
+            emptyLabel="Tất cả trạng thái"
+            options={[
+              { value: 'draft', label: 'Bản nháp' },
+              { value: 'pending', label: 'Chờ duyệt' },
+              { value: 'approved', label: 'Đã duyệt' },
+              { value: 'rejected', label: 'Từ chối' },
+            ]}
+          />
+        </div>
       </div>
 
       {/* Main Table */}
-      <div className="rounded-md border bg-card overflow-x-auto">
+      <div className="flex min-h-0 flex-1 flex-col rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[120px]">Mã phiếu</TableHead>
               <TableHead className="w-[110px]">Loại phiếu</TableHead>
-              <TableHead>Trạm / Cửa hàng</TableHead>
+              <TableHead>Trạm xăng</TableHead>
               <TableHead>Bể xuất</TableHead>
               <TableHead>Bể nhận</TableHead>
-              <TableHead className="text-right">Lượng xuất (L)</TableHead>
+              <TableHead className="text-right tabular-nums text-orange-600">Lượng xuất (L)</TableHead>
               <TableHead className="w-[110px]">Trạng thái</TableHead>
               <TableHead className="text-right w-[140px]">Ngày lập</TableHead>
               <TableHead className="text-right w-[130px]">Thao tác</TableHead>
@@ -221,22 +234,14 @@ export function IssueTable() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  Đang tải danh sách phiếu xuất điều chỉnh...
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={9} loading title="Đang tải danh sách phiếu xuất điều chỉnh..." />
             ) : issues.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  Không tìm thấy phiếu xuất nào.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={9} title="Không tìm thấy phiếu xuất nào." />
             ) : (
               issues.map((issue) => {
                 const statusMeta = statusConfig[issue.status] || {
                   label: issue.status,
-                  variant: 'outline' as const,
+                  tone: 'neutral' as const,
                 };
                 const kindMeta = kindBadgeConfig[issue.kind] || {
                   label: issue.kind_name || issue.kind,
@@ -244,10 +249,8 @@ export function IssueTable() {
                 };
 
                 return (
-                  <TableRow key={issue.id} data-testid={`issue-row-${issue.code}`}>
-                    <TableCell className="font-mono font-medium text-xs">
-                      {issue.code}
-                    </TableCell>
+                  <TableRow key={issue.id} data-testid={`issue-row-${issue.code}`} onClick={rowClick(() => handleView(issue))}>
+                    <TableCell className="font-mono font-medium text-xs">{issue.code}</TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${kindMeta.className}`}
@@ -255,9 +258,7 @@ export function IssueTable() {
                         {kindMeta.label}
                       </span>
                     </TableCell>
-                    <TableCell className="font-medium text-sm">
-                      {issue.branch_name}
-                    </TableCell>
+                    <TableCell className="font-medium text-sm">{issue.branch_name}</TableCell>
                     <TableCell className="text-xs">
                       <div className="font-medium">{issue.tank_name}</div>
                       <div className="text-muted-foreground">{issue.fuel_type_name}</div>
@@ -272,13 +273,11 @@ export function IssueTable() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums font-bold text-primary text-sm">
+                    <TableCell className="text-right tabular-nums font-semibold text-orange-600 text-sm">
                       {formatNumberVN(issue.volume_liters)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusMeta.variant} className="text-xs">
-                        {statusMeta.label}
-                      </Badge>
+                      <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
                       {formatDateTimeVN(issue.created_at)}
@@ -298,8 +297,9 @@ export function IssueTable() {
                         </Button>
 
                         {/* Actions for draft: Submit, Edit, Delete */}
-                        {issue.status === 'draft' && canCreate && (
+                        {issue.status === 'draft' && (
                           <>
+                            {canUpdate && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -310,6 +310,9 @@ export function IssueTable() {
                             >
                               <PaperAirplaneIcon className="w-4 h-4" />
                             </Button>
+                            )}
+
+                            {canUpdate && (
 
                             <Button
                               variant="ghost"
@@ -322,6 +325,10 @@ export function IssueTable() {
                               <PencilSquareIcon className="w-4 h-4" />
                             </Button>
 
+                            )}
+
+                            {canDelete && (
+
                             <Button
                               variant="ghost"
                               size="sm"
@@ -332,6 +339,8 @@ export function IssueTable() {
                             >
                               <TrashIcon className="w-4 h-4" />
                             </Button>
+
+                            )}
                           </>
                         )}
 
@@ -372,23 +381,11 @@ export function IssueTable() {
       )}
 
       {/* Dialogs */}
-      <IssueDialogForm
-        open={createEditDialogOpen}
-        onOpenChange={setCreateEditDialogOpen}
-        issue={selectedIssue}
-      />
+      <IssueDialogForm open={createEditDialogOpen} onOpenChange={setCreateEditDialogOpen} issue={selectedIssue} />
 
-      <IssueDetailDialog
-        open={detailDialogOpen}
-        onOpenChange={setDetailDialogOpen}
-        issue={selectedIssue}
-      />
+      <IssueDetailDialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen} issue={selectedIssue} />
 
-      <IssueApproveDialog
-        open={approveDialogOpen}
-        onOpenChange={setApproveDialogOpen}
-        issue={selectedIssue}
-      />
+      <IssueApproveDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen} issue={selectedIssue} />
 
       {/* Confirm Delete Dialog */}
       <ConfirmDialog

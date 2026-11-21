@@ -91,18 +91,18 @@ export function ReportFilters({ template, filters, onChange, onReset }: ReportFi
           />
         </div>
 
-        {/* Chi nhánh */}
+        {/* Trạm xăng */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Chi nhánh / Trạm</Label>
+          <Label className="text-xs">Trạm xăng / Trạm</Label>
           <Select
             value={filters.branchId || 'ALL'}
             onValueChange={(val) => onChange({ ...filters, branchId: val === 'ALL' ? undefined : val, tankId: undefined })}
           >
             <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Tất cả chi nhánh" />
+              <SelectValue placeholder="Tất cả trạm xăng" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Tất cả chi nhánh</SelectItem>
+              <SelectItem value="ALL">Tất cả trạm xăng</SelectItem>
               {branches.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
                   {b.name}

@@ -60,7 +60,7 @@ export function IssueDetailDialog({
           <div className="space-y-4 py-2 text-sm">
             <div className="grid grid-cols-2 gap-4 pb-3 border-b">
               <div>
-                <span className="text-muted-foreground block text-xs">Cửa hàng / Trạm:</span>
+                <span className="text-muted-foreground block text-xs">Trạm xăng / Trạm:</span>
                 <span className="font-medium">{issue.branch_name}</span>
               </div>
               <div>

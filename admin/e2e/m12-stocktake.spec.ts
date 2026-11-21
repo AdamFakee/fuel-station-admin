@@ -36,7 +36,7 @@ test.describe('Module M12 - Kiểm kê, Tồn kho & Cảnh báo (Stocktake & Ale
       });
     });
 
-    // 2. Mock Chi nhánh
+    // 2. Mock Trạm xăng
     await page.route('**/v1/assets/branches*', async (route: Route) => {
       await route.fulfill({
         status: 200,

@@ -1,5 +1,10 @@
 'use client';
 
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { driverDetail } from '@/lib/row-details';
+import { TableEmptyRow } from '@/components/table-empty-row';
+import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -53,6 +58,7 @@ export function DriverTable({
   onEdit,
   onManageCredentials,
 }: DriverTableProps) {
+  const [detail, setDetail] = React.useState<DriverListItem | null>(null);
   const updateStatus = useUpdateDriverStatus();
   const deleteDriver = useDeleteDriver();
 
@@ -64,7 +70,7 @@ export function DriverTable({
     const newStatus = statusConfirmTarget.status === 'active' ? 'blocked' : 'active';
     updateStatus.mutate(
       { id: statusConfirmTarget.id, status: newStatus },
-      { onSuccess: () => setStatusConfirmTarget(null) }
+      { onSuccess: () => setStatusConfirmTarget(null) },
     );
   };
 
@@ -78,17 +84,13 @@ export function DriverTable({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return (
-          <Badge variant="outline" className="border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-            Đang làm việc
-          </Badge>
-        );
+        return <StatusBadge tone="success">Đang làm việc</StatusBadge>;
       case 'blocked':
-        return <Badge variant="destructive">Tạm khóa</Badge>;
+        return <StatusBadge tone="danger">Tạm khóa</StatusBadge>;
       case 'inactive':
-        return <Badge variant="secondary">Nghỉ việc</Badge>;
+        return <StatusBadge tone="neutral">Nghỉ việc</StatusBadge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <StatusBadge tone="neutral">{status}</StatusBadge>;
     }
   };
 
@@ -111,35 +113,24 @@ export function DriverTable({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                  Đang tải danh sách tài xế & nhân viên...
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={9} loading title="Đang tải danh sách tài xế & nhân viên..." />
             ) : drivers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                  Không tìm thấy tài xế nào phù hợp.
-                </TableCell>
-              </TableRow>
+              <TableEmptyRow colSpan={9} title="Không tìm thấy tài xế nào phù hợp." />
             ) : (
               drivers.map((d) => (
-                <TableRow key={d.id} data-testid={`driver-row-${d.code}`}>
-                  <TableCell className="font-mono font-medium text-primary">
-                    {d.code}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {d.full_name}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {d.phone || '-'}
-                  </TableCell>
+                <TableRow key={d.id} data-testid={`driver-row-${d.code}`} onClick={rowClick(() => setDetail(d))}>
+                  <TableCell className="font-mono font-medium text-primary">{d.code}</TableCell>
+                  <TableCell className="font-medium">{d.full_name}</TableCell>
+                  <TableCell className="font-mono text-sm text-muted-foreground">{d.phone || '-'}</TableCell>
                   <TableCell className="text-sm">
                     {d.department || <span className="text-muted-foreground">-</span>}
                   </TableCell>
                   <TableCell>
                     {d.card_number ? (
-                      <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30">
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30"
+                      >
                         <CreditCardIcon className="mr-1 h-3 w-3" />
                         {d.card_number}
                       </Badge>
@@ -149,7 +140,10 @@ export function DriverTable({
                   </TableCell>
                   <TableCell>
                     {d.has_face ? (
-                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30">
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30"
+                      >
                         <UserCircleIcon className="mr-1 h-3 w-3" />
                         Đã đăng ký
                       </Badge>
@@ -159,7 +153,10 @@ export function DriverTable({
                   </TableCell>
                   <TableCell>
                     {d.has_fingerprint ? (
-                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950/30">
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950/30"
+                      >
                         <FingerPrintIcon className="mr-1 h-3 w-3" />
                         Đã đăng ký
                       </Badge>
@@ -167,64 +164,82 @@ export function DriverTable({
                       <span className="text-[11px] text-muted-foreground italic">Chưa có</span>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {getStatusBadge(d.status)}
-                  </TableCell>
+                  <TableCell>{getStatusBadge(d.status)}</TableCell>
                   <TableCell className={ACTION_CELL_CLASS}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" data-testid={`driver-actions-${d.code}`}>
-                          <span className="sr-only">Mở menu</span>
-                          <EllipsisHorizontalIcon className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {canEdit && (
-                          <>
-                            <DropdownMenuItem onClick={() => onEdit(d)} data-testid={`edit-driver-${d.code}`}>
-                              <PencilSquareIcon className="mr-2 h-4 w-4" />
-                              Sửa hồ sơ
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onManageCredentials(d)} data-testid={`credentials-driver-${d.code}`}>
-                              <IdentificationIcon className="mr-2 h-4 w-4" />
-                              Thẻ & Sinh trắc học
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setStatusConfirmTarget(d)} data-testid={`status-driver-${d.code}`}>
-                              {d.status === 'active' ? (
-                                <>
-                                  <LockClosedIcon className="mr-2 h-4 w-4 text-amber-500" />
-                                  <span className="text-amber-600">Tạm khóa tài xế</span>
-                                </>
-                              ) : (
-                                <>
-                                  <LockOpenIcon className="mr-2 h-4 w-4 text-emerald-500" />
-                                  <span className="text-emerald-600">Mở khóa hoạt động</span>
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {canDelete && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => setDeleteConfirmTarget(d)}
-                              className="text-destructive focus:text-destructive"
-                              data-testid={`delete-driver-${d.code}`}
-                            >
-                              <TrashIcon className="mr-2 h-4 w-4" />
-                              Xóa hồ sơ
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {(canEdit || canDelete) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            data-testid={`driver-actions-${d.code}`}
+                          >
+                            <span className="sr-only">Mở menu</span>
+                            <EllipsisHorizontalIcon className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canEdit && (
+                            <>
+                              <DropdownMenuItem onClick={() => onEdit(d)} data-testid={`edit-driver-${d.code}`}>
+                                <PencilSquareIcon className="mr-2 h-4 w-4" />
+                                Sửa hồ sơ
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => onManageCredentials(d)}
+                                data-testid={`credentials-driver-${d.code}`}
+                              >
+                                <IdentificationIcon className="mr-2 h-4 w-4" />
+                                Thẻ & Sinh trắc học
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setStatusConfirmTarget(d)}
+                                data-testid={`status-driver-${d.code}`}
+                              >
+                                {d.status === 'active' ? (
+                                  <>
+                                    <LockClosedIcon className="mr-2 h-4 w-4 text-amber-500" />
+                                    <span className="text-amber-600">Tạm khóa tài xế</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <LockOpenIcon className="mr-2 h-4 w-4 text-emerald-500" />
+                                    <span className="text-emerald-600">Mở khóa hoạt động</span>
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {canDelete && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setDeleteConfirmTarget(d)}
+                                className="text-destructive focus:text-destructive"
+                                data-testid={`delete-driver-${d.code}`}
+                              >
+                                <TrashIcon className="mr-2 h-4 w-4" />
+                                Xóa hồ sơ
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={detail?.full_name ?? ''}
+        description={'Tài xế'}
+        sections={detail ? driverDetail(detail) : []}
+      />
       </div>
 
       {/* Confirm Lock / Unlock */}
