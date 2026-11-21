@@ -57,8 +57,8 @@ func TestListPermissionsAndBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListPermissions failed: %v", err)
 	}
-	if len(perms) != 61 {
-		t.Errorf("expected 61 permissions according to BRD/seed, got %d", len(perms))
+	if len(perms) != 65 {
+		t.Errorf("expected 65 permissions according to seed, got %d", len(perms))
 	}
 
 	branches, err := svc.ListBranches(ctx)

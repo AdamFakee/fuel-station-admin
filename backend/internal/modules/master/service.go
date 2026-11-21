@@ -491,7 +491,7 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 		return nil, fmt.Errorf("check plate: %w", err)
 	}
 	if plateExists {
-		return nil, fmt.Errorf("%w: license plate '%s' already registered", apperr.ErrConflict, req.Plate)
+		return nil, fmt.Errorf("%w: biển số '%s' đã được đăng ký cho xe khác", apperr.ErrConflict, req.Plate)
 	}
 
 	// Check card uniqueness if provided
@@ -504,7 +504,7 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 			return nil, fmt.Errorf("check card: %w", err)
 		}
 		if cardInUse {
-			return nil, fmt.Errorf("%w: NFC card '%s' is already assigned to another vehicle or driver", apperr.ErrConflict, req.CardNumber)
+			return nil, fmt.Errorf("%w: thẻ NFC '%s' đã được gán cho xe hoặc tài xế khác", apperr.ErrConflict, req.CardNumber)
 		}
 	}
 
@@ -619,7 +619,7 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 		return nil, fmt.Errorf("check plate: %w", err)
 	}
 	if plateInUse {
-		return nil, fmt.Errorf("%w: license plate '%s' is used by another vehicle", apperr.ErrConflict, req.Plate)
+		return nil, fmt.Errorf("%w: biển số '%s' đang được xe khác sử dụng", apperr.ErrConflict, req.Plate)
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -755,7 +755,7 @@ func (s *Service) AssignVehicleCard(ctx context.Context, id uuid.UUID, cardNumbe
 		WHERE tenant_id = $1 AND method = 'card' AND external_id = $2 AND status = 'active'
 	`, tenantID, cardNumber).Scan(&activeOwner)
 	if err == nil && activeOwner != "" && activeOwner != id.String() {
-		return fmt.Errorf("%w: card '%s' is active on another entity", apperr.ErrConflict, cardNumber)
+		return fmt.Errorf("%w: thẻ '%s' đang được xe hoặc tài xế khác sử dụng", apperr.ErrConflict, cardNumber)
 	}
 
 	// Revoke existing active card for this vehicle
@@ -1101,7 +1101,7 @@ func (s *Service) CreateDriver(ctx context.Context, req CreateDriverRequest) (*D
 		return nil, fmt.Errorf("check code: %w", err)
 	}
 	if codeExists {
-		return nil, fmt.Errorf("%w: driver code '%s' already exists", apperr.ErrConflict, req.Code)
+		return nil, fmt.Errorf("%w: mã tài xế '%s' đã tồn tại, hãy dùng mã khác", apperr.ErrConflict, req.Code)
 	}
 
 	// Check card duplicate
@@ -1114,7 +1114,7 @@ func (s *Service) CreateDriver(ctx context.Context, req CreateDriverRequest) (*D
 			return nil, fmt.Errorf("check card: %w", err)
 		}
 		if cardInUse {
-			return nil, fmt.Errorf("%w: NFC card '%s' is already assigned to another vehicle or driver", apperr.ErrConflict, req.CardNumber)
+			return nil, fmt.Errorf("%w: thẻ NFC '%s' đã được gán cho xe hoặc tài xế khác", apperr.ErrConflict, req.CardNumber)
 		}
 	}
 
@@ -1305,7 +1305,7 @@ func (s *Service) AssignDriverCard(ctx context.Context, id uuid.UUID, cardNumber
 		WHERE tenant_id = $1 AND method = 'card' AND external_id = $2 AND status = 'active'
 	`, tenantID, cardNumber).Scan(&activeOwner)
 	if err == nil && activeOwner != "" && activeOwner != id.String() {
-		return fmt.Errorf("%w: card '%s' is active on another entity", apperr.ErrConflict, cardNumber)
+		return fmt.Errorf("%w: thẻ '%s' đang được xe hoặc tài xế khác sử dụng", apperr.ErrConflict, cardNumber)
 	}
 
 	// Revoke existing active card for this driver

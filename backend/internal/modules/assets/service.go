@@ -184,7 +184,7 @@ func (s *Service) CreateBranch(ctx context.Context, req CreateBranchRequest) (*B
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, apperr.ErrConflict
+			return nil, fmt.Errorf("%w: mã %s '%s' đã tồn tại, hãy dùng mã khác", apperr.ErrConflict, "trạm xăng", req.Code)
 		}
 		return nil, fmt.Errorf("insert branch: %w", err)
 	}
@@ -347,7 +347,7 @@ func (s *Service) CreateFuelType(ctx context.Context, req CreateFuelTypeRequest)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, apperr.ErrConflict
+			return nil, fmt.Errorf("%w: mã %s '%s' đã tồn tại, hãy dùng mã khác", apperr.ErrConflict, "loại nhiên liệu", req.Code)
 		}
 		return nil, fmt.Errorf("create fuel type: %w", err)
 	}
@@ -548,7 +548,7 @@ func (s *Service) CreateTank(ctx context.Context, req CreateTankRequest) (*Tank,
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, apperr.ErrConflict
+			return nil, fmt.Errorf("%w: mã %s '%s' đã tồn tại, hãy dùng mã khác", apperr.ErrConflict, "bể chứa", req.Code)
 		}
 		return nil, fmt.Errorf("insert tank: %w", err)
 	}
@@ -857,7 +857,7 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, apperr.ErrConflict
+			return nil, fmt.Errorf("%w: mã %s '%s' đã tồn tại, hãy dùng mã khác", apperr.ErrConflict, "trụ bơm", req.Code)
 		}
 		return nil, fmt.Errorf("insert pump: %w", err)
 	}
@@ -901,7 +901,7 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, fmt.Errorf("%w: COM port %s is already used by another pump in this store", apperr.ErrConflict, comPort)
+			return nil, fmt.Errorf("%w: cổng COM %s đã được trụ bơm khác ở cùng trạm xăng sử dụng", apperr.ErrConflict, comPort)
 		}
 		return nil, fmt.Errorf("insert sensor: %w", err)
 	}
@@ -1147,7 +1147,7 @@ func (s *Service) UpdateSensor(ctx context.Context, pumpID string, req UpdateSen
 		}
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, fmt.Errorf("%w: COM port %s is already used by another pump in this store", apperr.ErrConflict, req.ComPort)
+			return nil, fmt.Errorf("%w: cổng COM %s đã được trụ bơm khác ở cùng trạm xăng sử dụng", apperr.ErrConflict, req.ComPort)
 		}
 		return nil, fmt.Errorf("update sensor: %w", err)
 	}

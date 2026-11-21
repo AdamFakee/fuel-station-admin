@@ -95,7 +95,7 @@ func (s *Service) CreateSupplier(ctx context.Context, req CreateSupplierRequest)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return nil, apperr.ErrConflict
+			return nil, fmt.Errorf("%w: mã nhà cung cấp '%s' đã tồn tại, hãy dùng mã khác", apperr.ErrConflict, req.Code)
 		}
 		return nil, fmt.Errorf("create supplier: %w", err)
 	}
