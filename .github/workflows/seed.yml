@@ -28,7 +28,7 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           username: root
           password: ${{ secrets.VPS_PASSWORD }}
-          source: backend/scripts/seed_operational.py
+          source: backend/scripts/seed_operational.py,backend/scripts/reset_dev_data.sql
           target: ~/app
           strip_components: 2
 
@@ -67,11 +67,18 @@ jobs:
             done
             curl -fsS http://localhost:8080/healthz >/dev/null
 
-            # Không ghi đè: đã có bể / phiên đổ thì dừng
+            # Không ghi đè dữ liệu thật. Riêng dữ liệu demo do migration cũ tạo (công ty CTY-01 với tài khoản mật khẩu mặc định)
+            # thì xóa đi để nạp dữ liệu chuẩn; chỉ xóa khi đó là công ty DUY NHẤT trên server.
             EXISTING=$($PSQL -At -c "SELECT (SELECT count(*) FROM station.tank) + (SELECT count(*) FROM station.dispense_session)")
-            if [ "${EXISTING:-0}" != "0" ]; then
-              echo "Server đã có dữ liệu vận hành ($EXISTING bản ghi), không nạp thêm để tránh trùng."
-              exit 1
+            TENANTS=$($PSQL -At -c "SELECT coalesce(string_agg(code, ','), '') FROM station.tenant")
+            if [ "${EXISTING:-0}" != "0" ] || [ -n "$TENANTS" ]; then
+              if [ "$TENANTS" = "CTY-01" ] || { [ "$TENANTS" = "PETRO-VN" ] && [ "${EXISTING:-0}" = "0" ]; }; then
+                echo "Phát hiện dữ liệu demo của migration cũ hoặc lần nạp dở, xóa để nạp dữ liệu chuẩn."
+                $PSQL -v ON_ERROR_STOP=1 -q < reset_dev_data.sql
+              else
+                echo "Server đã có dữ liệu thật (công ty: ${TENANTS:-không rõ}, $EXISTING bản ghi vận hành), không nạp thêm để tránh trùng."
+                exit 1
+              fi
             fi
 
             # Khóa API Edge chỉ dùng trong lần nạp này: ngẫu nhiên, không ai biết sau đó.
