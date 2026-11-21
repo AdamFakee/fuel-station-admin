@@ -1,5 +1,6 @@
 'use client';
 
+import { useFullReceipt } from '../api/get-receipt';
 import * as React from 'react';
 import {
   Dialog,
@@ -43,8 +44,9 @@ const statusConfig: Record<
 export function ReceiptDetailDialog({
   open,
   onOpenChange,
-  receipt,
+  receipt: listItem,
 }: ReceiptDetailDialogProps) {
+  const receipt = useFullReceipt(listItem, open);
   if (!receipt) return null;
 
   const currentStatus = statusConfig[receipt.status] || {

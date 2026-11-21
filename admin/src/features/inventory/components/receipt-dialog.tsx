@@ -1,5 +1,6 @@
 'use client';
 
+import { useFullReceipt } from '../api/get-receipt';
 import { OptionSelect } from '@/components/option-select';
 import { DatePicker } from '@/components/date-picker';
 import * as React from 'react';
@@ -57,6 +58,9 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
   const { data: supplierData } = useSuppliers();
   const suppliers = supplierData || [];
 
+  // Danh sách phiếu không có các dòng bể: lấy bản đầy đủ để đổ vào form sửa
+  const fullReceipt = useFullReceipt(receipt ?? null, open);
+
   const [branchId, setBranchId] = React.useState('');
   const [receivedAt, setReceivedAt] = React.useState('');
   const [supplierId, setSupplierId] = React.useState('');
@@ -87,7 +91,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
         setDocumentNo(receipt.document_no || '');
         setNote(receipt.note || '');
         setLines(
-          receipt.lines.map((l) => ({
+          (fullReceipt?.lines ?? []).map((l) => ({
             tank_id: l.tank_id,
             fuel_type_id: l.fuel_type_id,
             fuel_type_name: l.fuel_type_name,
@@ -108,7 +112,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
         setLines([]);
       }
     }
-  }, [open, receipt, branches, suppliers]);
+  }, [open, receipt, fullReceipt, branches, suppliers]);
 
   const createMutation = useCreateReceipt();
   const updateMutation = useUpdateReceipt();

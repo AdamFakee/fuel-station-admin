@@ -8,6 +8,15 @@ export async function getReceipt(id: string): Promise<StockReceipt> {
   return res.data;
 }
 
+/**
+ * Danh sách phiếu không kèm các dòng bể, nên khi xem hoặc sửa một phiếu phải lấy bản đầy đủ.
+ * Trả về bản đầy đủ khi đã tải xong, trong lúc chờ thì trả tạm dòng của danh sách.
+ */
+export function useFullReceipt(listItem: StockReceipt | null, enabled: boolean) {
+  const { data } = useReceipt(listItem?.id ?? '', enabled && !!listItem);
+  return data ?? listItem;
+}
+
 export function useReceipt(id: string, enabled = true) {
   return useQuery({
     queryKey: receiptKeys.detail(id),
