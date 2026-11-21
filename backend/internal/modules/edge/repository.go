@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"fuel-station-backend/internal/platform/crypto"
 	"time"
 
 	"fuel-station-backend/internal/shared/apperr"
@@ -23,11 +24,20 @@ type Repository interface {
 }
 
 type postgresRepository struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	cryptoKey []byte // khóa giải mã mật khẩu máy chấm công gửi kèm cho Edge Agent (mạng LAN)
 }
 
 func NewRepository(pool *pgxpool.Pool) Repository {
-	return &postgresRepository{pool: pool}
+	return &postgresRepository{pool: pool, cryptoKey: crypto.DefaultCryptoKey}
+}
+
+// WithCryptoKey đặt khóa giải mã mật khẩu máy chấm công (cùng khóa mà module assets dùng để mã hóa).
+func WithCryptoKey(repo Repository, key []byte) Repository {
+	if r, ok := repo.(*postgresRepository); ok {
+		r.cryptoKey = key
+	}
+	return repo
 }
 
 func (r *postgresRepository) FindStationByApiKeyHash(ctx context.Context, keyHash string) (*StationContext, error) {
@@ -140,15 +150,15 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 
 	case "pump_sensor":
 		query := `
-			SELECT s.id, s.pump_id, s.name, s.serial, s.com_port, s.baud, s.version
+			SELECT s.id, s.pump_id, s.name, s.serial, s.com_port, s.baud, s.version, p.edge_pump_id
 			FROM station.pump_sensor s
 			JOIN station.pump p ON p.id = s.pump_id AND p.tenant_id = s.tenant_id
 			WHERE s.tenant_id = $1 AND s.id = $2 AND p.branch_id = $3
 		`
 		var id, pumpID, name, comPort string
-		var serial, version int64
+		var serial, version, edgePumpID int64
 		var baud int
-		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &pumpID, &name, &serial, &comPort, &baud, &version)
+		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &pumpID, &name, &serial, &comPort, &baud, &version, &edgePumpID)
 		if err != nil {
 			return nil, err
 		}
@@ -159,10 +169,11 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["com_port"] = comPort
 		data["baud"] = baud
 		data["version"] = version
+		data["edge_pump_id"] = edgePumpID // số trụ trên trạm: Edge Agent dùng số này, không dùng uuid
 
 	case "access_terminal":
 		query := `
-			SELECT t.id, t.pump_id, t.terminal_code, t.host, t.port, t.https, t.username, t.version
+			SELECT t.id, t.pump_id, t.terminal_code, t.host, t.port, t.https, t.username, t.version, t.password_enc, p.edge_pump_id
 			FROM station.access_terminal t
 			JOIN station.pump p ON p.id = t.pump_id AND p.tenant_id = t.tenant_id
 			WHERE t.tenant_id = $1 AND t.id = $2 AND p.branch_id = $3
@@ -170,10 +181,17 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		var id, pumpID, terminalCode, host, username string
 		var port int
 		var https bool
-		var version int64
-		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &pumpID, &terminalCode, &host, &port, &https, &username, &version)
+		var version, edgePumpID int64
+		var passwordEnc []byte
+		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &pumpID, &terminalCode, &host, &port, &https, &username, &version, &passwordEnc, &edgePumpID)
 		if err != nil {
 			return nil, err
+		}
+		// Edge Agent cần mật khẩu thật để đăng nhập máy chấm công trong LAN: giải mã rồi gửi kèm (đường truyền chỉ cho Edge đã xác thực).
+		if len(passwordEnc) > 0 {
+			if plain, derr := crypto.DecryptAESGCM(passwordEnc, r.cryptoKey); derr == nil {
+				data["password"] = string(plain)
+			}
 		}
 		data["id"] = id
 		data["pump_id"] = pumpID
@@ -183,6 +201,7 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["https"] = https
 		data["username"] = username
 		data["version"] = version
+		data["edge_pump_id"] = edgePumpID
 
 	case "vehicle":
 		// Đẩy MỌI xe của công ty kèm cờ `allowed_here` (xe có được đổ ở trạm xăng của trạm này không). Edge Agent dựa vào cờ để từ chối
@@ -208,14 +227,17 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["version"] = version
 
 	case "driver":
-		query := `SELECT id, code, full_name, phone, status, version FROM station.driver WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`
+		query := `SELECT id, code, full_name, phone, status, version, valid_from, valid_to FROM station.driver WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`
 		var id, code, fullName, status string
 		var phone *string
 		var version int64
-		err := r.pool.QueryRow(ctx, query, tenantID, entityID).Scan(&id, &code, &fullName, &phone, &status, &version)
+		var validFrom, validTo *time.Time
+		err := r.pool.QueryRow(ctx, query, tenantID, entityID).Scan(&id, &code, &fullName, &phone, &status, &version, &validFrom, &validTo)
 		if err != nil {
 			return nil, err
 		}
+		data["valid_from"] = validFrom
+		data["valid_to"] = validTo
 		data["id"] = id
 		data["code"] = code
 		data["full_name"] = fullName
@@ -224,11 +246,11 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["version"] = version
 
 	case "credential":
-		query := `SELECT id, vehicle_id, driver_id, method, external_id, status, version FROM station.credential WHERE tenant_id = $1 AND id = $2`
+		query := `SELECT id, vehicle_id, driver_id, method, external_id, status, version, face_file_id FROM station.credential WHERE tenant_id = $1 AND id = $2`
 		var id, method, externalID, status string
-		var vehicleID, driverID *string
+		var vehicleID, driverID, faceFileID *string
 		var version int64
-		err := r.pool.QueryRow(ctx, query, tenantID, entityID).Scan(&id, &vehicleID, &driverID, &method, &externalID, &status, &version)
+		err := r.pool.QueryRow(ctx, query, tenantID, entityID).Scan(&id, &vehicleID, &driverID, &method, &externalID, &status, &version, &faceFileID)
 		if err != nil {
 			return nil, err
 		}
@@ -239,6 +261,9 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["external_id"] = externalID
 		data["status"] = status
 		data["version"] = version
+		if faceFileID != nil {
+			data["face_file_id"] = *faceFileID
+		}
 	}
 
 	return data, nil
@@ -342,6 +367,20 @@ func (r *postgresRepository) CreateDispenseSession(ctx context.Context, station 
 					fuelTypeID = &fID
 				}
 			}
+		}
+	}
+
+	// Edge Agent chỉ biết mã xe và mã tài xế (không biết uuid của server): tra id theo mã để phiên đổ gắn đúng xe và tài xế.
+	if (req.VehicleID == nil || *req.VehicleID == "") && req.VehicleCode != nil && *req.VehicleCode != "" {
+		var vid string
+		if err := tx.QueryRow(ctx, `SELECT id FROM station.vehicle WHERE tenant_id = $1 AND code = $2 AND deleted_at IS NULL`, station.TenantID, *req.VehicleCode).Scan(&vid); err == nil {
+			req.VehicleID = &vid
+		}
+	}
+	if (req.DriverID == nil || *req.DriverID == "") && req.DriverCode != nil && *req.DriverCode != "" {
+		var did string
+		if err := tx.QueryRow(ctx, `SELECT id FROM station.driver WHERE tenant_id = $1 AND code = $2 AND deleted_at IS NULL`, station.TenantID, *req.DriverCode).Scan(&did); err == nil {
+			req.DriverID = &did
 		}
 	}
 

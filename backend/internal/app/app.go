@@ -87,12 +87,14 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	iamService := iam.NewService(pool)
 	iamHandler := iam.NewHandler(iamService, log)
 
+	var deviceKey []byte // khóa mã hóa mật khẩu máy chấm công; dùng chung cho module assets (mã hóa) và edge (giải mã gửi cho Edge Agent)
 	assetsService := assets.NewService(pool)
 	if cfg.Crypto.DeviceKey != "" {
 		if len(cfg.Crypto.DeviceKey) != 32 {
 			return fmt.Errorf("DEVICE_CRYPTO_KEY phải đúng 32 ký tự, hiện có %d", len(cfg.Crypto.DeviceKey))
 		}
-		assetsService.WithCryptoKey([]byte(cfg.Crypto.DeviceKey))
+		deviceKey = []byte(cfg.Crypto.DeviceKey)
+		assetsService.WithCryptoKey(deviceKey)
 	} else if cfg.Env == "production" {
 		return fmt.Errorf("thiếu DEVICE_CRYPTO_KEY: không được dùng khóa mặc định khi chạy production")
 	}
@@ -113,8 +115,11 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	masterHandler := master.NewHandler(masterService, log)
 
 	edgeRepo := edge.NewRepository(pool)
+	if deviceKey != nil {
+		edgeRepo = edge.WithCryptoKey(edgeRepo, deviceKey)
+	}
 	edgeService := edge.NewService(edgeRepo, log)
-	edgeHandler := edge.NewHandler(edgeService, log)
+	edgeHandler := edge.NewHandler(edgeService, log).WithFiles(edge.NewFileServer(pool, diskStorage))
 
 	syncMonitorRepo := syncmonitor.NewRepository(pool)
 	syncMonitorService := syncmonitor.NewService(syncMonitorRepo, log)

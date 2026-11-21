@@ -14,6 +14,13 @@ import (
 type Handler struct {
 	service Service
 	log     *slog.Logger
+	files   *FileServer
+}
+
+// WithFiles bật endpoint tải ảnh khuôn mặt cho Edge Agent.
+func (h *Handler) WithFiles(files *FileServer) *Handler {
+	h.files = files
+	return h
 }
 
 func NewHandler(service Service, log *slog.Logger) *Handler {
@@ -32,6 +39,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 		er.Post("/dispense-sessions", h.CreateDispenseSession)
 		er.Post("/access-events", h.ReceiveAccessEvents)
 		er.Post("/heartbeat", h.Heartbeat)
+		er.Get("/files/{id}", h.files.Get(h))
 	})
 }
 
