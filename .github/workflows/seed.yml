@@ -62,10 +62,10 @@ jobs:
 
             # Backend phải đang chạy (migration đã áp dụng)
             for i in $(seq 1 30); do
-              curl -fsS http://localhost:8080/v1/health >/dev/null 2>&1 && break
+              curl -fsS http://localhost:8080/healthz >/dev/null 2>&1 && break
               sleep 2
             done
-            curl -fsS http://localhost:8080/v1/health >/dev/null
+            curl -fsS http://localhost:8080/healthz >/dev/null
 
             # Không ghi đè: đã có bể / phiên đổ thì dừng
             EXISTING=$($PSQL -At -c "SELECT (SELECT count(*) FROM station.tank) + (SELECT count(*) FROM station.dispense_session)")
