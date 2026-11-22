@@ -1,0 +1,66 @@
+name: Tạo tài khoản Quản trị hệ thống
+
+# Chạy thủ công (Actions -> Tạo tài khoản Quản trị hệ thống -> Run workflow) sau khi deploy xong.
+# Chỉ thêm đúng MỘT tài khoản vai trò ADMIN vào công ty đang có trên server, không động tới dữ liệu khác.
+# Chạy lại an toàn: email đã có thì giữ nguyên, không đổi mật khẩu.
+#
+# Mật khẩu lấy từ secret ADMIN_PASSWORD nếu có, không thì dùng secret SEED_PASSWORD sẵn có của lần seed trước
+# (từ 12 ký tự trở lên, nếu ngắn hơn thì tạo tài khoản sẽ bị từ chối). Mật khẩu chỉ nằm trong GitHub Secrets,
+# không ghi vào mã nguồn hay nhật ký. Email và tên nhập lúc bấm Run workflow nên không nằm trong repo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Email đăng nhập của tài khoản Quản trị hệ thống'
+        required: true
+      full_name:
+        description: 'Họ và tên hiển thị'
+        required: true
+      confirm:
+        description: 'Gõ ADMIN để xác nhận tạo tài khoản trên server'
+        required: true
+
+jobs:
+  seed-admin:
+    name: Tạo tài khoản ADMIN
+    if: github.event.inputs.confirm == 'ADMIN'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tạo tài khoản trên VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+          DEVICE_CRYPTO_KEY: ${{ secrets.DEVICE_CRYPTO_KEY }}
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS || format('http://{0}:3000', secrets.VPS_HOST) }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || secrets.SEED_PASSWORD }}
+          ADMIN_EMAIL: ${{ github.event.inputs.email }}
+          ADMIN_NAME: ${{ github.event.inputs.full_name }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          envs: DOCKER_USERNAME,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,DEVICE_CRYPTO_KEY,CORS_ALLOWED_ORIGINS,ADMIN_PASSWORD,ADMIN_EMAIL,ADMIN_NAME
+          script_stop: true
+          script: |
+            set -e
+            cd ~/app
+            if [ -z "$ADMIN_PASSWORD" ]; then echo "Thiếu secret ADMIN_PASSWORD (hoặc SEED_PASSWORD)"; exit 1; fi
+
+            # Backend phải đang chạy bản mới (đã có chế độ SEED_MODE=admin và migration vai trò ADMIN)
+            for i in $(seq 1 30); do
+              curl -fsS http://localhost:8080/healthz >/dev/null 2>&1 && break
+              sleep 2
+            done
+            curl -fsS http://localhost:8080/healthz >/dev/null
+
+            docker compose exec -T \
+              -e SEED_MODE=admin \
+              -e ADMIN_EMAIL="$ADMIN_EMAIL" \
+              -e ADMIN_NAME="$ADMIN_NAME" \
+              -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+              backend ./seed

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"fuel-station-backend/internal/platform/crypto"
 	"github.com/google/uuid"
@@ -64,6 +65,12 @@ func main() {
 	must(err, "kết nối database")
 	defer pool.Close()
 
+	// Chế độ chỉ tạo tài khoản Quản trị hệ thống cho server đã có dữ liệu thật (không động tới dữ liệu khác).
+	if os.Getenv("SEED_MODE") == "admin" {
+		seedAdminOnly(ctx, pool)
+		return
+	}
+
 	tenantID := uuid.MustParse(defaultTenantID)
 
 	_, err = pool.Exec(ctx, `
@@ -102,17 +109,16 @@ func main() {
 
 	users := []struct {
 		id, name, email, phone, password, role string
-		branchID                               string // rỗng = xem toàn công ty
 	}{
 		// Quản trị hệ thống (bên triển khai): vai trò cao nhất, quản lý được cả tài khoản Quản lý.
-		{"33333333-3333-3333-3333-333333333337", "Lê Hoàng Nam", "quantri@petrovn.vn", "0908552310", "Admin@123456", "ADMIN", ""},
-		{adminUserID, "Nguyễn Văn Quản Lý", "admin@petrovn.vn", "0901234567", "Admin@123456", "MANAGER", ""},
-		{accountantID, "Trần Thị Thu Hà", "ketoan@petrovn.vn", "0912345678", "Accountant@123456", "ACCOUNTANT", ""},
-		{itUserID, "Phạm Minh Tuấn", "it@petrovn.vn", "0987654321", "TechIT@123456", "IT", ""},
-		// Quản lý từng trạm: chỉ thấy và thao tác dữ liệu trạm của mình. Phiếu nhập phải do người khác lập mới duyệt được.
-		{"33333333-3333-3333-3333-333333333334", "Trần Đức Thắng", "thang.td@petrovn.vn", "0913556201", "Manager@123456", "MANAGER", stations[0].id},
-		{"33333333-3333-3333-3333-333333333335", "Đỗ Quang Huy", "huy.dq@petrovn.vn", "0904118472", "Manager@123456", "MANAGER", stations[1].id},
-		{"33333333-3333-3333-3333-333333333336", "Võ Thị Thanh Hương", "huong.vtt@petrovn.vn", "0935227619", "Manager@123456", "MANAGER", stations[2].id},
+		{"33333333-3333-3333-3333-333333333337", "Lê Hoàng Nam", "quantri@petrovn.vn", "0908552310", "Admin@123456", "ADMIN"},
+		{adminUserID, "Nguyễn Văn Quản Lý", "admin@petrovn.vn", "0901234567", "Admin@123456", "MANAGER"},
+		{accountantID, "Trần Thị Thu Hà", "ketoan@petrovn.vn", "0912345678", "Accountant@123456", "ACCOUNTANT"},
+		{itUserID, "Phạm Minh Tuấn", "it@petrovn.vn", "0987654321", "TechIT@123456", "IT"},
+		// Thêm các Quản lý khác: phiếu nhập phải do người khác lập mới duyệt được.
+		{"33333333-3333-3333-3333-333333333334", "Trần Đức Thắng", "thang.td@petrovn.vn", "0913556201", "Manager@123456", "MANAGER"},
+		{"33333333-3333-3333-3333-333333333335", "Đỗ Quang Huy", "huy.dq@petrovn.vn", "0904118472", "Manager@123456", "MANAGER"},
+		{"33333333-3333-3333-3333-333333333336", "Võ Thị Thanh Hương", "huong.vtt@petrovn.vn", "0935227619", "Manager@123456", "MANAGER"},
 	}
 
 	for _, u := range users {
@@ -128,12 +134,49 @@ func main() {
 			ON CONFLICT (tenant_id, id) DO NOTHING`,
 			uuid.MustParse(u.id), tenantID, u.name, u.email, u.phone, u.email, hash, roleID(u.role))
 		must(err, "tạo tài khoản "+u.email)
-		if u.branchID != "" {
-			_, err = pool.Exec(ctx, `INSERT INTO station.user_branch (tenant_id, user_id, branch_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-				tenantID, uuid.MustParse(u.id), uuid.MustParse(u.branchID))
-			must(err, "gán trạm xăng cho "+u.email)
-		}
 	}
 
 	fmt.Println("Đã nạp dữ liệu nền: 1 công ty, 3 vai trò, 6 tài khoản, 3 trạm xăng và 3 trạm Edge.")
+}
+
+// seedAdminOnly tạo duy nhất một tài khoản Quản trị hệ thống (ADMIN) cho công ty đang có trên server.
+// Đọc từ biến môi trường ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD (mật khẩu lấy từ secret, không ghi vào mã nguồn hay nhật ký).
+// An toàn khi chạy lại: tài khoản đã có thì giữ nguyên, không đổi mật khẩu.
+func seedAdminOnly(ctx context.Context, pool *pgxpool.Pool) {
+	email := strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_EMAIL")))
+	name := strings.TrimSpace(os.Getenv("ADMIN_NAME"))
+	password := os.Getenv("ADMIN_PASSWORD")
+	if email == "" || name == "" {
+		must(fmt.Errorf("thiếu ADMIN_EMAIL hoặc ADMIN_NAME"), "đọc thông tin tài khoản")
+	}
+	if len(password) < 12 {
+		must(fmt.Errorf("ADMIN_PASSWORD phải từ 12 ký tự trở lên"), "kiểm tra mật khẩu")
+	}
+
+	// Phải đúng một công ty: nhiều công ty thì không đoán được tài khoản thuộc công ty nào.
+	var tenantID uuid.UUID
+	var tenantCount int
+	must(pool.QueryRow(ctx, `SELECT count(*), coalesce(min(id::text), '00000000-0000-0000-0000-000000000000')::uuid FROM station.tenant`).Scan(&tenantCount, &tenantID), "tra công ty")
+	if tenantCount != 1 {
+		must(fmt.Errorf("server có %d công ty, cần đúng 1", tenantCount), "xác định công ty")
+	}
+
+	var exists bool
+	must(pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM station.app_user WHERE tenant_id = $1 AND lower(email) = $2 AND deleted_at IS NULL)`, tenantID, email).Scan(&exists), "kiểm tra email")
+	if exists {
+		fmt.Println("Tài khoản", email, "đã tồn tại, giữ nguyên (không đổi mật khẩu).")
+		return
+	}
+
+	var roleID uuid.UUID
+	must(pool.QueryRow(ctx, `SELECT id FROM station.role WHERE tenant_id = $1 AND code = 'ADMIN'`, tenantID).Scan(&roleID), "tra vai trò ADMIN (cần chạy migration 000018 trước)")
+
+	hash, err := crypto.HashPassword(password)
+	must(err, "băm mật khẩu")
+	_, err = pool.Exec(ctx, `
+		INSERT INTO station.app_user (id, tenant_id, employee_code, full_name, email, username, password_hash, role_id, status, must_change_password)
+		VALUES ($1, $2, station.next_code($2, 'NV'), $3, $4, $4, $5, $6, 'active', FALSE)`,
+		uuid.New(), tenantID, name, email, hash, roleID)
+	must(err, "tạo tài khoản Quản trị hệ thống")
+	fmt.Println("Đã tạo tài khoản Quản trị hệ thống:", email)
 }
