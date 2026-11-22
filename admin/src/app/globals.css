@@ -294,19 +294,19 @@
   --destructive-border: #fecaca;
 
   /* Sidebar */
-  --sidebar: #ffffff;
-  --sidebar-foreground: #334155;
+  --sidebar: #1f4e79;
+  --sidebar-foreground: #e6eef7;
 
-  --sidebar-primary: #3f6b80;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #9cc9f2;
+  --sidebar-primary-foreground: #12304d;
 
-  --sidebar-accent: #e3edf2;
-  --sidebar-accent-foreground: #35596b;
+  --sidebar-accent: #2f6aa3;
+  --sidebar-accent-foreground: #ffffff;
 
-  --sidebar-muted-foreground: #64748b;
+  --sidebar-muted-foreground: #b4c9de;
 
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #3f6b80;
+  --sidebar-border: #2c5f8f;
+  --sidebar-ring: #9cc9f2;
 
   /* Lớp phủ modal */
   --overlay: #0f172a;
@@ -412,19 +412,19 @@
   --destructive-border: #991b1b;
 
   /* Sidebar */
-  --sidebar: #0f172a;
-  --sidebar-foreground: #e2e8f0;
+  --sidebar: #0c2a47;
+  --sidebar-foreground: #e2ecf7;
 
-  --sidebar-primary: #9ec0d1;
-  --sidebar-primary-foreground: #182932;
+  --sidebar-primary: #9cc9f2;
+  --sidebar-primary-foreground: #0c2a47;
 
-  --sidebar-accent: #233847;
-  --sidebar-accent-foreground: #c6dae4;
+  --sidebar-accent: #17436b;
+  --sidebar-accent-foreground: #ffffff;
 
-  --sidebar-muted-foreground: #94a3b8;
+  --sidebar-muted-foreground: #9fb6cc;
 
-  --sidebar-border: #334155;
-  --sidebar-ring: #9ec0d1;
+  --sidebar-border: #1d4a73;
+  --sidebar-ring: #9cc9f2;
 
   /* Lớp phủ modal */
   --overlay: #000000;
@@ -503,5 +503,14 @@
     animation: none;
     opacity: 0.6;
     bottom: 30%;
+  }
+}
+
+@keyframes fade-in-late {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

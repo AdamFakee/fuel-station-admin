@@ -22,7 +22,6 @@ import {
   CircleStackIcon,
   TruckIcon,
   UserGroupIcon,
-  ClipboardDocumentCheckIcon,
   DocumentArrowDownIcon,
   AdjustmentsHorizontalIcon,
   ChartBarIcon,
@@ -42,7 +41,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   permission?: string;
-  roles?: ('MANAGER' | 'ACCOUNTANT' | 'IT')[];
+  roles?: ('ADMIN' | 'MANAGER' | 'ACCOUNTANT' | 'IT')[];
 }
 
 interface NavGroup {
@@ -107,16 +106,10 @@ export function AppSidebar() {
           icon: UserGroupIcon,
           permission: 'master.driver:view',
         },
-        {
-          title: 'Định mức nhiên liệu',
-          href: '/quotas',
-          icon: ChartBarIcon,
-          permission: 'master.quota:view',
-        },
       ],
     },
     {
-      label: 'Kho & Kiểm kê',
+      label: 'Kho',
       items: [
         {
           title: 'Phiếu nhập bể',
@@ -129,12 +122,6 @@ export function AppSidebar() {
           href: '/inventory/issues',
           icon: AdjustmentsHorizontalIcon,
           permission: 'inventory.issue:view',
-        },
-        {
-          title: 'Kiểm kê & Đối chiếu',
-          href: '/inventory/stocktake',
-          icon: ClipboardDocumentCheckIcon,
-          permission: 'inventory.stocktake:view',
         },
       ],
     },
@@ -193,6 +180,7 @@ export function AppSidebar() {
   ];
 
   const roleLabelMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
+    ADMIN: { label: 'Quản trị hệ thống', variant: 'default' },
     MANAGER: { label: 'Quản lý', variant: 'default' },
     ACCOUNTANT: { label: 'Kế toán', variant: 'secondary' },
     IT: { label: 'IT Kỹ thuật', variant: 'outline' },
@@ -201,15 +189,15 @@ export function AppSidebar() {
   const currentRoleInfo = roleLabelMap[role] || { label: 'Quản lý', variant: 'default' };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       {/* Sidebar Header */}
-      <SidebarHeader className="h-14 border-b border-border/60 px-4 flex flex-row items-center gap-3">
+      <SidebarHeader className="h-14 border-b border-sidebar-border px-4 flex flex-row items-center gap-3">
         <Image src="/biwase-logo.png" alt="BIWASE" width={28} height={34} className="h-8 w-auto shrink-0" />
         <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
-          <span className="text-sm font-semibold text-foreground tracking-tight">
+          <span className="text-sm font-semibold text-sidebar-foreground tracking-tight">
             Fuel Station System
           </span>
-          <span className="text-xs text-muted-foreground font-mono">
+          <span className="text-xs text-sidebar-muted-foreground font-mono">
             Quản lý trạm xăng
           </span>
         </div>
@@ -229,7 +217,7 @@ export function AppSidebar() {
           return (
             <SidebarGroup key={group.label}>
               {!group.hideLabel && (
-                <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <SidebarGroupLabel className="text-xs font-medium text-sidebar-muted-foreground uppercase tracking-wider">
                   {group.label}
                 </SidebarGroupLabel>
               )}
@@ -267,14 +255,14 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Footer with User info & Logout */}
-      <SidebarFooter className="border-t border-border/60 p-3">
+      <SidebarFooter className="border-t border-sidebar-border p-3">
         <div className="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center gap-2.5 truncate group-data-[collapsible=icon]:hidden">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted font-medium text-xs text-foreground">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent font-medium text-xs text-sidebar-accent-foreground">
               {user?.fullName ? user.fullName[0].toUpperCase() : 'U'}
             </div>
             <div className="flex flex-col truncate">
-              <span className="text-xs font-medium text-foreground truncate">
+              <span className="text-xs font-medium text-sidebar-foreground truncate">
                 {user?.fullName || 'Người dùng'}
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
@@ -289,7 +277,7 @@ export function AppSidebar() {
             onClick={() => logout()}
             disabled={isLoggingOut}
             title="Đăng xuất"
-            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-muted rounded-md transition-colors"
+            className="p-1.5 text-sidebar-muted-foreground hover:text-white hover:bg-sidebar-accent rounded-md transition-colors"
           >
             <ArrowRightOnRectangleIcon className="h-4 w-4" />
             <span className="sr-only">Đăng xuất</span>

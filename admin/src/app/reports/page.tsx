@@ -2,13 +2,12 @@
 
 import { DetailPageHeader } from '@/components/detail-page-header';
 import React, { useState } from 'react';
-import { ReportFilterState, ReportTemplateType } from '@/features/reports/types';
+import { DispenseReportItem, ReportFilterState, ReportTemplateType } from '@/features/reports/types';
 import { useStockLedgerReport } from '@/features/reports/api/get-stock-ledger-report';
 import { useReceiptsReport } from '@/features/reports/api/get-receipts-report';
-import { useDispensesReport } from '@/features/reports/api/get-dispenses-report';
+import { getDispensesReport, useDispensesReport } from '@/features/reports/api/get-dispenses-report';
 import { useVehicleConsumptionReport } from '@/features/reports/api/get-vehicle-consumption-report';
 import { useDriverDispenseReport } from '@/features/reports/api/get-driver-dispense-report';
-import { useReconciliationReport } from '@/features/reports/api/get-reconciliation-report';
 import { exportReportToExcel } from '@/features/reports/lib/export-excel';
 import { ReportFilters } from '@/features/reports/components/report-filters';
 import { StockLedgerReportView } from '@/features/reports/components/stock-ledger-report-view';
@@ -16,7 +15,6 @@ import { ReceiptsReportView } from '@/features/reports/components/receipts-repor
 import { DispensesReportView } from '@/features/reports/components/dispenses-report-view';
 import { VehicleConsumptionReportView } from '@/features/reports/components/vehicle-consumption-report-view';
 import { DriverDispenseReportView } from '@/features/reports/components/driver-dispense-report-view';
-import { ReconciliationReportView } from '@/features/reports/components/reconciliation-report-view';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileSpreadsheet, Printer } from 'lucide-react';
@@ -35,12 +33,23 @@ export default function ReportsPage() {
     toDate: defaultToDate,
   });
 
+  // Phân trang riêng cho hai bảng dài; đổi bộ lọc thì về trang 1
+  const [ledgerPage, setLedgerPage] = useState({ page: 1, pageSize: 50 });
+  const [dispensePage, setDispensePage] = useState({ page: 1, pageSize: 50 });
+  const changeFilters = (next: ReportFilterState) => {
+    setFilters(next);
+    setLedgerPage((p) => ({ ...p, page: 1 }));
+    setDispensePage((p) => ({ ...p, page: 1 }));
+  };
+
   // Queries for each template
   const stockLedgerQuery = useStockLedgerReport({
     branch_id: filters.branchId,
     tank_id: filters.tankId,
     from_date: filters.fromDate,
     to_date: filters.toDate,
+    page: ledgerPage.page,
+    page_size: ledgerPage.pageSize,
   });
 
   const receiptsQuery = useReceiptsReport({
@@ -57,8 +66,8 @@ export default function ReportsPage() {
     status: filters.status,
     from_date: filters.fromDate,
     to_date: filters.toDate,
-    page: 1,
-    page_size: 500,
+    page: dispensePage.page,
+    page_size: dispensePage.pageSize,
   });
 
   const vehicleConsumptionQuery = useVehicleConsumptionReport({
@@ -72,21 +81,6 @@ export default function ReportsPage() {
     from_date: filters.fromDate,
     to_date: filters.toDate,
   });
-
-  const reconciliationQuery = useReconciliationReport({
-    branch_id: filters.branchId,
-    tank_id: filters.tankId,
-    status: filters.status,
-    from_date: filters.fromDate,
-    to_date: filters.toDate,
-  });
-
-  const handleResetFilters = () => {
-    setFilters({
-      fromDate: defaultFromDate,
-      toDate: defaultToDate,
-    });
-  };
 
   const handlePrint = () => {
     window.print();
@@ -164,7 +158,21 @@ export default function ReportsPage() {
         break;
       }
       case 'dispenses': {
-        const items = dispensesQuery.data?.items || [];
+        // Xuất đủ mọi lượt đổ khớp bộ lọc, không chỉ trang đang xem: lấy lần lượt từng trang 500 dòng
+        const items: DispenseReportItem[] = [];
+        for (let exportPage = 1; ; exportPage++) {
+          const result = await getDispensesReport({
+            branch_id: filters.branchId,
+            tank_id: filters.tankId,
+            status: filters.status,
+            from_date: filters.fromDate,
+            to_date: filters.toDate,
+            page: exportPage,
+            page_size: 500,
+          });
+          items.push(...result.items);
+          if (items.length >= result.total_sessions || result.items.length === 0) break;
+        }
         const columns = [
           { header: 'Mã phiên', key: 'code', width: 16 },
           { header: 'Thời điểm', key: 'time', width: 20, align: 'right' as const },
@@ -175,7 +183,7 @@ export default function ReportsPage() {
           { header: 'Tài xế', key: 'driver_name', width: 20 },
           { header: 'Lít thực đổ (L)', key: 'dispensed_liters', width: 18, align: 'right' as const },
           { header: 'Số đồng hồ (L)', key: 'pump_total_liters', width: 18, align: 'right' as const },
-          { header: 'Số lần', key: 'sale_seq', width: 12, align: 'right' as const },
+          { header: 'Số lượt đổ', key: 'sale_seq', width: 12, align: 'right' as const },
           { header: 'Trạng thái', key: 'status', width: 14 },
         ];
         const data = items.map((d) => ({
@@ -201,21 +209,15 @@ export default function ReportsPage() {
           { header: 'Loại xe', key: 'type_name', width: 16 },
           { header: 'Số lượt đổ', key: 'session_count', width: 14, align: 'right' as const },
           { header: 'Tổng tiêu hao (L)', key: 'total_dispensed_liters', width: 20, align: 'right' as const },
-          { header: 'Hạn mức (L)', key: 'quota_liters', width: 16, align: 'right' as const },
-          { header: 'Chênh lệch (L)', key: 'variance_liters', width: 16, align: 'right' as const },
-          { header: 'Đánh giá', key: 'status_label', width: 18 },
         ];
         const data = items.map((v) => ({
           ...v,
           session_count: formatNumberVN(v.session_count),
           total_dispensed_liters: formatNumberVN(v.total_dispensed_liters, 2),
-          quota_liters: v.quota_liters !== null ? formatNumberVN(v.quota_liters, 2) : '—',
-          variance_liters: v.variance_liters !== null ? formatNumberVN(v.variance_liters, 2) : '—',
-          status_label: v.status === 'over_quota' ? 'Vượt định mức' : v.status === 'normal' ? 'Trong định mức' : 'Chưa có định mức',
         }));
         await exportReportToExcel({
-          filename: 'Tieu_hao_dinh_muc_theo_xe',
-          title: 'BÁO CÁO TIÊU HAO VÀ ĐỊNH MỨC THEO XE',
+          filename: 'Tieu_hao_theo_xe',
+          title: 'BÁO CÁO TIÊU HAO THEO XE',
           dateRangeStr,
           columns,
           data,
@@ -228,7 +230,7 @@ export default function ReportsPage() {
           { header: 'Mã nhân viên', key: 'driver_code', width: 16 },
           { header: 'Họ và tên', key: 'driver_name', width: 22 },
           { header: 'Điện thoại', key: 'phone', width: 16 },
-          { header: 'Số lượt nhận', key: 'session_count', width: 16, align: 'right' as const },
+          { header: 'Số lượt đổ', key: 'session_count', width: 16, align: 'right' as const },
           { header: 'Tổng số lít (L)', key: 'total_dispensed_liters', width: 20, align: 'right' as const },
           { header: 'TB / lượt (L)', key: 'avg_liters_per_session', width: 16, align: 'right' as const },
           { header: 'Phương tiện vận hành', key: 'vehicles_used', width: 25 },
@@ -242,42 +244,6 @@ export default function ReportsPage() {
         await exportReportToExcel({
           filename: 'Cap_phat_theo_tai_xe',
           title: 'BÁO CÁO CẤP PHÁT NHIÊN LIỆU THEO TÀI XẾ',
-          dateRangeStr,
-          columns,
-          data,
-        });
-        break;
-      }
-      case 'reconciliation': {
-        const items = reconciliationQuery.data?.items || [];
-        const columns = [
-          { header: 'Ngày đối chiếu', key: 'period_date', width: 16, align: 'right' as const },
-          { header: 'Trạm xăng', key: 'branch_name', width: 18 },
-          { header: 'Bể chứa', key: 'tank_name', width: 18 },
-          { header: 'Nhiên liệu', key: 'fuel_type_name', width: 16 },
-          { header: 'Tồn đầu (L)', key: 'opening_liters', width: 16, align: 'right' as const },
-          { header: 'Tổng nhập (L)', key: 'receipts_liters', width: 16, align: 'right' as const },
-          { header: 'Cấp phát (L)', key: 'dispensed_liters', width: 16, align: 'right' as const },
-          { header: 'Tồn sổ sách (L)', key: 'book_closing_liters', width: 18, align: 'right' as const },
-          { header: 'Thực đo (L)', key: 'measured_liters', width: 16, align: 'right' as const },
-          { header: 'Chênh lệch (L)', key: 'variance_liters', width: 16, align: 'right' as const },
-          { header: '% Lệch', key: 'variance_pct', width: 14, align: 'right' as const },
-          { header: 'Trạng thái', key: 'status', width: 14 },
-        ];
-        const data = items.map((rec) => ({
-          ...rec,
-          period_date: formatDateVN(rec.period_date),
-          opening_liters: formatNumberVN(rec.opening_liters, 2),
-          receipts_liters: formatNumberVN(rec.receipts_liters, 2),
-          dispensed_liters: formatNumberVN(rec.dispensed_liters, 2),
-          book_closing_liters: formatNumberVN(rec.book_closing_liters, 2),
-          measured_liters: rec.measured_liters !== null ? formatNumberVN(rec.measured_liters, 2) : '—',
-          variance_liters: rec.variance_liters !== null ? formatNumberVN(rec.variance_liters, 2) : '—',
-          variance_pct: rec.variance_pct !== null ? `${formatNumberVN(rec.variance_pct, 2)}%` : '—',
-        }));
-        await exportReportToExcel({
-          filename: 'Doi_chieu_kiem_ke_dinh_ky',
-          title: 'BÁO CÁO ĐỐI CHIẾU KIỂM KÊ VÀ HAO HỤT ĐỊNH KỲ',
           dateRangeStr,
           columns,
           data,
@@ -325,9 +291,6 @@ export default function ReportsPage() {
             <TabsTrigger value="driver-dispense">
               Cấp phát theo tài xế
             </TabsTrigger>
-            <TabsTrigger value="reconciliation">
-              Đối chiếu kiểm kê
-            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -337,8 +300,7 @@ export default function ReportsPage() {
         <ReportFilters
           template={template}
           filters={filters}
-          onChange={(newFilters) => setFilters(newFilters)}
-          onReset={handleResetFilters}
+          onChange={changeFilters}
         />
       </div>
 
@@ -348,6 +310,9 @@ export default function ReportsPage() {
           <StockLedgerReportView
             data={stockLedgerQuery.data}
             isLoading={stockLedgerQuery.isLoading}
+            page={ledgerPage.page}
+            pageSize={ledgerPage.pageSize}
+            onPageChange={(page, pageSize) => setLedgerPage({ page, pageSize })}
           />
         )}
         {template === 'receipts' && (
@@ -360,6 +325,9 @@ export default function ReportsPage() {
           <DispensesReportView
             data={dispensesQuery.data}
             isLoading={dispensesQuery.isLoading}
+            page={dispensePage.page}
+            pageSize={dispensePage.pageSize}
+            onPageChange={(page, pageSize) => setDispensePage({ page, pageSize })}
           />
         )}
         {template === 'vehicle-consumption' && (
@@ -372,12 +340,6 @@ export default function ReportsPage() {
           <DriverDispenseReportView
             data={driverDispenseQuery.data}
             isLoading={driverDispenseQuery.isLoading}
-          />
-        )}
-        {template === 'reconciliation' && (
-          <ReconciliationReportView
-            data={reconciliationQuery.data}
-            isLoading={reconciliationQuery.isLoading}
           />
         )}
       </div>

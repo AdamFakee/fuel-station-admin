@@ -39,3 +39,6 @@ Thumbs.db
 *.db
 tmp/
 scratch/
+
+# Ảnh tải lên khi chạy local
+backend/data/

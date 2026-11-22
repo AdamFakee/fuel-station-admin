@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type UserRole = 'MANAGER' | 'ACCOUNTANT' | 'IT';
+export type UserRole = 'ADMIN' | 'MANAGER' | 'ACCOUNTANT' | 'IT';
 
 export interface AuthUser {
   id: string;

@@ -30,9 +30,12 @@ function SessionCheckScreen() {
       className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background"
       data-testid="session-check-screen"
     >
-      <Image src="/biwase-logo.png" alt="BIWASE" width={56} height={68} priority className="h-16 w-auto" />
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      <p className="text-sm text-muted-foreground">Đang kiểm tra phiên đăng nhập...</p>
+      {/* Hiện sau 0,4 giây: kiểm tra phiên nhanh thì không nháy logo và vòng xoay */}
+      <div className="flex animate-[fade-in-late_0.2s_0.4s_both] flex-col items-center gap-4">
+        <Image src="/biwase-logo.png" alt="BIWASE" width={56} height={68} priority className="h-16 w-auto" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Đang kiểm tra phiên đăng nhập...</p>
+      </div>
     </div>
   );
 }

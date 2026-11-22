@@ -11,10 +11,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ExclamationCircleIcon, CheckCircleIcon, SignalSlashIcon } from '@heroicons/react/24/outline';
+import { ExclamationCircleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { EdgeStationStatus } from '../types';
 import { formatDateTimeVN, formatNumberVN } from '@/lib/format';
 import { Empty } from '@/components/empty';
+import { DetailDialog } from '@/components/detail-dialog';
+import { rowClick } from '@/lib/row-click';
+import { stationDetail } from '@/lib/row-details';
 
 interface StationTableProps {
   stations: EdgeStationStatus[];
@@ -22,6 +25,8 @@ interface StationTableProps {
 }
 
 export function StationTable({ stations, isLoading }: StationTableProps) {
+  const [detail, setDetail] = React.useState<EdgeStationStatus | null>(null);
+
   if (!isLoading && stations.length === 0) {
     return (
       <Empty
@@ -49,7 +54,7 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
         </TableHeader>
         <TableBody>
           {stations.map((st) => (
-            <TableRow key={st.id}>
+            <TableRow key={st.id} className="hover:bg-muted/20" onClick={rowClick(() => setDetail(st))}>
               {/* Mã trạm (font-mono, left) */}
               <TableCell className="font-mono text-xs font-semibold text-primary">
                 {st.code}
@@ -74,7 +79,7 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="gap-1.5 border-zinc-300 bg-zinc-50 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 font-normal">
-                    <SignalSlashIcon className="w-3 h-3 text-zinc-400" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
                     Offline
                   </Badge>
                 )}
@@ -136,6 +141,13 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
           ))}
         </TableBody>
       </Table>
+
+      <DetailDialog
+        open={detail !== null}
+        onOpenChange={(open) => !open && setDetail(null)}
+        title={detail?.name ?? ''}
+        sections={detail ? stationDetail(detail) : []}
+      />
     </div>
   );
 }

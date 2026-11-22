@@ -5,34 +5,73 @@ import { StatCard } from '@/components/stat-card';
 import { BeakerIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { StatusBadge } from '@/components/status-badge';
 import React from 'react';
-import { DispenseReportResponse } from '../types';
+import { DispenseReportItem, DispenseReportResponse } from '../types';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
+import { SessionDetailDialog } from '@/features/dispense/components/session-detail-dialog';
+import Paginator from '@/components/paginator';
+import { rowClick } from '@/lib/row-click';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface DispensesReportViewProps {
   data?: DispenseReportResponse;
   isLoading: boolean;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number, pageSize: number) => void;
 }
 
-export function DispensesReportView({ data, isLoading }: DispensesReportViewProps) {
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return <StatusBadge tone="success">Hoàn thành</StatusBadge>;
+    case 'cancelled':
+      return <StatusBadge tone="neutral">Đã hủy</StatusBadge>;
+    case 'failed':
+      return <StatusBadge tone="danger">Lỗi</StatusBadge>;
+    default:
+      return <StatusBadge tone="neutral">{status}</StatusBadge>;
+  }
+};
+
+/** Dòng bảng tách riêng và memo: mở popup chỉ đổi state ở cha, không phải vẽ lại hàng trăm dòng. */
+const DispenseRow = React.memo(function DispenseRow({
+  row,
+  onOpen,
+}: {
+  row: DispenseReportItem;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <TableRow className="hover:bg-muted/20" onClick={rowClick(() => onOpen(row.id))}>
+      <TableCell className="font-mono text-xs font-semibold">{row.code}</TableCell>
+      <TableCell className="text-right tabular-nums text-xs">
+        {formatDateTimeVN(row.finished_at || row.started_at)}
+      </TableCell>
+      <TableCell className="text-xs font-medium">{row.pump_name}</TableCell>
+      <TableCell className="text-xs">{row.tank_name || '—'}</TableCell>
+      <TableCell className="text-xs">{row.fuel_type_name || '—'}</TableCell>
+      <TableCell className="text-xs font-bold">{row.vehicle_plate || '—'}</TableCell>
+      <TableCell className="text-xs">{row.driver_name || '—'}</TableCell>
+      <TableCell className="text-right tabular-nums text-xs text-blue-600 font-extrabold">
+        {formatNumberVN(row.dispensed_liters, 2)}
+      </TableCell>
+      <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+        {row.pump_total_liters !== null ? formatNumberVN(row.pump_total_liters, 2) : '—'}
+      </TableCell>
+      <TableCell className="text-right tabular-nums text-xs text-muted-foreground">{row.sale_seq || '—'}</TableCell>
+      <TableCell>{getStatusBadge(row.status)}</TableCell>
+    </TableRow>
+  );
+});
+
+export function DispensesReportView({ data, isLoading, page, pageSize, onPageChange }: DispensesReportViewProps) {
+  const [detailId, setDetailId] = React.useState<string | null>(null);
+
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Đang tải lịch sử cấp phát...</div>;
   }
 
   const items = data?.items || [];
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <StatusBadge tone="success">Hoàn thành</StatusBadge>;
-      case 'cancelled':
-        return <StatusBadge tone="neutral">Đã hủy</StatusBadge>;
-      case 'failed':
-        return <StatusBadge tone="danger">Lỗi</StatusBadge>;
-      default:
-        return <StatusBadge tone="neutral">{status}</StatusBadge>;
-    }
-  };
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -77,7 +116,7 @@ export function DispensesReportView({ data, isLoading }: DispensesReportViewProp
               <TableHead>Tài xế</TableHead>
               <TableHead className="text-right tabular-nums text-blue-600 font-semibold">Lít thực đổ (L)</TableHead>
               <TableHead className="text-right tabular-nums">Số đồng hồ tổng (L)</TableHead>
-              <TableHead className="text-right tabular-nums w-[80px]">Số lần</TableHead>
+              <TableHead className="text-right tabular-nums w-[110px]">Số lượt đổ</TableHead>
               <TableHead className="w-[110px]">Trạng thái</TableHead>
             </TableRow>
           </TableHeader>
@@ -85,33 +124,25 @@ export function DispensesReportView({ data, isLoading }: DispensesReportViewProp
             {items.length === 0 ? (
               <TableEmptyRow colSpan={11} title="Không tìm thấy phiên đổ nhiên liệu nào khớp với bộ lọc." />
             ) : (
-              items.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="font-mono text-xs font-semibold">{row.code}</TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">
-                    {formatDateTimeVN(row.finished_at || row.started_at)}
-                  </TableCell>
-                  <TableCell className="text-xs font-medium">{row.pump_name}</TableCell>
-                  <TableCell className="text-xs">{row.tank_name || '—'}</TableCell>
-                  <TableCell className="text-xs">{row.fuel_type_name || '—'}</TableCell>
-                  <TableCell className="text-xs font-bold">{row.vehicle_plate || '—'}</TableCell>
-                  <TableCell className="text-xs">{row.driver_name || '—'}</TableCell>
-                  <TableCell className="text-right tabular-nums text-xs text-blue-600 font-extrabold">
-                    {formatNumberVN(row.dispensed_liters, 2)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
-                    {row.pump_total_liters !== null ? formatNumberVN(row.pump_total_liters, 2) : '—'}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
-                    {row.sale_seq || '—'}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(row.status)}</TableCell>
-                </TableRow>
-              ))
+              items.map((row) => <DispenseRow key={row.id} row={row} onOpen={setDetailId} />)
             )}
           </TableBody>
         </Table>
       </div>
+
+      <Paginator
+        className="shrink-0"
+        currentPage={page}
+        pageSize={pageSize}
+        totalItems={data?.total_sessions ?? 0}
+        onPageChange={onPageChange}
+      />
+
+      <SessionDetailDialog
+        open={detailId !== null}
+        onOpenChange={(open) => !open && setDetailId(null)}
+        sessionId={detailId}
+      />
     </div>
   );
 }

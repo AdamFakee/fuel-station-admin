@@ -66,18 +66,17 @@ export default function UsersPage() {
 
   return (
     <>
+      {/* Tiêu đề trang nằm ngoài khung nội dung (không bị cộng thêm lề), nút dùng cỡ chuẩn như các trang khác */}
+      <DetailPageHeader title="Quản lý Tài khoản & Nhân sự">
+        {hasPermission('iam.user:create') && (
+          <Button onClick={handleOpenCreate}>
+            <PlusIcon className="mr-2 h-4 w-4" />
+            Thêm tài khoản
+          </Button>
+        )}
+      </DetailPageHeader>
+
       <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
-        {/* Header */}
-        <DetailPageHeader title="Quản lý Tài khoản & Nhân sự">
-          {hasPermission('iam.user:create') && (
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={handleOpenCreate}>
-                <PlusIcon className="mr-1.5 h-4 w-4" />
-                Thêm tài khoản
-              </Button>
-            </div>
-          )}
-        </DetailPageHeader>
 
         {/* Filter & Search Bar */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">

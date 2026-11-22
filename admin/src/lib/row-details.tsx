@@ -1,13 +1,14 @@
 import * as React from 'react';
 import { DetailSection } from '@/components/detail-dialog';
 import { StatusBadge } from '@/components/status-badge';
+import { FaceThumbnail } from '@/components/face-thumbnail';
 import { formatDateTimeVN, formatNumberVN } from '@/lib/format';
 import type { Branch, PumpDetail, Tank } from '@/features/assets/types';
 import type { UserListItem } from '@/features/iam/types';
 import type { DriverListItem, VehicleListItem } from '@/features/master/types';
-import type { QuotaRule } from '@/features/quota/types';
-import type { AlertItem, StockReconciliationItem } from '@/features/inventory/types';
 import type { AccessEventListItem } from '@/features/dispense/types';
+import type { EdgeStationStatus } from '@/features/sync-monitor/types';
+import type { StockLedgerLineItem, StockLedgerSummaryItem } from '@/features/reports/types';
 
 /**
  * Nội dung hộp thoại chi tiết cho từng loại dòng bảng. Chỉ đọc, gom một chỗ để mọi bảng hiển thị nhất quán.
@@ -101,7 +102,7 @@ export function pumpDetail(p: PumpDetail): DetailSection[] {
         { label: 'Mã máy', value: p.terminal?.terminal_code },
         { label: 'Địa chỉ', value: p.terminal ? `${p.terminal.host}:${p.terminal.port}` : undefined },
         { label: 'Tài khoản', value: p.terminal?.username },
-        { label: 'Mật khẩu', value: p.terminal ? (p.terminal.has_password ? 'Đã đặt' : 'Chưa đặt') : undefined },
+        { label: 'Mật khẩu', value: p.terminal ? (p.terminal.has_password ? p.terminal.password_hint || 'Đã đặt' : 'Chưa đặt') : undefined },
       ],
     },
     auditSection(p.created_at, p.updated_at),
@@ -169,11 +170,10 @@ export function driverDetail(d: DriverListItem): DetailSection[] {
     {
       title: 'Tài xế',
       fields: [
-        { label: 'Mã nhân viên', value: d.code },
+        { label: 'Mã tài xế', value: d.code },
         { label: 'Trạng thái', value: <StatusBadge tone={status.tone}>{status.label}</StatusBadge> },
         { label: 'Họ và tên', value: d.full_name },
         { label: 'Số điện thoại', value: d.phone },
-        { label: 'Bộ phận', value: d.department },
         { label: 'Hiệu lực', value: d.valid_from || d.valid_to ? `${d.valid_from ?? '…'} → ${d.valid_to ?? 'không thời hạn'}` : 'Không thời hạn' },
         { label: 'Ghi chú', value: d.note, wide: true },
       ],
@@ -182,97 +182,11 @@ export function driverDetail(d: DriverListItem): DetailSection[] {
       title: 'Phương thức xác thực',
       fields: [
         { label: 'Thẻ NFC', value: d.card_number || 'Chưa có' },
-        { label: 'Khuôn mặt', value: d.has_face ? 'Đã đăng ký' : 'Chưa có' },
+        { label: 'Khuôn mặt', value: d.has_face ? <FaceThumbnail fileId={d.face_file_id} size={96} /> : 'Chưa có' },
         { label: 'Vân tay', value: d.has_fingerprint ? 'Đã đăng ký' : 'Chưa có' },
       ],
     },
     auditSection(d.created_at, d.updated_at),
-  ];
-}
-
-const PERIOD_LABEL: Record<string, string> = { per_dispense: 'Từng lần', day: 'Theo ngày', week: 'Theo tuần', month: 'Theo tháng' };
-
-export function quotaRuleDetail(r: QuotaRule): DetailSection[] {
-  return [
-    {
-      title: 'Quy tắc định mức',
-      fields: [
-        { label: 'Mã quy tắc', value: r.code },
-        {
-          label: 'Trạng thái',
-          value: <StatusBadge tone={r.status === 'active' ? 'success' : 'neutral'}>{r.status === 'active' ? 'Hiệu lực' : 'Đã hủy'}</StatusBadge>,
-        },
-        { label: 'Xe áp dụng', value: [r.target_code, r.target_name].filter(Boolean).join(' · ') },
-        { label: 'Chu kỳ', value: PERIOD_LABEL[r.period] ?? r.period },
-        { label: 'Định mức tối đa', value: `${formatNumberVN(r.max_volume_liters)} L` },
-        { label: 'Giãn cách tối thiểu', value: r.min_interval_minutes ? `${r.min_interval_minutes} phút` : 'Không giới hạn' },
-        { label: 'Hiệu lực từ', value: dateTime(r.effective_from) },
-        { label: 'Hiệu lực đến', value: r.effective_to ? dateTime(r.effective_to) : 'Không thời hạn' },
-      ],
-    },
-    auditSection(r.created_at, r.updated_at),
-  ];
-}
-
-const ALERT_KIND: Record<string, string> = {
-  low_stock: 'Tồn kho thấp',
-  loss_variance: 'Lệch ngưỡng hao hụt',
-  station_offline: 'Trạm mất kết nối',
-  sync_error: 'Lỗi đồng bộ',
-};
-
-export function alertDetail(a: AlertItem): DetailSection[] {
-  return [
-    {
-      title: 'Cảnh báo',
-      fields: [
-        { label: 'Loại cảnh báo', value: ALERT_KIND[a.kind] ?? a.kind },
-        {
-          label: 'Trạng thái',
-          value: <StatusBadge tone={a.resolved_at ? 'success' : 'danger'}>{a.resolved_at ? 'Đã xử lý' : 'Chưa xử lý'}</StatusBadge>,
-        },
-        { label: 'Trạm xăng', value: a.branch_name },
-        { label: 'Bể chứa', value: a.tank_name },
-        { label: 'Trạm Edge', value: a.edge_station_name },
-        { label: 'Phát sinh lúc', value: dateTime(a.created_at) },
-        { label: 'Xử lý lúc', value: a.resolved_at ? dateTime(a.resolved_at) : undefined },
-        { label: 'Nội dung', value: a.message, wide: true },
-      ],
-    },
-  ];
-}
-
-export function stocktakeDetail(s: StockReconciliationItem): DetailSection[] {
-  return [
-    {
-      title: 'Kỳ đối chiếu',
-      fields: [
-        { label: 'Ngày', value: s.period_date },
-        { label: 'Trạm xăng', value: s.branch_name },
-        { label: 'Bể chứa', value: `${s.tank_name} (${s.tank_code})` },
-        { label: 'Loại nhiên liệu', value: s.fuel_type_name },
-      ],
-    },
-    {
-      title: 'Số liệu sổ sách',
-      fields: [
-        { label: 'Tồn đầu kỳ', value: `${formatNumberVN(s.opening_liters)} L` },
-        { label: 'Nhập trong kỳ', value: `${formatNumberVN(s.receipts_liters)} L` },
-        { label: 'Xuất bơm', value: `${formatNumberVN(s.dispensed_liters)} L` },
-        { label: 'Xuất điều chỉnh', value: `${formatNumberVN(s.other_issues_liters)} L` },
-        { label: 'Tồn cuối sổ', value: `${formatNumberVN(s.book_closing_liters)} L` },
-      ],
-    },
-    {
-      title: 'Thực đo & chênh lệch',
-      fields: [
-        { label: 'Thực đo (que thăm)', value: s.measured_liters !== undefined ? `${formatNumberVN(s.measured_liters)} L` : 'Chưa đo' },
-        { label: 'Số tích lũy đồng hồ', value: s.pump_totalizer_liters !== undefined ? `${formatNumberVN(s.pump_totalizer_liters)} L` : undefined },
-        { label: 'Chênh lệch', value: s.variance_liters !== undefined ? `${formatNumberVN(s.variance_liters)} L (${formatNumberVN(s.variance_pct, 2)} %)` : undefined },
-        { label: 'Dung sai cho phép', value: `${formatNumberVN(s.tolerance_pct)} %` },
-        { label: 'Người đo', value: s.measured_by_name },
-      ],
-    },
   ];
 }
 
@@ -296,5 +210,87 @@ export function accessEventDetail(e: AccessEventListItem): DetailSection[] {
         { label: 'Lý do', value: e.reason, wide: true },
       ],
     },
+  ];
+}
+
+const litersL = (value: number) => `${formatNumberVN(value, 2)} L`;
+
+/** Một dòng tổng hợp theo bể trong báo cáo Nhập – Xuất – Tồn. */
+export function stockSummaryDetail(s: StockLedgerSummaryItem): DetailSection[] {
+  return [
+    {
+      title: 'Thông tin bể',
+      fields: [
+        { label: 'Mã bể', value: s.tank_code },
+        { label: 'Tên bể', value: s.tank_name },
+        { label: 'Nhiên liệu', value: s.fuel_type_name },
+        { label: 'Trạm xăng', value: s.branch_name },
+        { label: 'Dung tích', value: litersL(s.capacity_liters) },
+      ],
+    },
+    {
+      title: 'Biến động trong kỳ',
+      fields: [
+        { label: 'Tồn đầu', value: litersL(s.opening_liters) },
+        { label: 'Tổng nhập', value: litersL(s.receipt_liters) },
+        { label: 'Cấp phát', value: litersL(s.dispense_liters) },
+        { label: 'Xuất khác', value: litersL(s.issue_liters) },
+        { label: 'Điều chỉnh', value: litersL(s.adjust_liters) },
+        { label: 'Tồn cuối', value: litersL(s.closing_liters) },
+      ],
+    },
+  ];
+}
+
+/** Một dòng thẻ kho chi tiết trong báo cáo Nhập – Xuất – Tồn. */
+export function stockLedgerLineDetail(l: StockLedgerLineItem): DetailSection[] {
+  return [
+    {
+      title: 'Giao dịch',
+      fields: [
+        { label: 'Thời gian', value: dateTime(l.occurred_at) },
+        { label: 'Bể chứa', value: l.tank_name },
+        { label: 'Loại nghiệp vụ', value: l.kind_label },
+        { label: 'Mã tham chiếu', value: l.ref_code },
+        { label: 'Ghi chú', value: l.note, wide: true },
+      ],
+    },
+    {
+      title: 'Số lượng',
+      fields: [
+        { label: 'Nhập', value: l.in_liters > 0 ? litersL(l.in_liters) : '—' },
+        { label: 'Xuất', value: l.out_liters > 0 ? litersL(l.out_liters) : '—' },
+        { label: 'Tồn sau giao dịch', value: litersL(l.balance_liters) },
+      ],
+    },
+  ];
+}
+
+/** Một trạm Edge Agent trong màn Trạng thái trạm & Đồng bộ. */
+export function stationDetail(st: EdgeStationStatus): DetailSection[] {
+  return [
+    {
+      title: 'Thông tin trạm',
+      fields: [
+        { label: 'Mã trạm', value: st.code },
+        { label: 'Tên trạm / Thiết bị', value: st.name },
+        { label: 'Trạm xăng trực thuộc', value: `${st.branch_name} (${st.branch_code})` },
+        { label: 'Phiên bản', value: st.agent_version },
+      ],
+    },
+    {
+      title: 'Kết nối & đồng bộ',
+      fields: [
+        {
+          label: 'Trạng thái kết nối',
+          value: <StatusBadge tone={st.is_online ? 'success' : 'neutral'}>{st.is_online ? 'Online' : 'Offline'}</StatusBadge>,
+        },
+        { label: 'Hàng đợi chờ gửi', value: formatNumberVN(st.pending_queue) },
+        { label: 'Lần thấy cuối (Heartbeat)', value: dateTime(st.last_seen_at) },
+        { label: 'Lần đồng bộ cuối', value: dateTime(st.last_sync_at) },
+        { label: 'Lỗi gần nhất', value: st.last_error ?? 'Bình thường', wide: true },
+      ],
+    },
+    auditSection(st.created_at, st.updated_at),
   ];
 }

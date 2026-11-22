@@ -257,7 +257,6 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
               code: 'TX001',
               full_name: 'Trần Văn Lái',
               phone: '0911223344',
-              department: 'Đội xe vận tải 1',
               position: 'driver',
               status: 'active',
               card_number: '2001234567',
@@ -291,7 +290,7 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await expect(row.getByText('Đang làm việc', { exact: true })).toBeVisible();
   });
 
-  test('6. Form thêm tài xế validate trường bắt buộc (Mã NV, Họ tên, Trạm xăng)', async ({ page }) => {
+  test('6. Form thêm tài xế bắt buộc nhập họ tên (mã tài xế do hệ thống tự sinh)', async ({ page }) => {
     await page.route('**/master/drivers*', async (route) => {
       await route.fulfill({
         status: 200,
@@ -303,15 +302,14 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await page.goto('/drivers');
 
     await page.getByTestId('btn-create-driver').click();
-    await expect(page.getByText('Thêm tài xế / nhân viên mới')).toBeVisible();
+    await expect(page.getByText('Thêm tài xế mới')).toBeVisible();
 
     await page.getByTestId('submit-driver-btn').click();
 
-    await expect(page.getByText('Vui lòng nhập mã nhân viên')).toBeVisible();
     await expect(page.getByText('Vui lòng nhập họ và tên')).toBeVisible();
   });
 
-  test('7. Modal Quản lý định danh hỗ trợ các tab Thẻ NFC, Khuôn mặt, Vân tay và Danh sách', async ({ page }) => {
+  test('7. Form sửa tài xế gộp thẻ NFC, ảnh khuôn mặt và vân tay', async ({ page }) => {
     await page.route('**/master/drivers*', async (route) => {
       await route.fulfill({
         status: 200,
@@ -372,24 +370,14 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await page.goto('/drivers');
 
     await page.getByTestId('driver-actions-TX001').click();
-    await page.getByTestId('credentials-driver-TX001').click();
+    await page.getByTestId('edit-driver-TX001').click();
 
-    await expect(page.getByRole('heading', { name: 'Phương thức xác thực' })).toBeVisible();
-    await expect(page.getByText('Trần Văn Lái').last()).toBeVisible();
-
-    // Kiểm tra các tabs
-    await expect(page.getByRole('tab', { name: /Thẻ NFC/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Khuôn mặt/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Vân tay/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Đã đăng ký/i })).toBeVisible();
-
-    // Tab Khuôn mặt: chọn ảnh (ảnh lớn được tự nén)
-    await page.getByRole('tab', { name: /Khuôn mặt/i }).click();
+    // Thẻ, ảnh khuôn mặt và vân tay nằm ngay trong form sửa tài xế
+    await expect(page.getByRole('heading', { name: /Cập nhật hồ sơ tài xế/ })).toBeVisible();
+    await expect(page.getByLabel('Số thẻ NFC')).toHaveValue('2001234567');
     await expect(page.getByText('Ảnh khuôn mặt', { exact: true })).toBeVisible();
-
-    // Tab Vân tay
-    await page.getByRole('tab', { name: /Vân tay/i }).click();
-    await expect(page.getByText('Mã mẫu vân tay', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Mã mẫu vân tay')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Gỡ thẻ' })).toBeVisible();
   });
 
   test('8. Phân quyền RBAC: Actor IT Kỹ thuật (chỉ xem) bị ẩn nút Thêm xe, Thêm tài xế', async ({ page }) => {

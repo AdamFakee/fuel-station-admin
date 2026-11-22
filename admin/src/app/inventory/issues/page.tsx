@@ -3,7 +3,7 @@ import { IssueTable } from '@/features/inventory/components/issue-table';
 
 export const metadata: Metadata = {
   title: 'Phiếu xuất điều chỉnh - Fuel Station Admin',
-  description: 'Quản lý phiếu xuất điều chuyển nội bộ, hao hụt bốc hơi và kiểm định cột bơm (BRD v1.6)',
+  description: 'Quản lý phiếu xuất điều chuyển nội bộ, hao hụt bốc hơi và kiểm định cột bơm',
 };
 
 export default function StockIssuesPage() {

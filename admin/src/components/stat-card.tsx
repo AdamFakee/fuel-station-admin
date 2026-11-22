@@ -22,10 +22,10 @@ interface StatCardProps {
 export function StatCard({ label, value, icon: Icon, tone = 'neutral', className }: StatCardProps) {
   const classes = TONE_CLASSES[tone];
   return (
-    <div className={cn('flex items-center justify-between gap-3 rounded-xl border bg-card px-5 py-4 shadow-xs', className)}>
+    <div className={cn('@container/stat flex items-center justify-between gap-3 rounded-xl border bg-card px-5 py-4 shadow-xs', className)}>
       <div className="min-w-0">
         <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
-        <p className={cn('mt-1 truncate text-2xl font-bold tabular-nums tracking-tight', classes.value)}>{value}</p>
+        <p className={cn('mt-1 whitespace-nowrap text-base font-bold leading-tight tabular-nums tracking-tight @[170px]/stat:text-lg @[200px]/stat:text-xl @[240px]/stat:text-2xl', classes.value)} title={typeof value === 'string' || typeof value === 'number' ? String(value) : undefined}>{value}</p>
       </div>
       <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', classes.icon)}>
         <Icon className="h-5 w-5" />

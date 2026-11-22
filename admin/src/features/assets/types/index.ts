@@ -82,6 +82,8 @@ export interface AccessTerminal {
   https: boolean;
   username: string;
   has_password: boolean;
+  /** Mật khẩu dạng che, chỉ lộ 3 ký tự cuối (vd `••••••123`). */
+  password_hint?: string;
   version: number;
   created_at: string;
   updated_at: string;

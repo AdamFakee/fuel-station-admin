@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { StockLedgerResponse } from '../types';
 
@@ -7,6 +7,8 @@ export interface StockLedgerParams {
   tank_id?: string;
   from_date?: string;
   to_date?: string;
+  page?: number;
+  page_size?: number;
 }
 
 export const reportKeys = {
@@ -16,7 +18,6 @@ export const reportKeys = {
   dispenses: (params?: object) => [...reportKeys.all, 'dispenses', params] as const,
   vehicleConsumption: (params?: object) => [...reportKeys.all, 'vehicle-consumption', params] as const,
   driverDispense: (params?: object) => [...reportKeys.all, 'driver-dispense', params] as const,
-  reconciliation: (params?: object) => [...reportKeys.all, 'reconciliation', params] as const,
 };
 
 export async function getStockLedgerReport(params?: StockLedgerParams): Promise<StockLedgerResponse> {
@@ -28,5 +29,7 @@ export function useStockLedgerReport(params?: StockLedgerParams) {
   return useQuery({
     queryKey: reportKeys.stockLedger(params),
     queryFn: () => getStockLedgerReport(params),
+    // Giữ bảng cũ trong lúc tải trang mới để không bị nháy trắng
+    placeholderData: keepPreviousData,
   });
 }

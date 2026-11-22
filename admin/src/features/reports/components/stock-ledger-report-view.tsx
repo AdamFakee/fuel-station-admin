@@ -6,16 +6,26 @@ import { StockLedgerResponse } from '../types';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { DetailDialog } from '@/components/detail-dialog';
+import Paginator from '@/components/paginator';
+import { rowClick } from '@/lib/row-click';
+import { stockLedgerLineDetail, stockSummaryDetail } from '@/lib/row-details';
+import { StockLedgerLineItem, StockLedgerSummaryItem } from '../types';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface StockLedgerReportViewProps {
   data?: StockLedgerResponse;
   isLoading: boolean;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number, pageSize: number) => void;
 }
 
-export function StockLedgerReportView({ data, isLoading }: StockLedgerReportViewProps) {
+export function StockLedgerReportView({ data, isLoading, page, pageSize, onPageChange }: StockLedgerReportViewProps) {
   // Hai bảng của báo cáo này xem lần lượt: tổng hợp theo bể, hoặc thẻ kho chi tiết từng giao dịch.
   const [view, setView] = React.useState<'summary' | 'ledger'>('summary');
+  const [summaryDetail, setSummaryDetail] = React.useState<StockLedgerSummaryItem | null>(null);
+  const [lineDetail, setLineDetail] = React.useState<StockLedgerLineItem | null>(null);
 
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Đang tải dữ liệu báo cáo...</div>;
@@ -64,7 +74,11 @@ export function StockLedgerReportView({ data, isLoading }: StockLedgerReportView
               ) : (
                 <>
                   {summaries.map((item) => (
-                    <TableRow key={item.tank_id}>
+                    <TableRow
+                      key={item.tank_id}
+                      className="hover:bg-muted/20"
+                      onClick={rowClick(() => setSummaryDetail(item))}
+                    >
                       <TableCell className="font-mono text-xs font-semibold">{item.tank_code}</TableCell>
                       <TableCell className="font-medium">{item.tank_name}</TableCell>
                       <TableCell>{item.fuel_type_name}</TableCell>
@@ -122,55 +136,77 @@ export function StockLedgerReportView({ data, isLoading }: StockLedgerReportView
       )}
 
       {view === 'ledger' && (
-        <div className="flex min-h-[240px] flex-1 flex-col rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="w-[70px] text-right tabular-nums">STT</TableHead>
-                <TableHead className="w-[180px] text-right tabular-nums">Thời gian</TableHead>
-                <TableHead className="w-[120px]">Bể chứa</TableHead>
-                <TableHead className="w-[140px]">Loại nghiệp vụ</TableHead>
-                <TableHead className="w-[140px]">Mã tham chiếu</TableHead>
-                <TableHead className="text-right tabular-nums text-emerald-600">Nhập (L)</TableHead>
-                <TableHead className="text-right tabular-nums text-blue-600">Xuất (L)</TableHead>
-                <TableHead className="text-right tabular-nums font-semibold">Tồn sau (L)</TableHead>
-                <TableHead>Diễn giải / Ghi chú</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ledger.length === 0 ? (
-                <TableEmptyRow colSpan={9} title="Không có giao dịch thẻ kho trong khoảng thời gian đã chọn." />
-              ) : (
-                ledger.map((line) => (
-                  <TableRow key={line.id}>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">{line.seq}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatDateTimeVN(line.occurred_at)}
-                    </TableCell>
-                    <TableCell className="font-medium">{line.tank_name}</TableCell>
-                    <TableCell>
-                      <Badge variant={line.in_liters > 0 ? 'default' : 'secondary'} className="font-normal text-xs">
-                        {line.kind_label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs font-semibold">{line.ref_code || '—'}</TableCell>
-                    <TableCell className="text-right tabular-nums text-emerald-600 font-medium">
-                      {line.in_liters > 0 ? formatNumberVN(line.in_liters, 2) : '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-blue-600 font-medium">
-                      {line.out_liters > 0 ? formatNumberVN(line.out_liters, 2) : '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-bold">
-                      {formatNumberVN(line.balance_liters, 2)}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{line.note || '—'}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          <div className="flex min-h-[240px] flex-1 flex-col rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-[70px] text-right tabular-nums">STT</TableHead>
+                  <TableHead className="w-[180px] text-right tabular-nums">Thời gian</TableHead>
+                  <TableHead className="w-[120px]">Bể chứa</TableHead>
+                  <TableHead className="w-[140px]">Loại nghiệp vụ</TableHead>
+                  <TableHead className="w-[140px]">Mã tham chiếu</TableHead>
+                  <TableHead className="text-right tabular-nums text-emerald-600">Nhập (L)</TableHead>
+                  <TableHead className="text-right tabular-nums text-blue-600">Xuất (L)</TableHead>
+                  <TableHead className="text-right tabular-nums font-semibold">Tồn sau (L)</TableHead>
+                  <TableHead>Diễn giải / Ghi chú</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ledger.length === 0 ? (
+                  <TableEmptyRow colSpan={9} title="Không có giao dịch thẻ kho trong khoảng thời gian đã chọn." />
+                ) : (
+                  ledger.map((line) => (
+                    <TableRow key={line.id} className="hover:bg-muted/20" onClick={rowClick(() => setLineDetail(line))}>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">{line.seq}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatDateTimeVN(line.occurred_at)}
+                      </TableCell>
+                      <TableCell className="font-medium">{line.tank_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={line.in_liters > 0 ? 'default' : 'secondary'} className="font-normal text-xs">
+                          {line.kind_label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs font-semibold">{line.ref_code || '—'}</TableCell>
+                      <TableCell className="text-right tabular-nums text-emerald-600 font-medium">
+                        {line.in_liters > 0 ? formatNumberVN(line.in_liters, 2) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-blue-600 font-medium">
+                        {line.out_liters > 0 ? formatNumberVN(line.out_liters, 2) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-bold">
+                        {formatNumberVN(line.balance_liters, 2)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{line.note || '—'}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <Paginator
+            className="shrink-0"
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={data?.ledger_total ?? 0}
+            onPageChange={onPageChange}
+          />
+        </>
       )}
+
+      <DetailDialog
+        open={summaryDetail !== null}
+        onOpenChange={(open) => !open && setSummaryDetail(null)}
+        title={summaryDetail?.tank_name ?? ''}
+        sections={summaryDetail ? stockSummaryDetail(summaryDetail) : []}
+      />
+      <DetailDialog
+        open={lineDetail !== null}
+        onOpenChange={(open) => !open && setLineDetail(null)}
+        title={lineDetail ? `${lineDetail.kind_label} · ${lineDetail.tank_name}` : ''}
+        sections={lineDetail ? stockLedgerLineDetail(lineDetail) : []}
+      />
     </div>
   );
 }

@@ -41,6 +41,8 @@ import { useDeleteVehicle } from '../api/delete-vehicle';
 
 interface VehicleTableProps {
   vehicles: VehicleListItem[];
+  /** Số thứ tự của dòng đầu trang (trang 2 với 15 dòng/trang là 15), để STT đánh tiếp qua các trang. */
+  startIndex?: number;
   isLoading: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
@@ -50,6 +52,7 @@ interface VehicleTableProps {
 
 export function VehicleTable({
   vehicles,
+  startIndex = 0,
   isLoading,
   canEdit = true,
   canDelete = true,
@@ -85,6 +88,7 @@ export function VehicleTable({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[60px] text-center">STT</TableHead>
               <TableHead className="w-[110px]">Mã xe</TableHead>
               <TableHead className="w-[140px]">Biển số</TableHead>
               <TableHead>Loại xe & Nhiên liệu</TableHead>
@@ -96,12 +100,13 @@ export function VehicleTable({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableEmptyRow colSpan={7} loading title="Đang tải danh sách phương tiện..." />
+              <TableEmptyRow colSpan={8} loading title="Đang tải danh sách phương tiện..." />
             ) : vehicles.length === 0 ? (
-              <TableEmptyRow colSpan={7} title="Không tìm thấy phương tiện nào phù hợp." />
+              <TableEmptyRow colSpan={8} title="Không tìm thấy phương tiện nào phù hợp." />
             ) : (
-              vehicles.map((v) => (
+              vehicles.map((v, index) => (
                 <TableRow key={v.id} data-testid={`vehicle-row-${v.code}`} onClick={rowClick(() => setDetail(v))}>
+                  <TableCell className="text-center text-muted-foreground tabular-nums">{startIndex + index + 1}</TableCell>
                   <TableCell className="font-mono font-medium text-primary">{v.code}</TableCell>
                   <TableCell>
                     <span className="inline-block rounded bg-secondary px-2 py-0.5 font-mono text-sm font-semibold tracking-wider text-secondary-foreground">
@@ -116,25 +121,23 @@ export function VehicleTable({
                   </TableCell>
                   <TableCell>
                     {v.card_number ? (
-                      <Badge
-                        variant="secondary"
-                        className="font-mono text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400"
-                      >
-                        <CreditCardIcon className="mr-1 h-3 w-3" />
-                        {v.card_number}
-                      </Badge>
+                      <span className="font-mono text-sm text-foreground">{v.card_number}</span>
                     ) : (
                       <span className="text-xs text-muted-foreground italic">Chưa gán thẻ</span>
                     )}
                   </TableCell>
                   <TableCell className="text-sm">
                     {v.branch_names && v.branch_names.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {v.branch_names.map((name) => (
-                          <Badge key={name} variant="secondary" className="text-xs font-normal">
-                            {name}
+                      <div className="flex flex-col items-start gap-1" title={v.branch_names.join(', ')}>
+                        {/* Tối đa hai dòng: tên trạm đầu, rồi "+N trạm" ở dòng dưới nếu còn trạm khác (vừa bằng chiều cao dòng có 2 dòng chữ). Rê chuột xem đủ danh sách */}
+                        <Badge variant="secondary" className="max-w-full text-xs font-normal">
+                          <span className="truncate">{v.branch_names[0]}</span>
+                        </Badge>
+                        {v.branch_names.length > 1 && (
+                          <Badge variant="outline" className="shrink-0 text-xs font-medium">
+                            +{v.branch_names.length - 1} trạm
                           </Badge>
-                        ))}
+                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-amber-600">Chưa được phép ở trạm xăng nào</span>

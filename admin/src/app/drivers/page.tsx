@@ -14,7 +14,6 @@ import { useCatalogsSummary } from '@/features/master/api/get-catalogs-summary';
 import { getDrivers, useDrivers } from '@/features/master/api/get-drivers';
 import { DriverTable } from '@/features/master/components/driver-table';
 import { DriverDialogForm } from '@/features/master/components/driver-dialog-form';
-import { DriverCredentialsDialog } from '@/features/master/components/driver-credentials-dialog';
 import { DriverListItem } from '@/features/master/types';
 import { useImportDrivers } from '@/features/master/api/import-drivers';
 import { driverImportColumns, driverImportRowLabel } from '@/features/master/lib/driver-import-columns';
@@ -79,10 +78,9 @@ export default function DriversPage() {
         filename: 'danh-sach-tai-xe',
         title: 'Danh sách tài xế',
         columns: [
-          { header: 'Mã NV', key: 'code', width: 14 },
+          { header: 'Mã tài xế', key: 'code', width: 14 },
           { header: 'Họ và tên', key: 'full_name', width: 28 },
           { header: 'Số điện thoại', key: 'phone', width: 16 },
-          { header: 'Bộ phận', key: 'department', width: 22 },
           { header: 'Thẻ NFC', key: 'card_number', width: 16 },
           { header: 'Khuôn mặt', key: 'face', width: 12 },
           { header: 'Vân tay', key: 'fingerprint', width: 12 },
@@ -92,7 +90,6 @@ export default function DriversPage() {
           code: driver.code,
           full_name: driver.full_name,
           phone: driver.phone ?? '',
-          department: driver.department ?? '',
           card_number: driver.card_number ?? '',
           face: driver.has_face ? 'Đã đăng ký' : '',
           fingerprint: driver.has_fingerprint ? 'Đã đăng ký' : '',
@@ -108,7 +105,6 @@ export default function DriversPage() {
 
   // Dialog states
   const [isFormOpen, setIsFormOpen] = React.useState(false);
-  const [isCredsOpen, setIsCredsOpen] = React.useState(false);
   const [selectedDriver, setSelectedDriver] = React.useState<DriverListItem | null>(null);
 
   const handleOpenCreate = () => {
@@ -119,11 +115,6 @@ export default function DriversPage() {
   const handleOpenEdit = (driver: DriverListItem) => {
     setSelectedDriver(driver);
     setIsFormOpen(true);
-  };
-
-  const handleOpenManageCredentials = (driver: DriverListItem) => {
-    setSelectedDriver(driver);
-    setIsCredsOpen(true);
   };
 
   return (
@@ -153,7 +144,7 @@ export default function DriversPage() {
           <div className="relative min-w-[240px] flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Tìm theo mã NV, họ tên, SĐT, phòng ban..."
+              placeholder="Tìm theo mã tài xế, họ tên, SĐT..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -190,7 +181,6 @@ export default function DriversPage() {
           canEdit={canEdit}
           canDelete={canDelete}
           onEdit={handleOpenEdit}
-          onManageCredentials={handleOpenManageCredentials}
         />
 
         {/* Pagination */}
@@ -218,8 +208,6 @@ export default function DriversPage() {
         />
         <DriverDialogForm open={isFormOpen} onOpenChange={setIsFormOpen} catalogs={catalogs} driver={selectedDriver} />
 
-        {/* Manage Credentials / Biometrics Modal */}
-        <DriverCredentialsDialog open={isCredsOpen} onOpenChange={setIsCredsOpen} driver={selectedDriver} />
       </div>
     </>
   );

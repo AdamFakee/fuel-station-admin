@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { DispenseReportResponse } from '../types';
 import { reportKeys } from './get-stock-ledger-report';
@@ -25,5 +25,6 @@ export function useDispensesReport(params?: DispenseReportParams) {
   return useQuery({
     queryKey: reportKeys.dispenses(params),
     queryFn: () => getDispensesReport(params),
+    placeholderData: keepPreviousData,
   });
 }

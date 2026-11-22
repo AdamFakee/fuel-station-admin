@@ -3,7 +3,7 @@ import { ReceiptTable } from '@/features/inventory/components/receipt-table';
 
 export const metadata: Metadata = {
   title: 'Phiếu nhập bể - Fuel Station Admin',
-  description: 'Quản lý phiếu nhập nhiên liệu vào bể chứa theo đơn vị Lít và kiểm soát phê duyệt kép (BRD v1.6)',
+  description: 'Quản lý phiếu nhập nhiên liệu vào bể chứa theo đơn vị Lít và kiểm soát phê duyệt kép',
 };
 
 export default function StockReceiptsPage() {

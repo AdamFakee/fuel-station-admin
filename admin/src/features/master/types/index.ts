@@ -96,7 +96,6 @@ export interface DriverListItem {
   code: string;
   full_name: string;
   phone?: string;
-  department?: string;
   status: 'active' | 'blocked' | 'inactive';
   valid_from?: string;
   valid_to?: string;
@@ -115,10 +114,8 @@ export interface DriverDetail extends DriverListItem {
 }
 
 export interface CreateDriverInput {
-  code: string;
   full_name: string;
   phone?: string;
-  department?: string;
   status?: 'active' | 'blocked' | 'inactive';
   valid_from?: string;
   valid_to?: string;
@@ -129,7 +126,6 @@ export interface CreateDriverInput {
 export interface UpdateDriverInput {
   full_name: string;
   phone?: string;
-  department?: string;
   valid_from?: string;
   valid_to?: string;
   note?: string;
@@ -140,5 +136,4 @@ export interface DriverListParams {
   page_size?: number;
   q?: string;
   status?: string;
-  department?: string;
 }

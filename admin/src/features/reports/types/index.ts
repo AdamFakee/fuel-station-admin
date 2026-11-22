@@ -33,6 +33,10 @@ export interface StockLedgerLineItem {
 export interface StockLedgerResponse {
   summary: StockLedgerSummaryItem[];
   ledger: StockLedgerLineItem[];
+  /** Tổng số dòng thẻ kho khớp bộ lọc (không chỉ trang đang xem). */
+  ledger_total: number;
+  ledger_page: number;
+  ledger_page_size: number;
 }
 
 export interface ReceiptReportItem {
@@ -98,10 +102,6 @@ export interface VehicleConsumptionItem {
   type_name: string | null;
   session_count: number;
   total_dispensed_liters: number;
-  quota_liters: number | null;
-  quota_period: string | null;
-  variance_liters: number | null;
-  status: 'normal' | 'over_quota' | 'no_quota';
 }
 
 export interface VehicleConsumptionResponse {
@@ -129,44 +129,12 @@ export interface DriverDispenseResponse {
   total_dispensed_liters: number;
 }
 
-export interface ReconciliationReportItem {
-  id: string;
-  period_date: string;
-  branch_name: string;
-  tank_name: string;
-  tank_code: string;
-  fuel_type_name: string;
-  opening_liters: number;
-  receipts_liters: number;
-  dispensed_liters: number;
-  other_issues_liters: number;
-  book_closing_liters: number;
-  measured_liters: number | null;
-  pump_totalizer_liters: number | null;
-  variance_liters: number | null;
-  variance_pct: number | null;
-  tolerance_pct: number;
-  status: 'open' | 'matched' | 'alert' | 'confirmed';
-  measured_by_name: string | null;
-  confirmed_by_name: string | null;
-}
-
-export interface ReconciliationReportResponse {
-  items: ReconciliationReportItem[];
-  total_count: number;
-  matched_count: number;
-  alert_count: number;
-  confirmed_count: number;
-  total_variance_liters: number;
-}
-
 export type ReportTemplateType =
   | 'stock-ledger'
   | 'receipts'
   | 'dispenses'
   | 'vehicle-consumption'
-  | 'driver-dispense'
-  | 'reconciliation';
+  | 'driver-dispense';
 
 export interface ReportFilterState {
   branchId?: string;

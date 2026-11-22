@@ -30,12 +30,10 @@ import {
   PencilSquareIcon,
   LockClosedIcon,
   LockOpenIcon,
-  IdentificationIcon,
   TrashIcon,
-  UserCircleIcon,
   FingerPrintIcon,
-  CreditCardIcon,
 } from '@heroicons/react/24/outline';
+import { FaceThumbnail } from '@/components/face-thumbnail';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DriverListItem } from '../types';
 import { useUpdateDriverStatus } from '../api/update-driver-status';
@@ -47,7 +45,6 @@ interface DriverTableProps {
   canEdit?: boolean;
   canDelete?: boolean;
   onEdit: (driver: DriverListItem) => void;
-  onManageCredentials: (driver: DriverListItem) => void;
 }
 
 export function DriverTable({
@@ -56,7 +53,6 @@ export function DriverTable({
   canEdit = true,
   canDelete = true,
   onEdit,
-  onManageCredentials,
 }: DriverTableProps) {
   const [detail, setDetail] = React.useState<DriverListItem | null>(null);
   const updateStatus = useUpdateDriverStatus();
@@ -100,10 +96,9 @@ export function DriverTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[110px]">Mã NV</TableHead>
+              <TableHead className="w-[110px]">Mã tài xế</TableHead>
               <TableHead>Họ và tên</TableHead>
               <TableHead className="w-[120px]">Số điện thoại</TableHead>
-              <TableHead>Bộ phận</TableHead>
               <TableHead>Thẻ NFC</TableHead>
               <TableHead className="w-[120px]">Khuôn mặt</TableHead>
               <TableHead className="w-[120px]">Vân tay</TableHead>
@@ -113,40 +108,25 @@ export function DriverTable({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableEmptyRow colSpan={9} loading title="Đang tải danh sách tài xế & nhân viên..." />
+              <TableEmptyRow colSpan={8} loading title="Đang tải danh sách tài xế..." />
             ) : drivers.length === 0 ? (
-              <TableEmptyRow colSpan={9} title="Không tìm thấy tài xế nào phù hợp." />
+              <TableEmptyRow colSpan={8} title="Không tìm thấy tài xế nào phù hợp." />
             ) : (
               drivers.map((d) => (
                 <TableRow key={d.id} data-testid={`driver-row-${d.code}`} onClick={rowClick(() => setDetail(d))}>
                   <TableCell className="font-mono font-medium text-primary">{d.code}</TableCell>
                   <TableCell className="font-medium">{d.full_name}</TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">{d.phone || '-'}</TableCell>
-                  <TableCell className="text-sm">
-                    {d.department || <span className="text-muted-foreground">-</span>}
-                  </TableCell>
                   <TableCell>
                     {d.card_number ? (
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30"
-                      >
-                        <CreditCardIcon className="mr-1 h-3 w-3" />
-                        {d.card_number}
-                      </Badge>
+                      <span className="font-mono text-sm text-foreground">{d.card_number}</span>
                     ) : (
                       <span className="text-[11px] text-muted-foreground italic">Chưa có thẻ</span>
                     )}
                   </TableCell>
                   <TableCell>
                     {d.has_face ? (
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30"
-                      >
-                        <UserCircleIcon className="mr-1 h-3 w-3" />
-                        Đã đăng ký
-                      </Badge>
+                      <FaceThumbnail fileId={d.face_file_id} size={36} />
                     ) : (
                       <span className="text-[11px] text-muted-foreground italic">Chưa có</span>
                     )}
@@ -185,13 +165,6 @@ export function DriverTable({
                               <DropdownMenuItem onClick={() => onEdit(d)} data-testid={`edit-driver-${d.code}`}>
                                 <PencilSquareIcon className="mr-2 h-4 w-4" />
                                 Sửa hồ sơ
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => onManageCredentials(d)}
-                                data-testid={`credentials-driver-${d.code}`}
-                              >
-                                <IdentificationIcon className="mr-2 h-4 w-4" />
-                                Thẻ & Sinh trắc học
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => setStatusConfirmTarget(d)}

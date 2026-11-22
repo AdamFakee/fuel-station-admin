@@ -216,6 +216,7 @@ export default function VehiclesPage() {
         {/* Data Table */}
         <VehicleTable
           vehicles={data?.items || []}
+          startIndex={(page - 1) * pageSize}
           isLoading={isLoading}
           canEdit={canEdit}
           canDelete={canDelete}

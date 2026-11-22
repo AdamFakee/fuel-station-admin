@@ -19,22 +19,8 @@ function parseDate(raw: RawCell): string {
 
 /** Các cột của file Excel nhập tài xế. Thứ tự là thứ tự cột trong file mẫu. */
 export const driverImportColumns: ImportColumn<CreateDriverInput>[] = [
-  {
-    key: 'code',
-    header: 'Mã NV',
-    required: true,
-    width: 14,
-    example: 'TX001',
-    placeholder: 'VD: TX001',
-    hint: 'Chữ và số viết liền, tối đa 32 ký tự. Dùng làm mã nhân viên trên máy chấm công.',
-    parse: (raw) => {
-      if (!/^[A-Za-z0-9]{1,32}$/.test(raw)) throw new Error('Chỉ gồm chữ và số viết liền, tối đa 32 ký tự');
-      return raw.toUpperCase();
-    },
-  },
   { key: 'full_name', header: 'Họ và tên', required: true, width: 28, example: 'Nguyễn Văn A', placeholder: 'VD: Nguyễn Văn A' },
   { key: 'phone', header: 'Số điện thoại', width: 16, example: '0912345678' },
-  { key: 'department', header: 'Bộ phận', width: 22, example: 'Đội xe vận tải 1' },
   {
     key: 'card_number',
     header: 'Số thẻ NFC',
@@ -65,12 +51,8 @@ export const driverImportColumns: ImportColumn<CreateDriverInput>[] = [
   { key: 'note', header: 'Ghi chú', width: 30 },
 ];
 
-/** Gọi một dòng là ai: "Nguyễn Văn A (Mã NV: TX001)". */
+/** Gọi một dòng là ai: tên tài xế (mã nhân viên do hệ thống tự sinh nên không có trong file). */
 export function driverImportRowLabel(cells: Record<string, string>): string {
   const name = cells.full_name?.trim();
-  const code = cells.code?.trim();
-  if (name && code) return `${name} (Mã NV: ${code})`;
-  if (name) return `${name} (chưa có mã NV)`;
-  if (code) return `Mã NV ${code} (chưa có họ tên)`;
-  return '';
+  return name ? name : '';
 }

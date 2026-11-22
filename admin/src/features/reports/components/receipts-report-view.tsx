@@ -7,6 +7,9 @@ import { StatusBadge } from '@/components/status-badge';
 import React from 'react';
 import { ReceiptReportResponse } from '../types';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
+import { ReceiptDetailDialog } from '@/features/inventory/components/receipt-detail-dialog';
+import { useReceipt } from '@/features/inventory/api/get-receipt';
+import { rowClick } from '@/lib/row-click';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface ReceiptsReportViewProps {
@@ -14,7 +17,15 @@ interface ReceiptsReportViewProps {
   isLoading: boolean;
 }
 
+/** Tải phiếu đầy đủ theo id rồi mở hộp thoại chi tiết phiếu nhập dùng chung. */
+function ReceiptDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const { data } = useReceipt(id ?? '', id !== null);
+  return <ReceiptDetailDialog open={id !== null && !!data} onOpenChange={(open) => !open && onClose()} receipt={data ?? null} />;
+}
+
 export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps) {
+  const [detailId, setDetailId] = React.useState<string | null>(null);
+
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Đang tải dữ liệu bảng kê phiếu nhập...</div>;
   }
@@ -92,7 +103,7 @@ export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps)
               <TableEmptyRow colSpan={11} title="Không có phiếu nhập nào khớp với điều kiện lọc." />
             ) : (
               items.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className="hover:bg-muted/20" onClick={rowClick(() => setDetailId(row.id))}>
                   <TableCell className="font-mono text-xs font-semibold">{row.receipt_code}</TableCell>
                   <TableCell className="text-right tabular-nums text-xs">{formatDateTimeVN(row.received_at)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
@@ -126,6 +137,8 @@ export function ReceiptsReportView({ data, isLoading }: ReceiptsReportViewProps)
           </TableBody>
         </Table>
       </div>
+
+      <ReceiptDetail id={detailId} onClose={() => setDetailId(null)} />
     </div>
   );
 }

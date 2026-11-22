@@ -296,7 +296,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
             {isEditing ? `Chỉnh sửa phiếu nhập ${receipt?.code}` : 'Lập phiếu nhập bể'}
           </DialogTitle>
           <DialogDescription>
-            Ghi nhận số lượng nhiên liệu thực nhập vào bể chứa theo đơn vị Lít. Không áp dụng giá tiền (BRD v1.6).
+            Ghi nhận lượng nhiên liệu nhập vào bể chứa, tính bằng lít.
           </DialogDescription>
         </DialogHeader>
 
@@ -342,7 +342,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
               </div>
 
               <div>
-                <Label htmlFor="tanker_plate">Biển số xe bồn</Label>
+                <Label htmlFor="tanker_plate">Biển số xe bồn chở hàng</Label>
                 <Input
                   id="tanker_plate"
                   placeholder="VD: 29C-123.45"
@@ -353,7 +353,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
               </div>
 
               <div>
-                <Label htmlFor="document_no">Số hóa đơn / Phiếu xuất NCC</Label>
+                <Label htmlFor="document_no">Số hóa đơn của nhà cung cấp</Label>
                 <Input
                   id="document_no"
                   placeholder="VD: HĐ-00129"
@@ -367,7 +367,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
                 <Label htmlFor="note">Ghi chú</Label>
                 <Input
                   id="note"
-                  placeholder="Ghi chú đợt giao..."
+                  placeholder="Ghi chú về lần giao hàng này..."
                   className="mt-1.5"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
@@ -379,9 +379,9 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-semibold">Danh sách bể nhận hàng *</h4>
+                  <h4 className="text-sm font-semibold">Bể nhận nhiên liệu *</h4>
                   <p className="text-xs text-muted-foreground">
-                    Chọn bể nhận và nhập số Lít theo chứng từ & thực tế
+                    Mỗi dòng là một bể. Nhập số lít ghi trên hóa đơn và số lít thực tế nhận được.
                   </p>
                 </div>
                 <Button
@@ -450,7 +450,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
                           </div>
 
                           <div>
-                            <Label className="text-xs">Chứng từ (Lít) *</Label>
+                            <Label className="text-xs">Số lít theo hóa đơn *</Label>
                             <Input
                               type="number"
                               min="0"
@@ -469,7 +469,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
                           </div>
 
                           <div>
-                            <Label className="text-xs font-semibold">Thực nhập (Lít) *</Label>
+                            <Label className="text-xs font-semibold">Số lít thực nhận *</Label>
                             <Input
                               type="number"
                               min="0"
@@ -491,7 +491,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
                         {/* Variance and Capacity Feedback */}
                         <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
                           <div className="flex items-center gap-2">
-                            <span>Chênh lệch:</span>
+                            <span>Chênh lệch (thực nhận trừ hóa đơn):</span>
                             <span
                               className={`font-semibold tabular-nums ${
                                 variance < 0
@@ -530,14 +530,14 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
 
             {/* Total Summary */}
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-foreground">Tổng cộng đợt nhập:</span>
+              <span className="font-medium text-foreground">Tổng cộng:</span>
               <div className="flex items-center gap-6">
                 <div>
-                  <span className="text-xs text-muted-foreground mr-1">Chứng từ:</span>
+                  <span className="text-xs text-muted-foreground mr-1">Theo hóa đơn:</span>
                   <span className="font-semibold tabular-nums">{formatNumberVN(totalDocumentLiters)} L</span>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground mr-1">Thực nhập:</span>
+                  <span className="text-xs text-muted-foreground mr-1">Thực nhận:</span>
                   <span className="font-bold text-primary tabular-nums text-base">{formatNumberVN(totalActualLiters)} L</span>
                 </div>
                 <div>

@@ -11,14 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import Paginator from '@/components/paginator';
-import {
-  MagnifyingGlassIcon,
-  CheckCircleIcon,
-  ShieldExclamationIcon,
-  ListBulletIcon,
-  XCircleIcon,
-  BeakerIcon,
-} from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { CircleCheckBigIcon, CircleXIcon, ClipboardListIcon, DropletsIcon, ShieldBanIcon } from 'lucide-react';
 import { StatCard } from '@/components/stat-card';
 import { formatNumberVN } from '@/lib/format';
 import { useBranches } from '@/features/iam/api/get-branches';
@@ -93,21 +87,21 @@ export default function DispenseSessionsPage() {
     <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
         {/* Thẻ số liệu tổng quan */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Tổng phiên" value={summary ? formatNumberVN(summary.total_sessions) : '—'} icon={ListBulletIcon} tone="primary" />
-          <StatCard label="Hoàn thành" value={summary ? formatNumberVN(summary.completed_sessions) : '—'} icon={CheckCircleIcon} tone="success" />
+          <StatCard label="Tổng phiên" value={summary ? formatNumberVN(summary.total_sessions) : '—'} icon={ClipboardListIcon} tone="primary" />
+          <StatCard label="Hoàn thành" value={summary ? formatNumberVN(summary.completed_sessions) : '—'} icon={CircleCheckBigIcon} tone="success" />
           <StatCard
             label="Đã hủy / lỗi"
             value={summary ? formatNumberVN(summary.cancelled_sessions + summary.failed_sessions) : '—'}
-            icon={XCircleIcon}
+            icon={CircleXIcon}
             tone="neutral"
           />
           <StatCard
-            label="Tổng thể tích cấp"
+            label="Tổng lít cấp"
             value={summary ? `${formatNumberVN(summary.total_dispensed_liters, 2)} L` : '—'}
-            icon={BeakerIcon}
+            icon={DropletsIcon}
             tone="primary"
           />
-          <StatCard label="Bị từ chối" value={summary ? formatNumberVN(summary.rejected_auth_count) : '—'} icon={ShieldExclamationIcon} tone="danger" />
+          <StatCard label="Bị từ chối" value={summary ? formatNumberVN(summary.rejected_auth_count) : '—'} icon={ShieldBanIcon} tone="danger" />
         </div>
 
         {/* Main Tabs Container */}

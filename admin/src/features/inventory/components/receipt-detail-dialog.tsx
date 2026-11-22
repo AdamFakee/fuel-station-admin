@@ -67,7 +67,7 @@ export function ReceiptDetailDialog({
             </div>
           </div>
           <DialogDescription>
-            Chi tiết đợt nhập bể, thông số chênh lệch thực tế và lịch sử phê duyệt kép BRD v1.6.
+            Chi tiết lượng nhập, chênh lệch thực tế và lịch sử duyệt phiếu.
           </DialogDescription>
         </DialogHeader>
 
@@ -148,8 +148,8 @@ export function ReceiptDetailDialog({
                   <TableRow>
                     <TableHead>Bể chứa</TableHead>
                     <TableHead>Nhiên liệu</TableHead>
-                    <TableHead className="text-right">Chứng từ (L)</TableHead>
-                    <TableHead className="text-right font-semibold">Thực nhập (L)</TableHead>
+                    <TableHead className="text-right">Theo hóa đơn (L)</TableHead>
+                    <TableHead className="text-right font-semibold">Thực nhận (L)</TableHead>
                     <TableHead className="text-right">Chênh lệch (L)</TableHead>
                   </TableRow>
                 </TableHeader>
