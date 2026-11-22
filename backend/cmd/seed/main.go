@@ -104,6 +104,8 @@ func main() {
 		id, name, email, phone, password, role string
 		branchID                               string // rỗng = xem toàn công ty
 	}{
+		// Quản trị hệ thống (bên triển khai): vai trò cao nhất, quản lý được cả tài khoản Quản lý.
+		{"33333333-3333-3333-3333-333333333337", "Lê Hoàng Nam", "quantri@petrovn.vn", "0908552310", "Admin@123456", "ADMIN", ""},
 		{adminUserID, "Nguyễn Văn Quản Lý", "admin@petrovn.vn", "0901234567", "Admin@123456", "MANAGER", ""},
 		{accountantID, "Trần Thị Thu Hà", "ketoan@petrovn.vn", "0912345678", "Accountant@123456", "ACCOUNTANT", ""},
 		{itUserID, "Phạm Minh Tuấn", "it@petrovn.vn", "0987654321", "TechIT@123456", "IT", ""},

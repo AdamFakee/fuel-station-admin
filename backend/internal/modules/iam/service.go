@@ -54,6 +54,34 @@ func getTenantAndActor(ctx context.Context) (tenantID, actorUserID uuid.UUID, ac
 	return tID, uID, p.RoleCode, nil
 }
 
+// roleAdmin là vai trò cao nhất ("Quản trị hệ thống"), chỉ người cùng vai trò mới được tạo/sửa/khóa/xóa.
+const roleAdmin = "ADMIN"
+
+// isTopRole: các vai trò quản trị phải luôn còn ít nhất một tài khoản hoạt động.
+func isTopRole(code string) bool { return code == "MANAGER" || code == roleAdmin }
+
+func roleName(code string) string {
+	if code == roleAdmin {
+		return "Quản trị hệ thống"
+	}
+	return "Quản lý"
+}
+
+// actorIsAdmin cho biết người đang thao tác có vai trò Quản trị hệ thống hay không.
+func actorIsAdmin(ctx context.Context) bool {
+	p, ok := authz.FromContext(ctx)
+	return ok && p.RoleCode == roleAdmin
+}
+
+// ensureCanTouchRole chặn người không phải Quản trị hệ thống động tới tài khoản hoặc vai trò Quản trị hệ thống
+// (nếu không, Quản lý có thể tự nâng quyền hoặc khóa người cấp trên).
+func ensureCanTouchRole(ctx context.Context, roleCode string) error {
+	if roleCode == roleAdmin && !actorIsAdmin(ctx) {
+		return fmt.Errorf("%w: chỉ tài khoản Quản trị hệ thống mới được thao tác với tài khoản Quản trị hệ thống", apperr.ErrForbidden)
+	}
+	return nil
+}
+
 // ------------------------------------------------------------------------------------------------
 // USER SERVICES
 // ------------------------------------------------------------------------------------------------
@@ -306,10 +334,13 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 	}
 
 	// Verify role exists in tenant
-	var roleExists bool
-	err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM station.role WHERE tenant_id = $1 AND id = $2)`, tenantID, roleUUID).Scan(&roleExists)
-	if err != nil || !roleExists {
+	var newRoleCode string
+	err = s.pool.QueryRow(ctx, `SELECT code FROM station.role WHERE tenant_id = $1 AND id = $2`, tenantID, roleUUID).Scan(&newRoleCode)
+	if err != nil {
 		return nil, fmt.Errorf("%w: vai trò không tồn tại trong hệ thống", apperr.ErrNotFound)
+	}
+	if err := ensureCanTouchRole(ctx, newRoleCode); err != nil {
+		return nil, err
 	}
 
 	// Email là tài khoản đăng nhập nên phải duy nhất.
@@ -459,22 +490,32 @@ func (s *Service) UpdateUser(ctx context.Context, idStr string, req UpdateUserRe
 		return nil, fmt.Errorf("query existing user: %w", err)
 	}
 
-	// SAFETY RULE: Prevent self-demotion from MANAGER
-	if userUUID == actorUserID && oldRoleCode == "MANAGER" && oldRoleID != newRoleUUID {
-		return nil, fmt.Errorf("%w: bạn không thể tự hạ quyền Quản lý của chính mình", apperr.ErrForbidden)
+	if err := ensureCanTouchRole(ctx, oldRoleCode); err != nil {
+		return nil, err
+	}
+	var newRoleCode string
+	if err := s.pool.QueryRow(ctx, `SELECT code FROM station.role WHERE tenant_id = $1 AND id = $2`, tenantID, newRoleUUID).Scan(&newRoleCode); err == nil {
+		if err := ensureCanTouchRole(ctx, newRoleCode); err != nil {
+			return nil, err
+		}
+	}
+
+	// SAFETY RULE: Prevent self-demotion from a top role
+	if userUUID == actorUserID && isTopRole(oldRoleCode) && oldRoleID != newRoleUUID {
+		return nil, fmt.Errorf("%w: bạn không thể tự hạ quyền của chính mình", apperr.ErrForbidden)
 	}
 
 	// SAFETY RULE: Prevent demoting the last active MANAGER in tenant
-	if oldRoleCode == "MANAGER" && oldRoleID != newRoleUUID {
+	if isTopRole(oldRoleCode) && oldRoleID != newRoleUUID {
 		var activeManagerCount int
 		err = s.pool.QueryRow(ctx, `
 			SELECT COUNT(*)
 			FROM station.app_user u
 			JOIN station.role r ON r.id = u.role_id AND r.tenant_id = u.tenant_id
-			WHERE u.tenant_id = $1 AND r.code = 'MANAGER' AND u.status = 'active' AND u.deleted_at IS NULL
-		`, tenantID).Scan(&activeManagerCount)
+			WHERE u.tenant_id = $1 AND r.code = $2 AND u.status = 'active' AND u.deleted_at IS NULL
+		`, tenantID, oldRoleCode).Scan(&activeManagerCount)
 		if err == nil && activeManagerCount <= 1 {
-			return nil, fmt.Errorf("%w: không thể thay đổi vai trò của Quản lý duy nhất đang hoạt động", apperr.ErrForbidden)
+			return nil, fmt.Errorf("%w: không thể thay đổi vai trò của tài khoản %s duy nhất đang hoạt động", apperr.ErrForbidden, roleName(oldRoleCode))
 		}
 	}
 
@@ -606,6 +647,10 @@ func (s *Service) UpdateUserStatus(ctx context.Context, idStr, newStatus string)
 		return fmt.Errorf("query user: %w", err)
 	}
 
+	if err := ensureCanTouchRole(ctx, roleCode); err != nil {
+		return err
+	}
+
 	if currentStatus == newStatus {
 		return nil
 	}
@@ -618,16 +663,16 @@ func (s *Service) UpdateUserStatus(ctx context.Context, idStr, newStatus string)
 		}
 
 		// 2. Cannot lock last active manager
-		if roleCode == "MANAGER" {
+		if isTopRole(roleCode) {
 			var activeManagerCount int
 			err = s.pool.QueryRow(ctx, `
 				SELECT COUNT(*)
 				FROM station.app_user u
 				JOIN station.role r ON r.id = u.role_id AND r.tenant_id = u.tenant_id
-				WHERE u.tenant_id = $1 AND r.code = 'MANAGER' AND u.status = 'active' AND u.deleted_at IS NULL
-			`, tenantID).Scan(&activeManagerCount)
+				WHERE u.tenant_id = $1 AND r.code = $2 AND u.status = 'active' AND u.deleted_at IS NULL
+			`, tenantID, roleCode).Scan(&activeManagerCount)
 			if err == nil && activeManagerCount <= 1 {
-				return fmt.Errorf("%w: không thể khóa tài khoản Quản lý duy nhất đang hoạt động", apperr.ErrForbidden)
+				return fmt.Errorf("%w: không thể khóa tài khoản %s duy nhất đang hoạt động", apperr.ErrForbidden, roleName(roleCode))
 			}
 		}
 	}
@@ -700,17 +745,21 @@ func (s *Service) ResetPassword(ctx context.Context, idStr, newPassword string) 
 		return fmt.Errorf("%w: mật khẩu mới phải từ 8 ký tự trở lên", apperr.ErrInvalidInput)
 	}
 
-	var employeeCode, fullName string
+	var employeeCode, fullName, targetRoleCode string
 	err = s.pool.QueryRow(ctx, `
-		SELECT employee_code, full_name
-		FROM station.app_user
-		WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
-	`, tenantID, userUUID).Scan(&employeeCode, &fullName)
+		SELECT u.employee_code, u.full_name, r.code
+		FROM station.app_user u
+		JOIN station.role r ON r.id = u.role_id AND r.tenant_id = u.tenant_id
+		WHERE u.tenant_id = $1 AND u.id = $2 AND u.deleted_at IS NULL
+	`, tenantID, userUUID).Scan(&employeeCode, &fullName, &targetRoleCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperr.ErrNotFound
 		}
 		return fmt.Errorf("query user: %w", err)
+	}
+	if err := ensureCanTouchRole(ctx, targetRoleCode); err != nil {
+		return err
 	}
 
 	hashedPassword, err := crypto.HashPassword(newPassword)
@@ -797,17 +846,21 @@ func (s *Service) DeleteUser(ctx context.Context, idStr string) error {
 		return fmt.Errorf("query user: %w", err)
 	}
 
-	// SAFETY RULE: cannot delete last active MANAGER
-	if roleCode == "MANAGER" {
+	if err := ensureCanTouchRole(ctx, roleCode); err != nil {
+		return err
+	}
+
+	// SAFETY RULE: cannot delete last active top-role user
+	if isTopRole(roleCode) {
 		var activeManagerCount int
 		err = s.pool.QueryRow(ctx, `
 			SELECT COUNT(*)
 			FROM station.app_user u
 			JOIN station.role r ON r.id = u.role_id AND r.tenant_id = u.tenant_id
-			WHERE u.tenant_id = $1 AND r.code = 'MANAGER' AND u.status = 'active' AND u.deleted_at IS NULL
-		`, tenantID).Scan(&activeManagerCount)
+			WHERE u.tenant_id = $1 AND r.code = $2 AND u.status = 'active' AND u.deleted_at IS NULL
+		`, tenantID, roleCode).Scan(&activeManagerCount)
 		if err == nil && activeManagerCount <= 1 {
-			return fmt.Errorf("%w: không thể xóa tài khoản Quản lý duy nhất đang hoạt động", apperr.ErrForbidden)
+			return fmt.Errorf("%w: không thể xóa tài khoản %s duy nhất đang hoạt động", apperr.ErrForbidden, roleName(roleCode))
 		}
 	}
 
@@ -873,11 +926,12 @@ func (s *Service) ListRoles(ctx context.Context) ([]RoleListItem, error) {
 		LEFT JOIN station.app_user u ON u.role_id = r.id AND u.tenant_id = r.tenant_id
 		LEFT JOIN station.role_permission rp ON rp.role_id = r.id
 		WHERE r.tenant_id = $1
+		  AND ($2 OR r.code <> 'ADMIN')
 		GROUP BY r.id
 		ORDER BY r.is_system DESC, r.code ASC
 	`
 
-	rows, err := s.pool.Query(ctx, query, tenantID)
+	rows, err := s.pool.Query(ctx, query, tenantID, actorIsAdmin(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("list roles: %w", err)
 	}
@@ -1171,7 +1225,7 @@ func (s *Service) DeleteRole(ctx context.Context, idStr string) error {
 
 	// SAFETY RULE: cannot delete system role
 	if isSystem {
-		return fmt.Errorf("%w: không thể xóa các vai trò hệ thống mặc định (MANAGER, ACCOUNTANT, IT)", apperr.ErrForbidden)
+		return fmt.Errorf("%w: không thể xóa các vai trò hệ thống mặc định (ADMIN, MANAGER, ACCOUNTANT, IT)", apperr.ErrForbidden)
 	}
 
 	// SAFETY RULE: cannot delete role if assigned to active users
