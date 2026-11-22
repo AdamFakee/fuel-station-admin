@@ -105,7 +105,8 @@ export function StockLedgerReportView({ data, isLoading, page, pageSize, onPageC
                     </TableRow>
                   ))}
                   {/* Hàng tổng cộng */}
-                  <TableRow className="bg-muted/70 font-semibold border-t-2">
+                  {/* Dính đáy khung cuộn để dòng tổng luôn hiện khi cuộn danh sách bể */}
+                  <TableRow className="font-semibold [&>td]:sticky [&>td]:bottom-0 [&>td]:z-[2] [&>td]:border-t-2 [&>td]:bg-muted">
                     <TableCell colSpan={5} className="text-right font-bold">
                       TỔNG CỘNG (LÍT):
                     </TableCell>

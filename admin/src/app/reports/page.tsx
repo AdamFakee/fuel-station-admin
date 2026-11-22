@@ -8,7 +8,9 @@ import { useReceiptsReport } from '@/features/reports/api/get-receipts-report';
 import { getDispensesReport, useDispensesReport } from '@/features/reports/api/get-dispenses-report';
 import { useVehicleConsumptionReport } from '@/features/reports/api/get-vehicle-consumption-report';
 import { useDriverDispenseReport } from '@/features/reports/api/get-driver-dispense-report';
-import { exportReportToExcel } from '@/features/reports/lib/export-excel';
+import { exportReportToExcel, type ExportExcelOptions } from '@/features/reports/lib/export-excel';
+import { exportReportToPdf } from '@/features/reports/lib/export-pdf';
+import { toast } from 'sonner';
 import { ReportFilters } from '@/features/reports/components/report-filters';
 import { StockLedgerReportView } from '@/features/reports/components/stock-ledger-report-view';
 import { ReceiptsReportView } from '@/features/reports/components/receipts-report-view';
@@ -17,7 +19,7 @@ import { VehicleConsumptionReportView } from '@/features/reports/components/vehi
 import { DriverDispenseReportView } from '@/features/reports/components/driver-dispense-report-view';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileSpreadsheet, Printer } from 'lucide-react';
+import { FileDown, FileSpreadsheet, Printer } from 'lucide-react';
 import { formatNumberVN, formatDateTimeVN, formatDateVN } from '@/lib/format';
 
 export default function ReportsPage() {
@@ -82,11 +84,8 @@ export default function ReportsPage() {
     to_date: filters.toDate,
   });
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleExportExcel = async () => {
+  /** Dựng dữ liệu của báo cáo đang xem, dùng chung cho Excel, PDF và in. */
+  const buildReport = async (): Promise<ExportExcelOptions | null> => {
     const dateRangeStr = `${filters.fromDate ? formatDateVN(filters.fromDate) : 'Đầu kỳ'} - ${
       filters.toDate ? formatDateVN(filters.toDate) : 'Hiện tại'
     }`;
@@ -117,14 +116,13 @@ export default function ReportsPage() {
           adjust_liters: formatNumberVN(s.adjust_liters, 2),
           closing_liters: formatNumberVN(s.closing_liters, 2),
         }));
-        await exportReportToExcel({
+        return {
           filename: 'Bao_cao_nhap_xuat_ton_be',
           title: 'BÁO CÁO TỔNG HỢP NHẬP – XUẤT – TỒN VÀ THẺ KHO',
           dateRangeStr,
           columns,
           data,
-        });
-        break;
+        };
       }
       case 'receipts': {
         const items = receiptsQuery.data?.items || [];
@@ -148,14 +146,13 @@ export default function ReportsPage() {
           actual_liters: formatNumberVN(r.actual_liters, 2),
           variance_liters: formatNumberVN(r.variance_liters, 2),
         }));
-        await exportReportToExcel({
+        return {
           filename: 'Bang_ke_phieu_nhap_be',
           title: 'BẢNG KÊ PHIẾU NHẬP NHIÊN LIỆU VÀO BỂ',
           dateRangeStr,
           columns,
           data,
-        });
-        break;
+        };
       }
       case 'dispenses': {
         // Xuất đủ mọi lượt đổ khớp bộ lọc, không chỉ trang đang xem: lấy lần lượt từng trang 500 dòng
@@ -192,14 +189,13 @@ export default function ReportsPage() {
           dispensed_liters: formatNumberVN(d.dispensed_liters, 2),
           pump_total_liters: d.pump_total_liters !== null ? formatNumberVN(d.pump_total_liters, 2) : '—',
         }));
-        await exportReportToExcel({
+        return {
           filename: 'Lich_su_cap_phat_nhien_lieu',
           title: 'BÁO CÁO LỊCH SỬ CẤP PHÁT NHIÊN LIỆU ĐỘI XE',
           dateRangeStr,
           columns,
           data,
-        });
-        break;
+        };
       }
       case 'vehicle-consumption': {
         const items = vehicleConsumptionQuery.data?.items || [];
@@ -215,14 +211,13 @@ export default function ReportsPage() {
           session_count: formatNumberVN(v.session_count),
           total_dispensed_liters: formatNumberVN(v.total_dispensed_liters, 2),
         }));
-        await exportReportToExcel({
+        return {
           filename: 'Tieu_hao_theo_xe',
           title: 'BÁO CÁO TIÊU HAO THEO XE',
           dateRangeStr,
           columns,
           data,
-        });
-        break;
+        };
       }
       case 'driver-dispense': {
         const items = driverDispenseQuery.data?.items || [];
@@ -241,108 +236,119 @@ export default function ReportsPage() {
           total_dispensed_liters: formatNumberVN(d.total_dispensed_liters, 2),
           avg_liters_per_session: formatNumberVN(d.avg_liters_per_session, 2),
         }));
-        await exportReportToExcel({
+        return {
           filename: 'Cap_phat_theo_tai_xe',
           title: 'BÁO CÁO CẤP PHÁT NHIÊN LIỆU THEO TÀI XẾ',
           dateRangeStr,
           columns,
           data,
-        });
-        break;
+        };
       }
+    }
+    return null;
+  };
+
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | 'print' | null>(null);
+  const runExport = async (kind: 'excel' | 'pdf' | 'print') => {
+    setExporting(kind);
+    try {
+      const report = await buildReport();
+      if (!report) return;
+      if (kind === 'excel') await exportReportToExcel(report);
+      else await exportReportToPdf(report, kind === 'pdf' ? 'download' : 'print');
+    } catch {
+      toast.error('Không thể xuất báo cáo. Vui lòng thử lại.');
+    } finally {
+      setExporting(null);
     }
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
+    <>
       <DetailPageHeader
         title="Báo cáo & Xuất dữ liệu"
         className="print:border-none"
         headerActions={
           <div className="flex items-center gap-2 print:hidden">
-            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
+            <Button
+              variant="outline"
+              onClick={() => runExport('print')}
+              disabled={exporting !== null}
+              className="gap-1.5"
+            >
               <Printer className="h-4 w-4" />
-              <span>In / PDF</span>
+              <span>{exporting === 'print' ? 'Đang chuẩn bị...' : 'In'}</span>
             </Button>
-            <Button size="sm" onClick={handleExportExcel} className="gap-1.5">
+            <Button
+              variant="outline"
+              onClick={() => runExport('pdf')}
+              disabled={exporting !== null}
+              className="gap-1.5"
+            >
+              <FileDown className="h-4 w-4" />
+              <span>{exporting === 'pdf' ? 'Đang tạo PDF...' : 'Tải PDF'}</span>
+            </Button>
+            <Button onClick={() => runExport('excel')} disabled={exporting !== null} className="gap-1.5">
               <FileSpreadsheet className="h-4 w-4" />
-              <span>Xuất Excel</span>
+              <span>{exporting === 'excel' ? 'Đang xuất...' : 'Xuất Excel'}</span>
             </Button>
           </div>
         }
       />
 
-      {/* Navigation Tabs for 6 Report Templates */}
-      <div className="print:hidden">
-        <Tabs value={template} onValueChange={(val) => setTemplate(val as ReportTemplateType)}>
-          <TabsList>
-            <TabsTrigger value="stock-ledger">
-              Nhập – Xuất – Tồn
-            </TabsTrigger>
-            <TabsTrigger value="receipts">
-              Bảng kê phiếu nhập
-            </TabsTrigger>
-            <TabsTrigger value="dispenses">
-              Lịch sử cấp phát
-            </TabsTrigger>
-            <TabsTrigger value="vehicle-consumption">
-              Tiêu hao theo xe
-            </TabsTrigger>
-            <TabsTrigger value="driver-dispense">
-              Cấp phát theo tài xế
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
+        {/* Navigation Tabs for 6 Report Templates */}
+        <div className="print:hidden">
+          <Tabs value={template} onValueChange={(val) => setTemplate(val as ReportTemplateType)}>
+            <TabsList>
+              <TabsTrigger value="stock-ledger">Nhập – Xuất – Tồn</TabsTrigger>
+              <TabsTrigger value="receipts">Bảng kê phiếu nhập</TabsTrigger>
+              <TabsTrigger value="dispenses">Lịch sử cấp phát</TabsTrigger>
+              <TabsTrigger value="vehicle-consumption">Tiêu hao theo xe</TabsTrigger>
+              <TabsTrigger value="driver-dispense">Cấp phát theo tài xế</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-      {/* Report Filter Parameters Bar */}
-      <div className="print:hidden">
-        <ReportFilters
-          template={template}
-          filters={filters}
-          onChange={changeFilters}
-        />
-      </div>
+        {/* Report Filter Parameters Bar */}
+        <div className="print:hidden">
+          <ReportFilters template={template} filters={filters} onChange={changeFilters} />
+        </div>
 
-      {/* Nội dung báo cáo: chỉ các dòng của bảng cuộn, tab, bộ lọc và tiêu đề cột luôn hiện */}
-      <div className="flex min-h-0 flex-1 flex-col print:block">
-        {template === 'stock-ledger' && (
-          <StockLedgerReportView
-            data={stockLedgerQuery.data}
-            isLoading={stockLedgerQuery.isLoading}
-            page={ledgerPage.page}
-            pageSize={ledgerPage.pageSize}
-            onPageChange={(page, pageSize) => setLedgerPage({ page, pageSize })}
-          />
-        )}
-        {template === 'receipts' && (
-          <ReceiptsReportView
-            data={receiptsQuery.data}
-            isLoading={receiptsQuery.isLoading}
-          />
-        )}
-        {template === 'dispenses' && (
-          <DispensesReportView
-            data={dispensesQuery.data}
-            isLoading={dispensesQuery.isLoading}
-            page={dispensePage.page}
-            pageSize={dispensePage.pageSize}
-            onPageChange={(page, pageSize) => setDispensePage({ page, pageSize })}
-          />
-        )}
-        {template === 'vehicle-consumption' && (
-          <VehicleConsumptionReportView
-            data={vehicleConsumptionQuery.data}
-            isLoading={vehicleConsumptionQuery.isLoading}
-          />
-        )}
-        {template === 'driver-dispense' && (
-          <DriverDispenseReportView
-            data={driverDispenseQuery.data}
-            isLoading={driverDispenseQuery.isLoading}
-          />
-        )}
+        {/* Nội dung báo cáo: chỉ các dòng của bảng cuộn, tab, bộ lọc và tiêu đề cột luôn hiện */}
+        <div className="flex min-h-0 flex-1 flex-col print:block">
+          {template === 'stock-ledger' && (
+            <StockLedgerReportView
+              data={stockLedgerQuery.data}
+              isLoading={stockLedgerQuery.isLoading}
+              page={ledgerPage.page}
+              pageSize={ledgerPage.pageSize}
+              onPageChange={(page, pageSize) => setLedgerPage({ page, pageSize })}
+            />
+          )}
+          {template === 'receipts' && (
+            <ReceiptsReportView data={receiptsQuery.data} isLoading={receiptsQuery.isLoading} />
+          )}
+          {template === 'dispenses' && (
+            <DispensesReportView
+              data={dispensesQuery.data}
+              isLoading={dispensesQuery.isLoading}
+              page={dispensePage.page}
+              pageSize={dispensePage.pageSize}
+              onPageChange={(page, pageSize) => setDispensePage({ page, pageSize })}
+            />
+          )}
+          {template === 'vehicle-consumption' && (
+            <VehicleConsumptionReportView
+              data={vehicleConsumptionQuery.data}
+              isLoading={vehicleConsumptionQuery.isLoading}
+            />
+          )}
+          {template === 'driver-dispense' && (
+            <DriverDispenseReportView data={driverDispenseQuery.data} isLoading={driverDispenseQuery.isLoading} />
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
