@@ -253,10 +253,7 @@ SELECT pg_temp.expect_error(format(
     (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'b1'), (SELECT v FROM ids WHERE k = 'es'), (SELECT v FROM ids WHERE k = 'pump')),
     '23514', 'phiên đã hủy phải có số lít bằng 0');
 
--- ---- 12. Định mức: bắt buộc có xe ----
-SELECT pg_temp.expect_error(format(
-    $q$INSERT INTO quota_rule (tenant_id, code, period, max_volume_ml, effective_from) VALUES (%L, 'Q1', 'day', 100000, current_date)$q$,
-    (SELECT v FROM ids WHERE k = 't1')), '23502', 'định mức phải gắn với một xe');
+-- ---- 12. (Định mức nhiên liệu đã bỏ) ----
 
 -- ---- 13. Kiểm kê: sổ sách phải khớp công thức ----
 SELECT pg_temp.expect_error(format(

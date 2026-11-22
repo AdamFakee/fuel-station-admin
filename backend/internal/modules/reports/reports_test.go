@@ -115,7 +115,6 @@ func TestReportsRBACProtection(t *testing.T) {
 		"/reports/dispenses",
 		"/reports/vehicle-consumption",
 		"/reports/driver-dispense",
-		"/reports/reconciliation",
 	}
 
 	for _, ep := range endpoints {

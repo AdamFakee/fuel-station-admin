@@ -57,8 +57,8 @@ func TestListPermissionsAndBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListPermissions failed: %v", err)
 	}
-	if len(perms) != 65 {
-		t.Errorf("expected 65 permissions according to seed, got %d", len(perms))
+	if len(perms) != 57 {
+		t.Errorf("expected 57 permissions according to seed, got %d", len(perms))
 	}
 
 	branches, err := svc.ListBranches(ctx)
@@ -262,7 +262,7 @@ func TestRoleLifecycleAndProtections(t *testing.T) {
 	updateRoleReq := iam.UpdateRoleRequest{
 		Name:            "Điều phối viên Đội xe",
 		Description:     "Điều phối xe, tài xế và hạn mức",
-		PermissionCodes: []string{"master.vehicle:view", "master.driver:view", "master.quota:view"},
+		PermissionCodes: []string{"master.vehicle:view", "master.driver:view", "master.catalog:view"},
 	}
 	updatedRole, err := svc.UpdateRole(ctx, role.ID, updateRoleReq)
 	if err != nil {

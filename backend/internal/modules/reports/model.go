@@ -15,6 +15,9 @@ type StockLedgerQuery struct {
 	TankID   *uuid.UUID `json:"tank_id"`
 	FromDate *time.Time `json:"from_date"`
 	ToDate   *time.Time `json:"to_date"`
+	// Phân trang cho thẻ kho chi tiết (bảng tổng hợp theo bể luôn trả đủ).
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
 }
 
 type TankSummaryItem struct {
@@ -52,6 +55,10 @@ type LedgerLineItem struct {
 type StockLedgerReportResponse struct {
 	Summary []TankSummaryItem `json:"summary"`
 	Ledger  []LedgerLineItem  `json:"ledger"`
+	// Tổng số dòng thẻ kho khớp bộ lọc (không chỉ trang đang trả về).
+	LedgerTotal    int `json:"ledger_total"`
+	LedgerPage     int `json:"ledger_page"`
+	LedgerPageSize int `json:"ledger_page_size"`
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -158,10 +165,6 @@ type VehicleConsumptionItem struct {
 	TypeName             *string   `json:"type_name"`
 	SessionCount         int       `json:"session_count"`
 	TotalDispensedLiters float64   `json:"total_dispensed_liters"`
-	QuotaLiters          *float64  `json:"quota_liters"`
-	QuotaPeriod          *string   `json:"quota_period"`
-	VarianceLiters       *float64  `json:"variance_liters"`
-	Status               string    `json:"status"` // "normal", "over_quota", "no_quota"
 }
 
 type VehicleConsumptionResponse struct {
@@ -198,47 +201,4 @@ type DriverDispenseResponse struct {
 	TotalDrivers         int                  `json:"total_drivers"`
 	TotalSessions        int                  `json:"total_sessions"`
 	TotalDispensedLiters float64              `json:"total_dispensed_liters"`
-}
-
-// ---------------------------------------------------------------------------------------------------
-// 6. Đối chiếu kiểm kê (Reconciliation Report)
-// ---------------------------------------------------------------------------------------------------
-
-type ReconciliationReportQuery struct {
-	BranchID *uuid.UUID `json:"branch_id"`
-	TankID   *uuid.UUID `json:"tank_id"`
-	Status   *string    `json:"status"`
-	FromDate *time.Time `json:"from_date"`
-	ToDate   *time.Time `json:"to_date"`
-}
-
-type ReconciliationReportItem struct {
-	ID                  uuid.UUID `json:"id"`
-	PeriodDate          string    `json:"period_date"`
-	BranchName          string    `json:"branch_name"`
-	TankName            string    `json:"tank_name"`
-	TankCode            string    `json:"tank_code"`
-	FuelTypeName        string    `json:"fuel_type_name"`
-	OpeningLiters       float64   `json:"opening_liters"`
-	ReceiptsLiters      float64   `json:"receipts_liters"`
-	DispensedLiters     float64   `json:"dispensed_liters"`
-	OtherIssuesLiters   float64   `json:"other_issues_liters"`
-	BookClosingLiters   float64   `json:"book_closing_liters"`
-	MeasuredLiters      *float64  `json:"measured_liters"`
-	PumpTotalizerLiters *float64  `json:"pump_totalizer_liters"`
-	VarianceLiters      *float64  `json:"variance_liters"`
-	VariancePct         *float64  `json:"variance_pct"`
-	TolerancePct        float64   `json:"tolerance_pct"`
-	Status              string    `json:"status"`
-	MeasuredByName      *string   `json:"measured_by_name"`
-	ConfirmedByName     *string   `json:"confirmed_by_name"`
-}
-
-type ReconciliationReportResponse struct {
-	Items               []ReconciliationReportItem `json:"items"`
-	TotalCount          int                        `json:"total_count"`
-	MatchedCount        int                        `json:"matched_count"`
-	AlertCount          int                        `json:"alert_count"`
-	ConfirmedCount      int                        `json:"confirmed_count"`
-	TotalVarianceLiters float64                    `json:"total_variance_liters"`
 }

@@ -35,7 +35,6 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 		pr.Get("/reports/dispenses", h.GetDispenses)
 		pr.Get("/reports/vehicle-consumption", h.GetVehicleConsumption)
 		pr.Get("/reports/driver-dispense", h.GetDriverDispense)
-		pr.Get("/reports/reconciliation", h.GetReconciliation)
 	})
 }
 
@@ -75,6 +74,8 @@ func (h *Handler) GetStockLedger(w http.ResponseWriter, r *http.Request) {
 		FromDate: parseDate(r.URL.Query().Get("from_date"), false),
 		ToDate:   parseDate(r.URL.Query().Get("to_date"), true),
 	}
+	q.Page, _ = strconv.Atoi(r.URL.Query().Get("page"))
+	q.PageSize, _ = strconv.Atoi(r.URL.Query().Get("page_size"))
 
 	resp, err := h.service.GetStockLedgerReport(r.Context(), q)
 	if err != nil {
@@ -166,29 +167,6 @@ func (h *Handler) GetDriverDispense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.service.GetDriverDispenseReport(r.Context(), q)
-	if err != nil {
-		httpx.Error(w, r, h.log, err)
-		return
-	}
-
-	httpx.JSON(w, http.StatusOK, resp)
-}
-
-func (h *Handler) GetReconciliation(w http.ResponseWriter, r *http.Request) {
-	var status *string
-	if s := r.URL.Query().Get("status"); s != "" {
-		status = &s
-	}
-
-	q := ReconciliationReportQuery{
-		BranchID: parseUUID(r.URL.Query().Get("branch_id")),
-		TankID:   parseUUID(r.URL.Query().Get("tank_id")),
-		Status:   status,
-		FromDate: parseDate(r.URL.Query().Get("from_date"), false),
-		ToDate:   parseDate(r.URL.Query().Get("to_date"), true),
-	}
-
-	resp, err := h.service.GetReconciliationReport(r.Context(), q)
 	if err != nil {
 		httpx.Error(w, r, h.log, err)
 		return

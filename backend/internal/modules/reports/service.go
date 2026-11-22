@@ -137,7 +137,31 @@ func (s *Service) GetStockLedgerReport(ctx context.Context, q StockLedgerQuery) 
 		summaries = append(summaries, item)
 	}
 
-	// 2. Fetch detailed ledger transactions
+	// 2. Fetch detailed ledger transactions (phân trang, kèm tổng số dòng)
+	page := q.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := q.PageSize
+	if pageSize < 1 || pageSize > 500 {
+		pageSize = 50
+	}
+
+	var ledgerTotal int
+	if err := s.pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		  FROM station.stock_ledger l
+		  JOIN station.tank t ON t.id = l.tank_id AND t.tenant_id = l.tenant_id
+		 WHERE l.tenant_id = $1
+		   AND ($2::UUID IS NULL OR t.branch_id = $2)
+		   AND ($6::UUID[] IS NULL OR t.branch_id = ANY($6))
+		   AND ($3::UUID IS NULL OR l.tank_id = $3)
+		   AND ($4::TIMESTAMPTZ IS NULL OR l.occurred_at >= $4)
+		   AND ($5::TIMESTAMPTZ IS NULL OR l.occurred_at <= $5)
+	`, tenantID, q.BranchID, q.TankID, q.FromDate, q.ToDate, authz.BranchScope(ctx)).Scan(&ledgerTotal); err != nil {
+		return nil, fmt.Errorf("failed to count stock ledger lines: %w", err)
+	}
+
 	ledgerQuery := `
 		SELECT l.id, l.tank_id, t.code, t.name, l.seq, l.occurred_at, l.kind,
 		       l.delta_ml, l.balance_after_ml, l.ref_type,
@@ -155,10 +179,10 @@ func (s *Service) GetStockLedgerReport(ctx context.Context, q StockLedgerQuery) 
 		   AND ($4::TIMESTAMPTZ IS NULL OR l.occurred_at >= $4)
 		   AND ($5::TIMESTAMPTZ IS NULL OR l.occurred_at <= $5)
 		 ORDER BY l.occurred_at ASC, l.seq ASC
-		 LIMIT 1000
+		 LIMIT $7 OFFSET $8
 	`
 
-	lRows, err := s.pool.Query(ctx, ledgerQuery, tenantID, q.BranchID, q.TankID, q.FromDate, q.ToDate, authz.BranchScope(ctx))
+	lRows, err := s.pool.Query(ctx, ledgerQuery, tenantID, q.BranchID, q.TankID, q.FromDate, q.ToDate, authz.BranchScope(ctx), pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stock ledger lines: %w", err)
 	}
@@ -187,8 +211,11 @@ func (s *Service) GetStockLedgerReport(ctx context.Context, q StockLedgerQuery) 
 	}
 
 	return &StockLedgerReportResponse{
-		Summary: summaries,
-		Ledger:  ledgerLines,
+		Summary:        summaries,
+		Ledger:         ledgerLines,
+		LedgerTotal:    ledgerTotal,
+		LedgerPage:     page,
+		LedgerPageSize: pageSize,
 	}, nil
 }
 
@@ -405,9 +432,7 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 		SELECT v.id AS vehicle_id, v.code AS vehicle_code, v.plate AS vehicle_plate,
 		       vt.name AS type_name,
 		       COUNT(ds.id) AS session_count,
-		       COALESCE(SUM(ds.dispensed_ml), 0) AS total_dispensed_ml,
-		       qr.max_volume_ml AS quota_rule_ml,
-		       qr.period AS quota_period
+		       COALESCE(SUM(ds.dispensed_ml), 0) AS total_dispensed_ml
 		  FROM station.vehicle v
 		  LEFT JOIN station.vehicle_type vt ON vt.id = v.vehicle_type_id AND vt.tenant_id = v.tenant_id
 		  LEFT JOIN station.dispense_session ds ON ds.vehicle_id = v.id AND ds.tenant_id = v.tenant_id
@@ -415,18 +440,11 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 		       AND ($6::UUID[] IS NULL OR ds.branch_id = ANY($6))
 		       AND ($3::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) >= $3)
 		       AND ($4::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) <= $4)
-		  LEFT JOIN LATERAL (
-		       SELECT max_volume_ml, period FROM station.quota_rule qr
-		        WHERE qr.tenant_id = v.tenant_id
-		          AND qr.status = 'active'
-		          AND qr.vehicle_id = v.id
-		        ORDER BY qr.created_at DESC LIMIT 1
-		  ) qr ON TRUE
 		 WHERE v.tenant_id = $1
 		   AND ($2::UUID IS NULL OR EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $2))
 		   AND ($6::UUID[] IS NULL OR EXISTS (SELECT 1 FROM station.vehicle_branch vs WHERE vs.tenant_id = v.tenant_id AND vs.vehicle_id = v.id AND vs.branch_id = ANY($6)))
 		   AND ($5::UUID IS NULL OR v.id = $5)
-		 GROUP BY v.id, v.code, v.plate, vt.name, qr.max_volume_ml, qr.period
+		 GROUP BY v.id, v.code, v.plate, vt.name
 		 ORDER BY total_dispensed_ml DESC, v.plate ASC
 	`
 
@@ -443,12 +461,10 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 	for rows.Next() {
 		var item VehicleConsumptionItem
 		var dispML int64
-		var quotaML *int64
 		if err := rows.Scan(
 			&item.VehicleID, &item.VehicleCode, &item.VehiclePlate,
 			&item.TypeName,
 			&item.SessionCount, &dispML,
-			&quotaML, &item.QuotaPeriod,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan vehicle report item: %w", err)
 		}
@@ -456,20 +472,6 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 		item.TotalDispensedLiters = mlToLiters(dispML)
 		totalDispensedML += dispML
 		totalSessions += item.SessionCount
-
-		if quotaML != nil {
-			qLiters := mlToLiters(*quotaML)
-			item.QuotaLiters = &qLiters
-			variance := item.TotalDispensedLiters - qLiters
-			item.VarianceLiters = &variance
-			if item.TotalDispensedLiters > qLiters {
-				item.Status = "over_quota"
-			} else {
-				item.Status = "normal"
-			}
-		} else {
-			item.Status = "no_quota"
-		}
 
 		items = append(items, item)
 	}
@@ -546,130 +548,5 @@ func (s *Service) GetDriverDispenseReport(ctx context.Context, q DriverDispenseQ
 		TotalDrivers:         len(items),
 		TotalSessions:        totalSessions,
 		TotalDispensedLiters: mlToLiters(totalDispensedML),
-	}, nil
-}
-
-// ---------------------------------------------------------------------------------------------------
-// 6. Đối chiếu kiểm kê (Reconciliation Report)
-// ---------------------------------------------------------------------------------------------------
-
-func (s *Service) GetReconciliationReport(ctx context.Context, q ReconciliationReportQuery) (*ReconciliationReportResponse, error) {
-	tenantID, err := getTenantUUID(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	query := `
-		SELECT rec.id, rec.period_date::TEXT,
-		       b.name AS branch_name,
-		       t.name AS tank_name,
-		       t.code AS tank_code,
-		       f.name AS fuel_type_name,
-		       rec.opening_ml,
-		       rec.receipts_ml,
-		       rec.dispensed_ml,
-		       rec.other_issues_ml,
-		       rec.book_closing_ml,
-		       rec.measured_ml,
-		       rec.pump_totalizer_ml,
-		       rec.variance_ml,
-		       rec.variance_pct,
-		       rec.tolerance_pct,
-		       rec.status,
-		       u1.full_name AS measured_by_name,
-		       u2.full_name AS confirmed_by_name
-		  FROM station.stock_reconciliation rec
-		  JOIN station.tank t ON t.id = rec.tank_id AND t.tenant_id = rec.tenant_id
-		  JOIN station.fuel_type f ON f.id = t.fuel_type_id AND f.tenant_id = rec.tenant_id
-		  JOIN station.branch b ON b.id = rec.branch_id AND b.tenant_id = rec.tenant_id
-		  LEFT JOIN station.app_user u1 ON u1.id = rec.measured_by AND u1.tenant_id = rec.tenant_id
-		  LEFT JOIN station.app_user u2 ON u2.id = rec.confirmed_by AND u2.tenant_id = rec.tenant_id
-		 WHERE rec.tenant_id = $1
-		   AND ($2::UUID IS NULL OR rec.branch_id = $2)
-		   AND ($7::UUID[] IS NULL OR rec.branch_id = ANY($7))
-		   AND ($3::UUID IS NULL OR rec.tank_id = $3)
-		   AND ($4::TEXT IS NULL OR rec.status = $4)
-		   AND ($5::DATE IS NULL OR rec.period_date >= $5::DATE)
-		   AND ($6::DATE IS NULL OR rec.period_date <= $6::DATE)
-		 ORDER BY rec.period_date DESC, t.name ASC
-	`
-
-	var fromDateStr, toDateStr *string
-	if q.FromDate != nil {
-		str := q.FromDate.Format("2006-01-02")
-		fromDateStr = &str
-	}
-	if q.ToDate != nil {
-		str := q.ToDate.Format("2006-01-02")
-		toDateStr = &str
-	}
-
-	rows, err := s.pool.Query(ctx, query, tenantID, q.BranchID, q.TankID, q.Status, fromDateStr, toDateStr, authz.BranchScope(ctx))
-	if err != nil {
-		return nil, fmt.Errorf("failed to query reconciliation report: %w", err)
-	}
-	defer rows.Close()
-
-	var items []ReconciliationReportItem
-	var matchedCount, alertCount, confirmedCount int
-	var totalVarianceML int64
-
-	for rows.Next() {
-		var item ReconciliationReportItem
-		var openML, recML, dispML, issML, bookCloseML int64
-		var measML, pumpTotML, varML *int64
-		var varPct *float64
-
-		if err := rows.Scan(
-			&item.ID, &item.PeriodDate,
-			&item.BranchName, &item.TankName, &item.TankCode, &item.FuelTypeName,
-			&openML, &recML, &dispML, &issML, &bookCloseML,
-			&measML, &pumpTotML, &varML,
-			&varPct, &item.TolerancePct,
-			&item.Status, &item.MeasuredByName, &item.ConfirmedByName,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan reconciliation report item: %w", err)
-		}
-
-		item.OpeningLiters = mlToLiters(openML)
-		item.ReceiptsLiters = mlToLiters(recML)
-		item.DispensedLiters = mlToLiters(dispML)
-		item.OtherIssuesLiters = mlToLiters(issML)
-		item.BookClosingLiters = mlToLiters(bookCloseML)
-
-		if measML != nil {
-			val := mlToLiters(*measML)
-			item.MeasuredLiters = &val
-		}
-		if pumpTotML != nil {
-			val := mlToLiters(*pumpTotML)
-			item.PumpTotalizerLiters = &val
-		}
-		if varML != nil {
-			val := mlToLiters(*varML)
-			item.VarianceLiters = &val
-			totalVarianceML += *varML
-		}
-		item.VariancePct = varPct
-
-		switch item.Status {
-		case "matched":
-			matchedCount++
-		case "alert":
-			alertCount++
-		case "confirmed":
-			confirmedCount++
-		}
-
-		items = append(items, item)
-	}
-
-	return &ReconciliationReportResponse{
-		Items:               items,
-		TotalCount:          len(items),
-		MatchedCount:        matchedCount,
-		AlertCount:          alertCount,
-		ConfirmedCount:      confirmedCount,
-		TotalVarianceLiters: mlToLiters(totalVarianceML),
 	}, nil
 }

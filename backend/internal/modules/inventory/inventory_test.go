@@ -42,8 +42,6 @@ func setupTest(t *testing.T) (*inventory.Service, *pgxpool.Pool, context.Context
 			"inventory.receipt:view", "inventory.receipt:create",
 			"inventory.receipt:update", "inventory.receipt:delete",
 			"inventory.receipt:approve",
-			"inventory.stocktake:view", "inventory.stocktake:create",
-			"inventory.stocktake:update", "inventory.stocktake:approve",
 		},
 	)
 	ctx = authz.WithPrincipal(ctx, principal)
@@ -476,117 +474,6 @@ func TestM12_TankStockAndLedger(t *testing.T) {
 	if ledgerItems[0].BalanceAfterLiters < 0 {
 		t.Errorf("expected positive balance after liters, got %f", ledgerItems[0].BalanceAfterLiters)
 	}
-}
-
-func TestM12_StockReconciliation_Workflow(t *testing.T) {
-	svc, pool, ctx := setupTest(t)
-	defer pool.Close()
-
-	branchID, tankID, _ := ensureTestTank(t, ctx, pool)
-
-	periodDate := time.Now().Format("2006-01-02")
-
-	// 1. Generate or get reconciliation
-	rec, err := svc.GenerateReconciliation(ctx, inventory.CreateReconciliationRequest{
-		BranchID:   branchID,
-		TankID:     tankID,
-		PeriodDate: periodDate,
-	})
-	if err != nil {
-		t.Fatalf("GenerateReconciliation failed: %v", err)
-	}
-	if rec.ID == "" {
-		t.Fatalf("expected non-empty reconciliation ID")
-	}
-
-	// 2. Submit measured stock within tolerance -> status matched
-	measuredLitersMatched := rec.BookClosingLiters // perfect match
-	matchedRec, err := svc.SubmitMeasuredStock(ctx, rec.ID, inventory.SubmitMeasureRequest{
-		MeasuredLiters: &measuredLitersMatched,
-		Note:           ptr("Đo que thăm thực tế khớp sổ sách"),
-	})
-	if err != nil {
-		t.Fatalf("SubmitMeasuredStock matched failed: %v", err)
-	}
-	if matchedRec.Status != "matched" {
-		t.Errorf("expected status 'matched', got '%s'", matchedRec.Status)
-	}
-
-	// 3. Submit measured stock with deviation exceeding tolerance -> status alert
-	// tolerance is typically 0.5%, let's deviate by 500 L
-	deviatedLiters := rec.BookClosingLiters + 500.0
-	alertRec, err := svc.SubmitMeasuredStock(ctx, rec.ID, inventory.SubmitMeasureRequest{
-		MeasuredLiters: &deviatedLiters,
-		Note:           ptr("Đo que thăm lệch 5%"),
-	})
-	if err != nil {
-		t.Fatalf("SubmitMeasuredStock alert failed: %v", err)
-	}
-	if alertRec.Status != "alert" {
-		t.Errorf("expected status 'alert', got '%s' (varPct=%v, tolPct=%v, measL=%v, bookL=%v)", alertRec.Status, alertRec.VariancePct, alertRec.TolerancePct, alertRec.MeasuredLiters, alertRec.BookClosingLiters)
-	}
-
-	// 4. Separation of duties: creator (adminUserID) cannot confirm
-	_, err = svc.ConfirmReconciliation(ctx, rec.ID, inventory.ConfirmReconciliationRequest{
-		AdjustLedger: false,
-	})
-	if err == nil {
-		t.Errorf("expected error when same user confirms reconciliation (anti-self-approval), got nil")
-	}
-
-	// 5. Accountant confirms reconciliation
-	accountantPrincipal := authz.NewPrincipal(
-		accountantID,
-		defaultTenantID,
-		"ACCOUNTANT",
-		[]string{branch1ID},
-		[]authz.Permission{"inventory.stocktake:view", "inventory.stocktake:approve"},
-	)
-	accountantCtx := authz.WithPrincipal(ctx, accountantPrincipal)
-
-	confirmedRec, err := svc.ConfirmReconciliation(accountantCtx, rec.ID, inventory.ConfirmReconciliationRequest{
-		AdjustLedger: true,
-		Note:         ptr("Kế toán trưởng phê duyệt đối soát"),
-	})
-	if err != nil {
-		t.Fatalf("ConfirmReconciliation failed: %v", err)
-	}
-	if confirmedRec.Status != "confirmed" {
-		t.Errorf("expected status 'confirmed', got '%s'", confirmedRec.Status)
-	}
-	if confirmedRec.ConfirmedBy == nil || *confirmedRec.ConfirmedBy != accountantID {
-		t.Errorf("expected confirmed_by = accountantID")
-	}
-}
-
-func TestM12_AlertsAndSummary(t *testing.T) {
-	svc, pool, ctx := setupTest(t)
-	defer pool.Close()
-
-	branchID, tankID, _ := ensureTestTank(t, ctx, pool)
-
-	// Summary
-	sum, err := svc.GetStocktakeSummary(ctx, branchID)
-	if err != nil {
-		t.Fatalf("GetStocktakeSummary failed: %v", err)
-	}
-	if sum.TotalTanks == 0 {
-		t.Errorf("expected at least 1 tank in summary, got 0")
-	}
-
-	// Check low stock
-	_, err = svc.CheckLowStock(ctx)
-	if err != nil {
-		t.Fatalf("CheckLowStock failed: %v", err)
-	}
-
-	// List alerts
-	alerts, err := svc.ListAlerts(ctx, branchID, nil)
-	if err != nil {
-		t.Fatalf("ListAlerts failed: %v", err)
-	}
-	_ = alerts
-	_ = tankID
 }
 
 func ptr[T any](v T) *T {

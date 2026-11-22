@@ -18,7 +18,6 @@ import (
 	"fuel-station-backend/internal/modules/iam"
 	"fuel-station-backend/internal/modules/inventory"
 	"fuel-station-backend/internal/modules/master"
-	"fuel-station-backend/internal/modules/quota"
 	"fuel-station-backend/internal/modules/reports"
 	"fuel-station-backend/internal/modules/syncmonitor"
 	"fuel-station-backend/internal/platform/postgres"
@@ -103,8 +102,6 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	feedbackService := feedback.NewService(pool)
 	feedbackHandler := feedback.NewHandler(feedbackService, log)
 
-	quotaService := quota.NewService(pool)
-	quotaHandler := quota.NewHandler(quotaService, log)
 
 	diskStorage, err := storage.NewLocalDiskStorage(cfg.Storage.Dir, pool)
 	if err != nil {
@@ -159,7 +156,6 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		})
 		iamHandler.RegisterRoutes(r, authMiddleware)
 		assetsHandler.RegisterRoutes(r, authMiddleware)
-		quotaHandler.RegisterRoutes(r, authMiddleware)
 		feedbackHandler.RegisterRoutes(r, authMiddleware)
 		masterHandler.RegisterRoutes(r, authMiddleware)
 		syncMonitorHandler.RegisterRoutes(r, authMiddleware)
