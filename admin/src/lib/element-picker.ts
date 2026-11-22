@@ -108,7 +108,7 @@ export function startElementPicker({ onPick, onCancel }: PickerHandlers): () => 
     position: 'fixed',
     zIndex: '2147483646',
     pointerEvents: 'none',
-    border: '2px solid #3f6b80',
+    border: '2px solid #1f4e79',
     background: 'rgba(63, 107, 128, 0.12)',
     borderRadius: '4px',
     transition: 'all 60ms ease-out',

@@ -2,7 +2,8 @@
 
 /*
  * Tailwind CSS v4
- * Dark mode kích hoạt khi phần tử <html> có class="dark".
+ * Ứng dụng chỉ có một giao diện sáng, không có dark mode. Biến thể `dark:` được giữ lại (cho các component
+ * shadcn có sẵn lớp dark:) nhưng không có chỗ nào gắn class "dark" nên không bao giờ bật.
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -23,22 +24,22 @@
     BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   /* -------------------------
-     Brand: xanh xám
+     Brand: xanh dương, lấy màu sidebar (#1f4e79) làm primary
      Dùng bg-brand-50 ... bg-brand-950.
      Đây là màu cố định, không tự đổi theo theme.
      ------------------------- */
 
-  --color-brand-50: #f2f7f9;
-  --color-brand-100: #e3edf2;
-  --color-brand-200: #c6dae4;
-  --color-brand-300: #9ec0d1;
-  --color-brand-400: #73a0b7;
-  --color-brand-500: #52849d;
-  --color-brand-600: #3f6b80;
-  --color-brand-700: #35596b;
-  --color-brand-800: #2f4b59;
-  --color-brand-900: #2a404c;
-  --color-brand-950: #182932;
+  --color-brand-50: #f1f6fb;
+  --color-brand-100: #e1ecf6;
+  --color-brand-200: #c3d9ec;
+  --color-brand-300: #93bbdc;
+  --color-brand-400: #5e97c6;
+  --color-brand-500: #3a78ad;
+  --color-brand-600: #2a6296;
+  --color-brand-700: #1f4e79;
+  --color-brand-800: #1a3f62;
+  --color-brand-900: #16324d;
+  --color-brand-950: #0c2a47;
 
   /* -------------------------
      Background và nội dung
@@ -197,7 +198,7 @@
 }
 
 /* =========================================================
-   2. LIGHT MODE
+   2. MÀU GIAO DIỆN (chỉ một giao diện sáng)
    ========================================================= */
 
 :root {
@@ -218,15 +219,15 @@
   --popover-foreground: #0f172a;
 
   /* Nút chính */
-  --primary: #3f6b80;
+  --primary: #1f4e79;
   --primary-foreground: #ffffff;
-  --primary-hover: #35596b;
-  --primary-active: #2f4b59;
+  --primary-hover: #1a3f62;
+  --primary-active: #16324d;
 
   /* Vùng nhấn nhẹ theo brand */
-  --primary-subtle: #f2f7f9;
-  --primary-subtle-foreground: #35596b;
-  --primary-border: #c6dae4;
+  --primary-subtle: #f1f6fb;
+  --primary-subtle-foreground: #1a3f62;
+  --primary-border: #c3d9ec;
 
   /* Nút phụ */
   --secondary: #f1f5f9;
@@ -238,8 +239,8 @@
   --muted-foreground: #475569;
 
   /* Hover nhẹ */
-  --accent: #e3edf2;
-  --accent-foreground: #2f4b59;
+  --accent: #e1ecf6;
+  --accent-foreground: #16324d;
 
   /* Viền layout nhẹ; viền input đậm hơn */
   --border: #e2e8f0;
@@ -250,11 +251,11 @@
   --placeholder: #64748b;
 
   /* Focus */
-  --ring: #3f6b80;
+  --ring: #1f4e79;
 
   /* Link */
-  --link: #35596b;
-  --link-hover: #2f4b59;
+  --link: #1f4e79;
+  --link-hover: #16324d;
 
   /* Disabled */
   --disabled: #e2e8f0;
@@ -312,130 +313,12 @@
   --overlay: #0f172a;
 
   /* Vùng chọn văn bản */
-  --selection: #c6dae4;
-  --selection-foreground: #182932;
+  --selection: #c3d9ec;
+  --selection-foreground: #0c2a47;
 }
 
 /* =========================================================
-   3. DARK MODE
-   ========================================================= */
-
-.dark {
-  color-scheme: dark;
-
-  /* Nền ứng dụng */
-  --background: #0b1220;
-  --foreground: #f1f5f9;
-
-  /* Card, bảng, form */
-  --card: #111c2e;
-  --card-foreground: #f1f5f9;
-
-  /* Dropdown, popover */
-  --popover: #162338;
-  --popover-foreground: #f1f5f9;
-
-  /* Nút chính: nền sáng hơn, chữ tối */
-  --primary: #9ec0d1;
-  --primary-foreground: #182932;
-  --primary-hover: #c6dae4;
-  --primary-active: #73a0b7;
-
-  /* Vùng nhấn nhẹ theo brand */
-  --primary-subtle: #182932;
-  --primary-subtle-foreground: #c6dae4;
-  --primary-border: #35596b;
-
-  /* Nút phụ */
-  --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
-  --secondary-hover: #334155;
-
-  /* Vùng phụ, mô tả */
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-
-  /* Hover nhẹ */
-  --accent: #233847;
-  --accent-foreground: #e3edf2;
-
-  /* Viền */
-  --border: #334155;
-  --border-strong: #64748b;
-
-  --input: #64748b;
-  --input-background: #0f172a;
-  --placeholder: #94a3b8;
-
-  /* Focus */
-  --ring: #9ec0d1;
-
-  /* Link */
-  --link: #9ec0d1;
-  --link-hover: #c6dae4;
-
-  /* Disabled */
-  --disabled: #1e293b;
-  --disabled-foreground: #64748b;
-
-  /* Thành công */
-  --success: #4ade80;
-  --success-foreground: #052e16;
-
-  --success-subtle: #10291e;
-  --success-subtle-foreground: #86efac;
-  --success-border: #166534;
-
-  /* Cảnh báo */
-  --warning: #fbbf24;
-  --warning-foreground: #451a03;
-
-  --warning-subtle: #302315;
-  --warning-subtle-foreground: #fde68a;
-  --warning-border: #92400e;
-
-  /* Thông tin */
-  --info: #60a5fa;
-  --info-foreground: #172554;
-
-  --info-subtle: #132540;
-  --info-subtle-foreground: #93c5fd;
-  --info-border: #1e40af;
-
-  /* Lỗi / nguy hiểm */
-  --destructive: #f87171;
-  --destructive-foreground: #450a0a;
-  --destructive-hover: #fca5a5;
-
-  --destructive-subtle: #321c23;
-  --destructive-subtle-foreground: #fca5a5;
-  --destructive-border: #991b1b;
-
-  /* Sidebar */
-  --sidebar: #0c2a47;
-  --sidebar-foreground: #e2ecf7;
-
-  --sidebar-primary: #9cc9f2;
-  --sidebar-primary-foreground: #0c2a47;
-
-  --sidebar-accent: #17436b;
-  --sidebar-accent-foreground: #ffffff;
-
-  --sidebar-muted-foreground: #9fb6cc;
-
-  --sidebar-border: #1d4a73;
-  --sidebar-ring: #9cc9f2;
-
-  /* Lớp phủ modal */
-  --overlay: #000000;
-
-  /* Vùng chọn văn bản */
-  --selection: #35596b;
-  --selection-foreground: #f2f7f9;
-}
-
-/* =========================================================
-   4. BASE STYLES
+   3. BASE STYLES
    Không ép font-weight trên tất cả phần tử.
    ========================================================= */
 
