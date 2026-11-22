@@ -5,16 +5,7 @@ import ExcelJS from 'exceljs';
 async function buildWorkbook(rows: string[][]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Dữ liệu');
-  sheet.addRow([
-    'Mã NV *',
-    'Họ và tên *',
-    'Số điện thoại',
-    'Bộ phận',
-    'Số thẻ NFC',
-    'Hiệu lực từ',
-    'Hiệu lực đến',
-    'Ghi chú',
-  ]);
+  sheet.addRow(['Họ và tên *', 'Số điện thoại', 'Số thẻ NFC', 'Hiệu lực từ', 'Hiệu lực đến', 'Ghi chú']);
   for (const row of rows) sheet.addRow(row);
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
@@ -38,7 +29,6 @@ test.describe('Nhập tài xế từ Excel', () => {
           role_name: 'Quản lý',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-1'],
           permissions: ['dashboard:view', 'master.driver:view', 'master.driver:create'],
         }),
       });
@@ -74,9 +64,9 @@ test.describe('Nhập tài xế từ Excel', () => {
     await page.getByTestId('btn-import-drivers').click();
 
     const file = await buildWorkbook([
-      ['TX100', 'Nguyễn Văn A', '0911111111', 'Đội 1', '3000000001', '', '', ''],
-      ['TX101', '', '0922222222', 'Đội 2', '', '', '', ''], // thiếu họ tên
-      ['TX 102', 'Lê Văn C', '', '', '12AB', '', '', ''], // mã có khoảng trắng, thẻ không phải số
+      ['Nguyễn Văn A', '0911111111', '3000000001', '', '', ''],
+      ['', '0922222222', '', '', '', ''], // thiếu họ tên
+      ['Lê Văn C', '', '12AB', '', '', ''], // số thẻ không phải số
     ]);
     await page.getByTestId('input-import-file').setInputFiles({
       name: 'tai-xe.xlsx',
@@ -87,25 +77,22 @@ test.describe('Nhập tài xế từ Excel', () => {
     // Chỉ rõ từng người đang thiếu gì, không báo lỗi chung chung
     const missingName = page.getByTestId('import-row-3');
     await expect(missingName).toContainText('Dòng 3');
-    await expect(missingName).toContainText('Mã NV TX101 (chưa có họ tên)');
+    await expect(missingName).toContainText('Chưa có tên');
     await expect(missingName).toContainText('Chưa nhập (bắt buộc)');
 
     const badValues = page.getByTestId('import-row-4');
-    await expect(badValues).toContainText('Lê Văn C (Mã NV: TX 102)');
-    await expect(badValues).toContainText('Chỉ gồm chữ và số viết liền');
+    await expect(badValues).toContainText('Lê Văn C');
     await expect(badValues).toContainText('Số thẻ phải là chuỗi chữ số thập phân');
 
     // Điền tiếp phần thiếu: dòng chuyển sang "sẵn sàng" ngay
     await page.locator('#import-3-full_name').fill('Trần Văn B');
     await expect(page.getByTestId('import-row-3')).toHaveCount(0);
-    await page.locator('#import-4-code').fill('TX102');
     await page.locator('#import-4-card_number').fill('3000000003');
     await expect(page.getByTestId('import-incomplete-rows')).toHaveCount(0);
 
     await page.getByTestId('btn-confirm-import').click();
     await expect.poll(() => importPayload?.rows.length).toBe(3);
-    expect(importPayload!.rows.map((r) => r.code)).toEqual(['TX100', 'TX101', 'TX102']);
-    expect(importPayload!.rows[1].full_name).toBe('Trần Văn B');
+    expect(importPayload!.rows.map((r) => r.full_name)).toEqual(['Nguyễn Văn A', 'Trần Văn B', 'Lê Văn C']);
   });
 
   test('file thiếu cột bắt buộc báo rõ cột nào thiếu', async ({ page }) => {
@@ -113,7 +100,7 @@ test.describe('Nhập tài xế từ Excel', () => {
     await page.getByTestId('btn-import-drivers').click();
 
     const workbook = new ExcelJS.Workbook();
-    workbook.addWorksheet('Dữ liệu').addRow(['Mã NV', 'Số điện thoại']);
+    workbook.addWorksheet('Dữ liệu').addRow(['Số điện thoại', 'Ghi chú']);
     await page.getByTestId('input-import-file').setInputFiles({
       name: 'sai.xlsx',
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

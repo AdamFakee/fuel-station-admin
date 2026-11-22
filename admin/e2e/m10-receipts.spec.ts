@@ -22,7 +22,6 @@ test.describe('Module M10 - Nhập bể (Stock Receipts) & Kiểm soát Sức ch
           role_name: 'Quản lý',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-01'],
           permissions: [
             'dashboard:view',
             'inventory.receipt:view',

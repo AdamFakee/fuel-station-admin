@@ -96,7 +96,6 @@ test.describe('Module M0 & M1 - Auth & Role RBAC E2E Tests', () => {
           role_name: 'Quản lý',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b1'],
           permissions: ['dashboard:view', 'asset.tank:view', 'iam.user:view', 'iam.role:view', 'inventory.receipt:view'],
         }),
       });
@@ -131,7 +130,6 @@ test.describe('Module M0 & M1 - Auth & Role RBAC E2E Tests', () => {
           role_name: 'Kế toán',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b1'],
           permissions: ['dashboard:view', 'inventory.receipt:view', 'inventory.issue:approve', 'inventory.stocktake:approve', 'report:view'],
         }),
       });
@@ -168,7 +166,6 @@ test.describe('Module M0 & M1 - Auth & Role RBAC E2E Tests', () => {
           role_name: 'IT Kỹ thuật',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b1'],
           permissions: ['dashboard:view', 'audit.log:view', 'sync.monitor:view', 'asset.tank:view'],
         }),
       });

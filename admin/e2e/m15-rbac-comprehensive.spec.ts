@@ -25,7 +25,6 @@ test.describe('Module M15 - Hoàn thiện & Phân quyền toàn diện 3 Actor (
           role_name: isManager ? 'Quản lý' : isAccountant ? 'Kế toán' : 'IT Kỹ thuật',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-01'],
           permissions: isManager
             ? [
                 'dashboard:view',

@@ -22,7 +22,6 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
           role_name: 'Quản lý',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-01'],
           permissions: [
             'dashboard:view',
             'org.branch:view', 'org.branch:create', 'org.branch:update', 'org.branch:delete',
@@ -341,7 +340,6 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
           role_name: 'Kế toán',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-01'],
           permissions: [
             'dashboard:view',
             'org.branch:view',

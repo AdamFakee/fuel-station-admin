@@ -168,7 +168,6 @@ test.describe('Module M9 - Giám sát Phiên đổ & Cấp phát (Dispense Sessi
           role_name: 'Quản lý',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-1', 'b-2'],
           permissions: ['dispense.session:view', 'master.vehicle:view', 'master.driver:view'],
         }),
       });
@@ -248,7 +247,7 @@ test.describe('Module M9 - Giám sát Phiên đổ & Cấp phát (Dispense Sessi
     await expect(page.getByText('Tổng phiên')).toBeVisible();
     await expect(page.getByText('Hoàn thành').first()).toBeVisible();
     await expect(page.getByText('Đã hủy / Lỗi')).toBeVisible();
-    await expect(page.getByText('Tổng thể tích cấp')).toBeVisible();
+    await expect(page.getByText('Tổng lít cấp')).toBeVisible();
     await expect(page.getByText('Bị từ chối', { exact: true })).toBeVisible();
 
     // Kiểm tra dữ liệu phiên đổ trong bảng
@@ -276,26 +275,20 @@ test.describe('Module M9 - Giám sát Phiên đổ & Cấp phát (Dispense Sessi
 
     // Kiểm tra các thông số định lượng (Lít, không tiền)
     await expect(dialog.getByText('125,50 L')).toBeVisible();
-    await expect(dialog.getByText('150,00 L')).toBeVisible();
 
     // Kiểm tra thông tin xe & tài xế
     await expect(dialog.getByText('29A-88888')).toBeVisible();
     await expect(dialog.getByText('Nguyễn Văn Tài').first()).toBeVisible();
 
-    // Kiểm tra Trụ bơm & Bể
+    // Kiểm tra Trụ bơm
     await expect(dialog.getByText('Trụ bơm 01')).toBeVisible();
-    await expect(dialog.getByText('Bể xăng 01')).toBeVisible();
 
-    // Kiểm tra Tiến trình sự kiện (Timeline)
-    await expect(dialog.getByText('Dòng thời gian phiên bơm')).toBeVisible();
-    await expect(dialog.getByText('Bơm hoàn tất (Completed)')).toBeVisible();
+    // Kiểm tra các bước của phiên đổ (không còn hiện tên trạng thái kỹ thuật hay khung gói tin thô)
+    await expect(dialog.getByText('Các bước của phiên đổ')).toBeVisible();
+    await expect(dialog.getByText('Hoàn tất, đã bơm xong')).toBeVisible();
 
-    // Kiểm tra Raw HEX
-    await expect(dialog.getByText('Khung gói tin thô (Raw HEX):')).toBeVisible();
-    await expect(dialog.getByText('02 01 04 29 41 38 38 38 38 38 03 4B')).toBeVisible();
-
-    // Đóng dialog
-    await dialog.getByRole('button', { name: 'Đóng' }).click();
+    // Đóng dialog bằng phím Esc (hộp thoại không còn nút "Đóng" ở chân)
+    await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();
   });
 

@@ -55,8 +55,6 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
       role_name: 'Quản lý',
       status: 'active',
       must_change_password: false,
-      branch_ids: ['b-1', 'b-2'],
-      branch_names: ['Trạm Xăng Cầu Giấy', 'Kho Nhiên Liệu Hải Phòng'],
       last_login_at: '2026-11-20T15:30:00Z',
       created_at: '2026-11-20T10:00:00Z',
       updated_at: '2026-11-20T10:00:00Z',
@@ -73,8 +71,6 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
       role_name: 'Kế toán',
       status: 'active',
       must_change_password: false,
-      branch_ids: ['b-1'],
-      branch_names: ['Trạm Xăng Cầu Giấy'],
       last_login_at: '2026-11-20T14:20:00Z',
       created_at: '2026-11-20T10:00:00Z',
       updated_at: '2026-11-20T10:00:00Z',
@@ -91,8 +87,6 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
       role_name: 'IT Kỹ thuật',
       status: 'locked',
       must_change_password: true,
-      branch_ids: ['b-2'],
-      branch_names: ['Kho Nhiên Liệu Hải Phòng'],
       last_login_at: null,
       created_at: '2026-11-20T11:00:00Z',
       updated_at: '2026-11-20T11:00:00Z',
@@ -131,7 +125,6 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
           role_name: 'Quản lý',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-1', 'b-2'],
           permissions: ['iam.user:view', 'iam.user:create', 'iam.user:update', 'iam.user:delete', 'iam.role:view', 'iam.role:create', 'iam.role:update', 'iam.role:delete'],
         }),
       });
@@ -198,7 +191,8 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
     await expect(page.getByRole('columnheader', { name: 'Họ và tên' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Email đăng nhập' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Vai trò' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Trạm xăng' })).toBeVisible();
+    // Tài khoản không còn gán theo trạm xăng nên bảng không có cột Trạm xăng
+    await expect(page.getByRole('columnheader', { name: 'Trạm xăng' })).toHaveCount(0);
     await expect(page.getByRole('columnheader', { name: 'Trạng thái' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Đăng nhập cuối' })).toBeVisible();
 
@@ -250,9 +244,8 @@ test.describe('Module M2 - Quản lý Tài khoản, Vai trò & Phân quyền (IA
     await expect(page.locator('#phone')).toBeVisible();
     await expect(page.locator('#role_id')).toBeVisible();
 
-    // Danh sách trạm xăng phân bổ bên trong form
-    await expect(page.locator('#user-form').getByText('Trạm Xăng Cầu Giấy')).toBeVisible();
-    await expect(page.locator('#user-form').getByText('Kho Nhiên Liệu Hải Phòng')).toBeVisible();
+    // Không còn phần chọn phạm vi trạm xăng trong form
+    await expect(page.locator('#user-form').getByText('Phạm vi Trạm xăng')).toHaveCount(0);
 
     // Nút submit & hủy
     await expect(page.getByRole('button', { name: 'Hủy' })).toBeVisible();

@@ -30,7 +30,6 @@ test.describe('Module M11 - Xuất điều chỉnh (Stock Issues) E2E Tests', ()
           role_name: isAccountant ? 'Kế toán' : isIT ? 'IT' : 'Quản lý',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-01'],
           permissions: isAccountant
             ? ['dashboard:view', 'inventory.issue:view', 'inventory.issue:approve']
             : isIT

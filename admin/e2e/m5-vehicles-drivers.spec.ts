@@ -20,7 +20,6 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
           role_name: 'Quản lý',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-1'],
           permissions: [
             'dashboard:view',
             'master.catalog:view',
@@ -302,7 +301,7 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await page.goto('/drivers');
 
     await page.getByTestId('btn-create-driver').click();
-    await expect(page.getByText('Thêm tài xế mới')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Thêm tài xế mới' })).toBeVisible();
 
     await page.getByTestId('submit-driver-btn').click();
 
@@ -397,7 +396,6 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
           role_name: 'IT Kỹ thuật',
           status: 'active',
           must_change_password: false,
-          branch_ids: ['b-1'],
           permissions: [
             'dashboard:view',
             'master.vehicle:view', // chỉ xem

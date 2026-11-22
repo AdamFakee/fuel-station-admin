@@ -256,9 +256,10 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
     await page.goto('/reports');
     await expect(page.locator('h1')).toContainText('Báo cáo & Xuất dữ liệu');
 
-    // Verify Export Excel and Print buttons exist
+    // Có đủ ba nút xuất: Excel, PDF và In
     await expect(page.getByRole('button', { name: /Xuất Excel/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /In \/ PDF/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Tải PDF/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'In', exact: true })).toBeVisible();
   });
 
   test('TC-M14-02: Strictly NO Money columns exist on all report views', async ({ page }) => {
@@ -331,9 +332,10 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
     await expect(fromInput).toHaveText(datePattern);
     await expect(toInput).toHaveText(datePattern);
 
-    // Click "Đặt lại bộ lọc"
-    await page.getByRole('button', { name: 'Đặt lại bộ lọc' }).click();
+    // Bấm "Tháng này" thì ngày bắt đầu và kết thúc vẫn là ngày hợp lệ (không còn nút "Đặt lại bộ lọc")
+    await page.getByRole('button', { name: 'Tháng này' }).click();
     await expect(fromInput).toHaveText(datePattern);
+    await expect(toInput).toHaveText(datePattern);
   });
 
   test('TC-M14-05: Excel export button triggers download successfully', async ({ page }) => {
