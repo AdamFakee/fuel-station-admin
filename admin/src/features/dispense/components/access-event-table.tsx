@@ -28,7 +28,6 @@ const REASON_TRANSLATIONS: Record<string, string> = {
   Expired: 'Thẻ hoặc quyền đã hết hạn',
   Unknown: 'Không tìm thấy thông tin trên hệ thống',
   UnknownCard: 'Mã thẻ lạ chưa được khai báo',
-  NoQuota: 'Hết hạn mức nhiên liệu khả dụng',
   BannedVehicle: 'Phương tiện bị cấm bơm',
   BannedDriver: 'Tài xế bị tạm đình chỉ',
 };

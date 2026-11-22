@@ -15,8 +15,6 @@ export interface DispenseSessionListItem {
   driver_id?: string;
   driver_name?: string;
   driver_code?: string;
-  limit_ml?: number;
-  limit_liters?: number;
   dispensed_ml: number;
   dispensed_liters: number;
   pump_total_ml?: number;

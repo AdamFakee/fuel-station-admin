@@ -250,43 +250,6 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
       });
     });
 
-    // 8. Mock Report 6: Reconciliation
-    await page.route('**/reports/reconciliation*', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          items: [
-            {
-              id: 'rec-01',
-              period_date: '2026-11-20',
-              branch_name: 'Trạm Xăng Dầu Số 1',
-              tank_name: 'Bể DO 01',
-              tank_code: 'B01',
-              fuel_type_name: 'DO 0.05S',
-              opening_liters: 5000,
-              receipts_liters: 12000,
-              dispensed_liters: 4500,
-              other_issues_liters: 100,
-              book_closing_liters: 12400,
-              measured_liters: 12385,
-              pump_totalizer_liters: 4500,
-              variance_liters: -15,
-              variance_pct: -0.12,
-              tolerance_pct: 0.5,
-              status: 'confirmed',
-              measured_by_name: 'Lê Văn Đo',
-              confirmed_by_name: 'Phạm Thị Kế Toán',
-            },
-          ],
-          total_count: 1,
-          matched_count: 0,
-          alert_count: 0,
-          confirmed_count: 1,
-          total_variance_liters: -15,
-        }),
-      });
-    });
   });
 
   test('TC-M14-01: Manager can access /reports and see the export actions', async ({ page }) => {
@@ -346,20 +309,12 @@ test.describe('Module M14 - Reports & Exports (6 Templates, Strictly NO Money)',
     await expect(page.getByText('Tổng nhiên liệu tiêu thụ toàn đội xe')).toBeVisible();
     await expect(page.getByText('29A-12345')).toBeVisible();
     await expect(page.getByText('29A-67890')).toBeVisible();
-    await expect(page.getByText('Trong định mức')).toBeVisible();
-    await expect(page.getByText('Vượt định mức')).toBeVisible();
 
     // Tab 5: Cấp phát theo tài xế
     await page.getByRole('tab', { name: 'Cấp phát theo tài xế' }).click();
     await expect(page.getByText('Tổng số tài xế nhận nhiên liệu')).toBeVisible();
     await expect(page.getByText('TX-001')).toBeVisible();
     await expect(page.getByText('0981122334')).toBeVisible();
-
-    // Tab 6: Đối chiếu kiểm kê
-    await page.getByRole('tab', { name: 'Đối chiếu kiểm kê' }).click();
-    await expect(page.getByText('Tổng số biên bản kiểm kê')).toBeVisible();
-    await expect(page.getByText('Đã chốt', { exact: true })).toBeVisible();
-    await expect(page.getByText('Phạm Thị Kế Toán')).toBeVisible();
   });
 
   test('TC-M14-04: Date range filter presets update date inputs', async ({ page }) => {

@@ -21,17 +21,6 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
 
   const items = data?.items || [];
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'over_quota':
-        return <StatusBadge tone="danger">Vượt định mức</StatusBadge>;
-      case 'normal':
-        return <StatusBadge tone="success">Trong định mức</StatusBadge>;
-      default:
-        return <StatusBadge tone="neutral">Chưa có định mức</StatusBadge>;
-    }
-  };
-
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       {/* Quick Summary Cards */}
@@ -43,7 +32,7 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
           tone="neutral"
         />
         <StatCard
-          label="Tổng số phiên đổ hoàn thành"
+          label="Tổng số lượt đổ hoàn tất"
           value={<>{formatNumberVN(data?.total_sessions || 0)}</>}
           icon={ChartBarIcon}
           tone="neutral"
@@ -66,14 +55,11 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
               <TableHead>Loại xe</TableHead>
               <TableHead className="text-right tabular-nums">Số lượt đổ</TableHead>
               <TableHead className="text-right tabular-nums text-indigo-600 font-bold">Tổng tiêu hao (L)</TableHead>
-              <TableHead className="text-right tabular-nums">Hạn mức quy định (L)</TableHead>
-              <TableHead className="text-right tabular-nums">Chênh lệch (L)</TableHead>
-              <TableHead className="w-[130px]">Đánh giá</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
-              <TableEmptyRow colSpan={8} title="Không có dữ liệu tiêu hao phương tiện trong khoảng thời gian đã chọn." />
+              <TableEmptyRow colSpan={5} title="Không có dữ liệu tiêu hao phương tiện trong khoảng thời gian đã chọn." />
             ) : (
               items.map((row) => (
                 <TableRow key={row.vehicle_id}>
@@ -84,41 +70,6 @@ export function VehicleConsumptionReportView({ data, isLoading }: VehicleConsump
                   <TableCell className="text-right tabular-nums text-xs font-extrabold text-indigo-600">
                     {formatNumberVN(row.total_dispensed_liters, 2)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">
-                    {row.quota_liters !== null ? (
-                      <div>
-                        <span className="font-medium">{formatNumberVN(row.quota_liters, 2)}</span>
-                        {row.quota_period && (
-                          <span className="text-[10px] text-muted-foreground block">
-                            (
-                            {row.quota_period === 'day'
-                              ? 'ngày'
-                              : row.quota_period === 'month'
-                                ? 'tháng'
-                                : row.quota_period}
-                            )
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right tabular-nums text-xs font-semibold ${
-                      (row.variance_liters || 0) > 0 ? 'text-destructive' : 'text-emerald-600'
-                    }`}
-                  >
-                    {row.variance_liters !== null ? (
-                      <>
-                        {row.variance_liters > 0 ? '+' : ''}
-                        {formatNumberVN(row.variance_liters, 2)}
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(row.status)}</TableCell>
                 </TableRow>
               ))
             )}

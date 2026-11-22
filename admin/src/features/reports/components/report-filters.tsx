@@ -9,16 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Filter, RotateCcw } from 'lucide-react';
+import { Filter } from 'lucide-react';
 
 interface ReportFiltersProps {
   template: ReportTemplateType;
   filters: ReportFilterState;
   onChange: (filters: ReportFilterState) => void;
-  onReset: () => void;
 }
 
-export function ReportFilters({ template, filters, onChange, onReset }: ReportFiltersProps) {
+export function ReportFilters({ template, filters, onChange }: ReportFiltersProps) {
   const { data: branchData } = useBranches();
   const branches = branchData?.data || [];
 
@@ -46,8 +45,8 @@ export function ReportFilters({ template, filters, onChange, onReset }: ReportFi
     });
   };
 
-  const showTankFilter = template === 'stock-ledger' || template === 'receipts' || template === 'dispenses' || template === 'reconciliation';
-  const showStatusFilter = template === 'receipts' || template === 'dispenses' || template === 'reconciliation';
+  const showTankFilter = template === 'stock-ledger' || template === 'receipts' || template === 'dispenses';
+  const showStatusFilter = template === 'receipts' || template === 'dispenses';
 
   return (
     <div className="bg-card border rounded-lg p-4 space-y-4 shadow-sm">
@@ -162,26 +161,12 @@ export function ReportFilters({ template, filters, onChange, onReset }: ReportFi
                     <SelectItem value="failed">Lỗi</SelectItem>
                   </>
                 )}
-                {template === 'reconciliation' && (
-                  <>
-                    <SelectItem value="matched">Khớp chuẩn</SelectItem>
-                    <SelectItem value="alert">Vượt ngưỡng hao hụt</SelectItem>
-                    <SelectItem value="confirmed">Đã xác nhận</SelectItem>
-                    <SelectItem value="open">Mở</SelectItem>
-                  </>
-                )}
               </SelectContent>
             </Select>
           </div>
         )}
       </div>
 
-      <div className="flex justify-end gap-2 pt-1 border-t">
-        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={onReset}>
-          <RotateCcw className="h-3.5 w-3.5 mr-1" />
-          Đặt lại bộ lọc
-        </Button>
-      </div>
     </div>
   );
 }

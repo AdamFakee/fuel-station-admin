@@ -7,10 +7,6 @@ export const stocktakeKeys = {
   tankStocks: (branchId?: string) => [...stocktakeKeys.all, 'tank-stocks', branchId] as const,
   tankLedger: (tankId: string, page: number, pageSize: number) =>
     [...stocktakeKeys.all, 'tank-ledger', tankId, page, pageSize] as const,
-  reconciliations: (params: any) => [...stocktakeKeys.all, 'reconciliations', params] as const,
-  reconciliationDetail: (id: string) => [...stocktakeKeys.all, 'reconciliation', id] as const,
-  summary: (branchId?: string) => [...stocktakeKeys.all, 'summary', branchId] as const,
-  alerts: (branchId?: string, resolved?: boolean) => [...stocktakeKeys.all, 'alerts', branchId, resolved] as const,
 };
 
 export async function getTankStocks(branchId?: string): Promise<TankStockItem[]> {

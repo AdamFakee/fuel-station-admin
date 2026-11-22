@@ -62,7 +62,6 @@ export function SessionTable({ sessions, isLoading, onViewDetail }: SessionTable
             <TableHead className="text-left">Phương tiện (Xe)</TableHead>
             <TableHead className="text-left">Tài xế</TableHead>
             <TableHead className="text-right tabular-nums w-[120px] text-blue-600">Đã đổ (Lít)</TableHead>
-            <TableHead className="text-right tabular-nums w-[120px]">Hạn mức (Lít)</TableHead>
             <TableHead className="text-left w-[120px]">Trạng thái</TableHead>
             <TableHead className="text-right tabular-nums w-[170px]">Thời điểm hoàn tất</TableHead>
             <TableHead className="text-right w-[80px]">Chi tiết</TableHead>
@@ -92,9 +91,6 @@ export function SessionTable({ sessions, isLoading, onViewDetail }: SessionTable
               </TableCell>
               <TableCell className="text-right tabular-nums text-xs font-semibold text-blue-600">
                 {formatNumberVN(s.dispensed_liters, 2)} L
-              </TableCell>
-              <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
-                {s.limit_liters !== undefined && s.limit_liters !== null ? `${formatNumberVN(s.limit_liters, 2)} L` : '—'}
               </TableCell>
               <TableCell className="text-left">
                 {statusBadge(s.status, s.edge_state)}
