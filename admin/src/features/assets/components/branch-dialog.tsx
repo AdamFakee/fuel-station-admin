@@ -19,6 +19,7 @@ import { Branch, BranchInput, branchSchema } from '../types';
 import { useCreateBranch } from '../api/create-branch';
 import { useUpdateBranch } from '../api/update-branch';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 interface BranchDialogProps {
   open: boolean;
@@ -78,7 +79,7 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
       }
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại');
+      showApiError(err, 'Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 

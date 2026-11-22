@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { StockIssue, UpdateIssueInput } from '../types';
 import { issueKeys } from './get-issues';
+import { showApiError } from '@/lib/api-error';
 
 export async function updateIssue({ id, data }: { id: string; data: UpdateIssueInput }): Promise<StockIssue> {
   const res = await apiClient.put<StockIssue>(`/inventory/issues/${id}`, data);
@@ -20,8 +21,7 @@ export function useUpdateIssue() {
       toast.success('Cập nhật phiếu xuất thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể cập nhật phiếu xuất';
-      toast.error(msg);
+      showApiError(err, 'Không thể cập nhật phiếu xuất');
     },
   });
 }

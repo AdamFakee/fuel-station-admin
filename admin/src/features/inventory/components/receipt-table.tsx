@@ -30,6 +30,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 const statusConfig: Record<
   ReceiptStatus,
@@ -110,7 +111,7 @@ export function ReceiptTable() {
       await submitMutation.mutateAsync(r.id);
       toast.success(`Đã nộp phiếu ${r.code} chờ phê duyệt`);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi nộp duyệt');
+      showApiError(err, 'Có lỗi xảy ra khi nộp duyệt');
     }
   };
 
@@ -121,7 +122,7 @@ export function ReceiptTable() {
       toast.success(`Đã xóa phiếu nhập ${deleteTarget.code}`);
       setDeleteTarget(null);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi xóa phiếu');
+      showApiError(err, 'Có lỗi xảy ra khi xóa phiếu');
     }
   };
 

@@ -31,6 +31,7 @@ import { useSuppliers } from '../api/get-suppliers';
 import { checkCapacity } from '../api/check-capacity';
 import { formatNumberVN } from '@/lib/format';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 interface FormLine {
   tank_id: string;
@@ -282,7 +283,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
       }
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi lưu phiếu nhập');
+      showApiError(err, 'Có lỗi xảy ra khi lưu phiếu nhập');
     } finally {
       setSubmitting(false);
     }

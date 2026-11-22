@@ -28,7 +28,7 @@ export default function RootLayout({
           <AdminShell>
             {children}
             <ForbiddenModal />
-            <Toaster position="top-right" richColors />
+            <Toaster position="bottom-right" richColors />
           </AdminShell>
         </ReactQueryProvider>
       </body>

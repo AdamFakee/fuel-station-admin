@@ -18,6 +18,7 @@ import { useApproveIssue } from '../api/approve-issue';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
 import { CheckCircle2Icon, XCircleIcon, AlertTriangleIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 interface IssueApproveDialogProps {
   open: boolean;
@@ -68,8 +69,7 @@ export function IssueApproveDialog({
       );
       onOpenChange(false);
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Có lỗi xảy ra khi phê duyệt';
-      toast.error(msg);
+      showApiError(err, 'Có lỗi xảy ra khi phê duyệt');
     } finally {
       setSubmitting(false);
     }

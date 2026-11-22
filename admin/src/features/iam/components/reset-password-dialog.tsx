@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useResetPassword } from '../api/reset-password';
 import { UserListItem } from '../types';
+import { apiErrorText } from '@/lib/api-error';
 
 interface ResetPasswordDialogProps {
   open: boolean;
@@ -56,7 +57,7 @@ export function ResetPasswordDialog({ open, onOpenChange, user }: ResetPasswordD
       { id: user.id, new_password: newPassword },
       {
         onSuccess: () => onOpenChange(false),
-        onError: (err: any) => setError(err.response?.data?.message || 'Không thể đặt lại mật khẩu'),
+        onError: (err: any) => setError(apiErrorText(err)),
       }
     );
   };

@@ -11,7 +11,6 @@ export interface AuthUser {
   employeeCode: string;
   role: UserRole;
   roleName: string;
-  branchIds: string[];
   permissions: string[];
 }
 
@@ -29,8 +28,6 @@ export interface RawUserResponse {
   role_code?: UserRole;
   role_name?: string;
   roleName?: string;
-  branch_ids?: string[];
-  branchIds?: string[];
   permissions?: string[];
 }
 
@@ -44,7 +41,6 @@ export function mapAuthUser(raw: RawUserResponse): AuthUser {
     employeeCode: raw.employeeCode || raw.employee_code || '',
     role: (raw.role || raw.role_code || 'MANAGER') as UserRole,
     roleName: raw.roleName || raw.role_name || '',
-    branchIds: raw.branchIds || raw.branch_ids || [],
     permissions: raw.permissions || [],
   };
 }

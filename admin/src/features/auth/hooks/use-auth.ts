@@ -19,7 +19,6 @@ export function useAuth() {
         employeeCode: (rawUser as any).employeeCode || (rawUser as any).employee_code || '',
         role: ((rawUser as any).role || (rawUser as any).role_code || 'MANAGER') as UserRole,
         roleName: (rawUser as any).roleName || (rawUser as any).role_name || '',
-        branchIds: (rawUser as any).branchIds || (rawUser as any).branch_ids || [],
         permissions: (rawUser as any).permissions || [],
       }
     : {
@@ -31,7 +30,6 @@ export function useAuth() {
         employeeCode: 'NV-0001',
         role: 'MANAGER',
         roleName: 'Quản lý',
-        branchIds: [],
         permissions: [],
       };
 

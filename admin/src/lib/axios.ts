@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 import { show403Popup } from '@/components/forbidden-modal';
 
 export const apiClient = axios.create({
@@ -9,6 +9,11 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+/** Yêu cầu tải dữ liệu (GET) thì không có nơi nào khác báo lỗi, nên báo ở đây. */
+function isReadRequest(error: { config?: { method?: string } }) {
+  return (error.config?.method ?? 'get').toLowerCase() === 'get';
+}
 
 apiClient.interceptors.response.use(
   (response) => response,
@@ -23,12 +28,10 @@ apiClient.interceptors.response.use(
     } else if (status === 403) {
       // Thiếu quyền -> Hiển thị Modal 403, KHÔNG tự động logout
       show403Popup();
-    } else if (!error.response) {
-      // Lỗi mạng hoặc Timeout -> Báo lỗi kết nối, KHÔNG mặc định logout
-      toast.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.');
-    } else if (status >= 500) {
-      // Lỗi Server 5xx -> Báo lỗi dịch vụ, KHÔNG mặc định logout
-      toast.error(error.response?.data?.message || 'Hệ thống xảy ra lỗi. Vui lòng thử lại sau.');
+    } else if (isReadRequest(error) && (!error.response || status >= 500)) {
+      // Lỗi mạng, timeout hoặc 5xx khi TẢI dữ liệu -> báo lỗi (đã ánh xạ theo mã lỗi), KHÔNG mặc định logout.
+      // Thao tác ghi (tạo, sửa, xóa) tự báo lỗi kèm tên việc đang làm nên không báo lặp ở đây.
+      showApiError(error);
     }
 
     return Promise.reject(error);

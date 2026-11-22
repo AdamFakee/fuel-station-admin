@@ -98,7 +98,7 @@ export default function UsersPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Lọc theo vai trò" />
               </SelectTrigger>
               <SelectContent>
@@ -118,7 +118,7 @@ export default function UsersPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Trạng thái" />
               </SelectTrigger>
               <SelectContent>

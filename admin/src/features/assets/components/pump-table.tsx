@@ -35,6 +35,7 @@ import { useBranches } from '../api/get-branches';
 import { PumpDialog } from './pump-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 export function PumpTable() {
   const [detail, setDetail] = React.useState<PumpDetail | null>(null);
@@ -135,7 +136,7 @@ export function PumpTable() {
         await deleteMutation.mutateAsync(pump.id);
         toast.success(`Đã ngừng vận hành trụ bơm ${pump.name}`);
       } catch (err: any) {
-        toast.error(err.response?.data?.message || 'Có lỗi xảy ra');
+        showApiError(err, 'Có lỗi xảy ra');
       }
     }
   };

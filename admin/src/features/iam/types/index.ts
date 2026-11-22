@@ -10,16 +10,12 @@ export interface UserListItem {
   role_name: string;
   status: 'active' | 'locked';
   must_change_password: boolean;
-  branch_ids: string[];
-  branch_names: string[];
   last_login_at?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface UserDetail extends UserListItem {
-  branches: BranchOption[];
-}
+export type UserDetail = UserListItem;
 
 /** Tài khoản đăng nhập là email + mật khẩu; mã nhân viên do hệ thống sinh nên không gửi lên. */
 export interface CreateUserInput {
@@ -28,7 +24,6 @@ export interface CreateUserInput {
   phone?: string;
   password: string;
   role_id: string;
-  branch_ids: string[];
 }
 
 export interface UpdateUserInput {
@@ -36,7 +31,6 @@ export interface UpdateUserInput {
   email: string;
   phone?: string;
   role_id: string;
-  branch_ids: string[];
 }
 
 export interface UpdateUserStatusInput {
@@ -90,13 +84,6 @@ export interface PermissionItem {
   description: string;
 }
 
-export interface BranchOption {
-  id: string;
-  code: string;
-  name: string;
-  address?: string;
-}
-
 export interface UserListParams {
   page?: number;
   page_size?: number;
@@ -111,4 +98,11 @@ export interface PagedResponse<T> {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+export interface BranchOption {
+  id: string;
+  code: string;
+  name: string;
+  address?: string;
 }

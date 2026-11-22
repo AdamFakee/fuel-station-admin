@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function deleteVehicle(id: string): Promise<{ message: string }> {
   const res = await apiClient.delete<{ message: string }>(`/master/vehicles/${id}`);
@@ -18,8 +19,7 @@ export function useDeleteVehicle() {
       toast.success('Đã xóa phương tiện khỏi danh mục');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể xóa phương tiện';
-      toast.error(msg);
+      showApiError(err, 'Không thể xóa phương tiện');
     },
   });
 }

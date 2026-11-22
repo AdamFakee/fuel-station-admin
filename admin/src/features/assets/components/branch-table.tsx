@@ -27,6 +27,7 @@ import { BranchDialog } from './branch-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { formatDateVN } from '@/lib/format';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 export function BranchTable() {
   const [detail, setDetail] = React.useState<Branch | null>(null);
@@ -66,7 +67,7 @@ export function BranchTable() {
         await deleteMutation.mutateAsync(branch.id);
         toast.success(`Đã ngừng hoạt động trạm xăng ${branch.name}`);
       } catch (err: any) {
-        toast.error(err.response?.data?.message || 'Có lỗi xảy ra');
+        showApiError(err, 'Có lỗi xảy ra');
       }
     }
   };

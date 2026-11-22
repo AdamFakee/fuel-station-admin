@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { CredentialItem } from '../types';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function uploadDriverFace({ id, file }: { id: string; file: File }): Promise<CredentialItem> {
   const formData = new FormData();
@@ -27,8 +28,7 @@ export function useUploadDriverFace() {
       toast.success('Cập nhật dữ liệu nhận diện khuôn mặt thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể tải ảnh khuôn mặt';
-      toast.error(msg);
+      showApiError(err, 'Không thể tải ảnh khuôn mặt');
     },
   });
 }

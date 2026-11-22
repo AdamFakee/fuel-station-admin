@@ -123,7 +123,6 @@ export function userDetail(u: UserListItem): DetailSection[] {
         { label: 'Email đăng nhập', value: u.email },
         { label: 'Số điện thoại', value: u.phone },
         { label: 'Vai trò', value: u.role_name },
-        { label: 'Trạm xăng phụ trách', value: u.branch_names?.join(', '), wide: true },
       ],
     },
     {

@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { CreateRoleInput, RoleDetail } from '../types';
 import { roleKeys } from './get-roles';
+import { showApiError } from '@/lib/api-error';
 
 export async function createRole(data: CreateRoleInput): Promise<RoleDetail> {
   const res = await apiClient.post<RoleDetail>('/iam/roles', data);
@@ -19,8 +20,7 @@ export function useCreateRole() {
       toast.success('Tạo vai trò thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể tạo vai trò';
-      toast.error(msg);
+      showApiError(err, 'Không thể tạo vai trò');
     },
   });
 }

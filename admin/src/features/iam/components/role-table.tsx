@@ -83,7 +83,9 @@ export function RoleTable({ roles, isLoading, onEdit }: RoleTableProps) {
           <TableBody>
             {roles.map((r) => {
               const canDelete = canDeleteRole && !r.is_system && r.user_count === 0;
-              const rowHasActions = canUpdateRole || canDelete;
+              // Vai trò Quản trị hệ thống là mặc định của hệ thống: chỉ xem, không có thao tác sửa hay xóa
+              const isLockedRole = r.code === 'ADMIN';
+              const rowHasActions = (canUpdateRole && !isLockedRole) || canDelete;
 
               return (
                 <TableRow key={r.id} className="hover:bg-muted/40 transition-colors" onClick={rowClick(() => onEdit(r))}>
@@ -132,7 +134,7 @@ export function RoleTable({ roles, isLoading, onEdit }: RoleTableProps) {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-44">
-                              {canUpdateRole && (
+                              {canUpdateRole && !isLockedRole && (
                                 <DropdownMenuItem onClick={() => onEdit(r)} className="cursor-pointer">
                                   <PencilSquareIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                                   Sửa ma trận quyền

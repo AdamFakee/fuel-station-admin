@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { StatusBadge } from '@/components/status-badge';
 import { usePermissions } from '../api/get-permissions';
 import { useRole } from '../api/get-role';
 import { useCreateRole } from '../api/create-role';
 import { useUpdateRole } from '../api/update-role';
 import { PermissionItem } from '../types';
+import { apiErrorText } from '@/lib/api-error';
 
 const MODULE_LABELS: Record<string, string> = {
   'iam.user': 'Tài khoản người dùng',
@@ -138,7 +138,7 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
         },
         {
           onSuccess: goBack,
-          onError: (err: any) => setError(err.response?.data?.message || 'Lỗi cập nhật vai trò'),
+          onError: (err: any) => setError(apiErrorText(err)),
         },
       );
       return;
@@ -157,13 +157,14 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
       },
       {
         onSuccess: goBack,
-        onError: (err: any) => setError(err.response?.data?.message || 'Lỗi tạo vai trò'),
+        onError: (err: any) => setError(apiErrorText(err)),
       },
     );
   };
 
   const isPending = createRole.isPending || updateRole.isPending;
-  const isSystemRole = roleDetail?.is_system ?? false;
+  // Vai trò Quản trị hệ thống là mặc định của hệ thống: chỉ xem, không sửa được
+  const isLocked = roleDetail?.code === 'ADMIN';
 
   if (isEdit && isRoleLoading) {
     return <div className="p-8 text-center text-muted-foreground">Đang tải vai trò...</div>;
@@ -180,22 +181,29 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
             </Link>
           </Button>
           <h1 className="truncate text-xl font-bold tracking-tight">
-            {isEdit ? `Chỉnh sửa vai trò: ${roleDetail?.name ?? ''}` : 'Tạo vai trò mới'}
+            {isLocked ? `Vai trò: ${roleDetail?.name ?? ''}` : isEdit ? `Chỉnh sửa vai trò: ${roleDetail?.name ?? ''}` : 'Tạo vai trò mới'}
           </h1>
-          {isSystemRole && <StatusBadge tone="info">Vai trò hệ thống</StatusBadge>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button type="button" variant="outline" onClick={goBack} disabled={isPending}>
-            Hủy
+            {isLocked ? 'Quay lại' : 'Hủy'}
           </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Tạo vai trò'}
-          </Button>
+          {!isLocked && (
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Đang lưu...' : isEdit ? 'Lưu thay đổi' : 'Tạo vai trò'}
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-6xl space-y-6 p-6">
+        {/* fieldset disabled khóa toàn bộ ô nhập và ô chọn quyền khi vai trò chỉ để xem */}
+        <fieldset disabled={isLocked} className="mx-auto w-full min-w-0 max-w-6xl space-y-6 border-0 p-6">
+          {isLocked && (
+            <div className="rounded-md border border-primary/20 bg-primary/10 p-3 text-sm font-medium text-primary">
+              Đây là vai trò mặc định của hệ thống, chỉ để xem và không chỉnh sửa được.
+            </div>
+          )}
           {error && (
             <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive">
               {error}
@@ -328,7 +336,7 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
               </div>
             )}
           </section>
-        </div>
+        </fieldset>
       </div>
     </form>
   );

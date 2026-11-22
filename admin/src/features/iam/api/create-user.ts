@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { CreateUserInput, UserDetail } from '../types';
 import { userKeys } from './get-users';
+import { showApiError } from '@/lib/api-error';
 
 export async function createUser(data: CreateUserInput): Promise<UserDetail> {
   const res = await apiClient.post<UserDetail>('/iam/users', data);
@@ -19,8 +20,7 @@ export function useCreateUser() {
       toast.success('Tạo tài khoản thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể tạo tài khoản';
-      toast.error(msg);
+      showApiError(err, 'Không thể tạo tài khoản');
     },
   });
 }

@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { UpdateUserInput, UserDetail } from '../types';
 import { userKeys } from './get-users';
+import { showApiError } from '@/lib/api-error';
 
 export async function updateUser({ id, data }: { id: string; data: UpdateUserInput }): Promise<UserDetail> {
   const res = await apiClient.put<UserDetail>(`/iam/users/${id}`, data);
@@ -20,8 +21,7 @@ export function useUpdateUser() {
       toast.success('Cập nhật tài khoản thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể cập nhật tài khoản';
-      toast.error(msg);
+      showApiError(err, 'Không thể cập nhật tài khoản');
     },
   });
 }

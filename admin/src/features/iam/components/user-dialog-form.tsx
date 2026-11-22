@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -23,10 +22,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRoles } from '../api/get-roles';
-import { useBranches } from '../api/get-branches';
 import { useCreateUser } from '../api/create-user';
 import { useUpdateUser } from '../api/update-user';
 import { UserDetail, UserListItem } from '../types';
+import { apiErrorText } from '@/lib/api-error';
 
 interface UserDialogFormProps {
   open: boolean;
@@ -38,7 +37,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
   const isEdit = Boolean(user);
 
   const { data: roles = [] } = useRoles();
-  const { data: branches = [] } = useBranches();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
 
@@ -48,7 +46,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [roleId, setRoleId] = React.useState('');
-  const [selectedBranches, setSelectedBranches] = React.useState<string[]>([]);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -59,7 +56,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
       setEmail(user.email);
       setPhone(user.phone || '');
       setRoleId(user.role_id);
-      setSelectedBranches(user.branch_ids || []);
       setError(null);
     } else {
       setEmployeeCode('');
@@ -68,24 +64,9 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
       setEmail('');
       setPhone('');
       setRoleId(roles[0]?.id || '');
-      setSelectedBranches(branches.map((b) => b.id));
       setError(null);
     }
-  }, [user, open, roles, branches]);
-
-  const toggleBranch = (bId: string) => {
-    setSelectedBranches((prev) =>
-      prev.includes(bId) ? prev.filter((id) => id !== bId) : [...prev, bId]
-    );
-  };
-
-  const selectAllBranches = () => {
-    setSelectedBranches(branches.map((b) => b.id));
-  };
-
-  const deselectAllBranches = () => {
-    setSelectedBranches([]);
-  };
+  }, [user, open, roles]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,12 +94,11 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
             email: email.trim(),
             phone: phone.trim() || undefined,
             role_id: roleId,
-            branch_ids: selectedBranches,
           },
         },
         {
           onSuccess: () => onOpenChange(false),
-          onError: (err: any) => setError(err.response?.data?.message || 'Lỗi cập nhật'),
+          onError: (err: any) => setError(apiErrorText(err)),
         }
       );
     } else {
@@ -134,11 +114,10 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
           email: email.trim(),
           phone: phone.trim() || undefined,
           role_id: roleId,
-          branch_ids: selectedBranches,
         },
         {
           onSuccess: () => onOpenChange(false),
-          onError: (err: any) => setError(err.response?.data?.message || 'Lỗi tạo tài khoản'),
+          onError: (err: any) => setError(apiErrorText(err)),
         }
       );
     }
@@ -251,61 +230,6 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Trạm xăng phân bổ */}
-            <div className="space-y-2 pt-2 border-t">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-semibold">Phạm vi Trạm xăng / Trạm xăng</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Người dùng chỉ có thể xem và thao tác dữ liệu thuộc các trạm xăng được gán
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={selectAllBranches}
-                  >
-                    Tất cả
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={deselectAllBranches}
-                  >
-                    Bỏ chọn
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 rounded-md border bg-muted/20">
-                {branches.map((b) => {
-                  const isChecked = selectedBranches.includes(b.id);
-                  return (
-                    <div
-                      key={b.id}
-                      onClick={() => toggleBranch(b.id)}
-                      className="flex items-center gap-2.5 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      <Checkbox
-                        id={`branch-${b.id}`}
-                        checked={isChecked}
-                        onCheckedChange={() => toggleBranch(b.id)}
-                      />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-medium truncate">{b.name}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">{b.code}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           </form>
         </DialogBody>

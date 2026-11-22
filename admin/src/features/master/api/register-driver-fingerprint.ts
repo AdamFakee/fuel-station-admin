@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { CredentialItem } from '../types';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function registerDriverFingerprint({
   id,
@@ -28,8 +29,7 @@ export function useRegisterDriverFingerprint() {
       toast.success('Đăng ký mẫu vân tay thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể đăng ký mẫu vân tay';
-      toast.error(msg);
+      showApiError(err, 'Không thể đăng ký mẫu vân tay');
     },
   });
 }

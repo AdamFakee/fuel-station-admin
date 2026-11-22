@@ -22,6 +22,7 @@ import { useUpdateTank } from '../api/update-tank';
 import { useBranches } from '../api/get-branches';
 import { useFuelTypes } from '../api/get-fuel-types';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 interface TankDialogProps {
   open: boolean;
@@ -103,7 +104,7 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
       }
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại');
+      showApiError(err, 'Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 

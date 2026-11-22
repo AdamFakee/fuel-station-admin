@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function assignDriverCard({ id, cardNumber }: { id: string; cardNumber: string }): Promise<{ card_number: string }> {
   const res = await apiClient.post<{ card_number: string }>(`/master/drivers/${id}/credentials/card`, { card_number: cardNumber });
@@ -19,8 +20,7 @@ export function useAssignDriverCard() {
       toast.success('Gán thẻ NFC cho tài xế thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể gán thẻ NFC';
-      toast.error(msg);
+      showApiError(err, 'Không thể gán thẻ NFC');
     },
   });
 }

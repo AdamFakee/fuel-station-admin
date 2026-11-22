@@ -30,6 +30,7 @@ import Paginator from '@/components/paginator';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 const statusConfig: Record<
   IssueStatus,
@@ -129,7 +130,7 @@ export function IssueTable() {
       await submitMutation.mutateAsync(issue.id);
       toast.success(`Đã nộp phiếu ${issue.code} chờ phê duyệt`);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi nộp duyệt');
+      showApiError(err, 'Có lỗi xảy ra khi nộp duyệt');
     }
   };
 

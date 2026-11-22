@@ -37,6 +37,7 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { formatNumberVN } from '@/lib/format';
 import { toast } from 'sonner';
 import Paginator from '@/components/paginator';
+import { showApiError } from '@/lib/api-error';
 
 export function TankTable() {
   const [detail, setDetail] = React.useState<Tank | null>(null);
@@ -159,7 +160,7 @@ export function TankTable() {
         await deleteMutation.mutateAsync(tank.id);
         toast.success(`Đã ngừng vận hành bể ${tank.name}`);
       } catch (err: any) {
-        toast.error(err.response?.data?.message || 'Có lỗi xảy ra');
+        showApiError(err, 'Có lỗi xảy ra');
       }
     }
   };

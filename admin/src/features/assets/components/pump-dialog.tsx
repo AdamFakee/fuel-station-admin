@@ -24,6 +24,7 @@ import { useUpdateTerminal } from '../api/update-terminal';
 import { useBranches } from '../api/get-branches';
 import { useTanks } from '../api/get-tanks';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 /** Tốc độ baud của bộ số Montech: phần cứng cố định, không cho sửa. */
 const SENSOR_BAUD = 9600;
@@ -173,7 +174,7 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
       }
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại');
+      showApiError(err, 'Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 

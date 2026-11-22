@@ -18,6 +18,7 @@ import { useApproveReceipt } from '../api/approve-receipt';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
 import { CheckCircle2Icon, XCircleIcon, ShieldAlertIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 
 interface ReceiptApproveDialogProps {
   open: boolean;
@@ -69,7 +70,7 @@ export function ReceiptApproveDialog({
       }
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi phê duyệt');
+      showApiError(err, 'Có lỗi xảy ra khi phê duyệt');
     } finally {
       setSubmitting(false);
     }

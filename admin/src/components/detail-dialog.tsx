@@ -21,14 +21,16 @@ interface DetailDialogProps {
   title: string;
   description?: string;
   sections: DetailSection[];
+  /** 'stacked': các nhóm xếp dọc trong một cột (mặc định xếp hai cột khi có nhiều nhóm). */
+  layout?: 'columns' | 'stacked';
 }
 
 /** Hộp thoại xem chi tiết chỉ đọc dùng chung: bấm vào một dòng của bảng là mở ra. */
-export function DetailDialog({ open, onOpenChange, title, description, sections }: DetailDialogProps) {
+export function DetailDialog({ open, onOpenChange, title, description, sections, layout = 'columns' }: DetailDialogProps) {
   // Cột trái: nhóm đầu tiên rồi tới nhóm "Hệ thống" (ngày tạo, cập nhật) ngay bên dưới; cột phải: các nhóm còn lại.
   const system = sections.filter((section, index) => index > 0 && section.title === 'Hệ thống');
-  const leftColumn = sections.length > 0 ? [sections[0], ...system] : [];
-  const rightColumn = sections.filter((section, index) => index > 0 && !system.includes(section));
+  const leftColumn = layout === 'stacked' ? sections : sections.length > 0 ? [sections[0], ...system] : [];
+  const rightColumn = layout === 'stacked' ? [] : sections.filter((section, index) => index > 0 && !system.includes(section));
   // Chỉ có một cột thì hộp hẹp lại, không để nửa bên phải trống
   const twoColumns = rightColumn.length > 0;
   return (

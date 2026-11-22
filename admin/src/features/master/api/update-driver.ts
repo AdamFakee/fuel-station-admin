@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { DriverDetail, UpdateDriverInput } from '../types';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function updateDriver({ id, data }: { id: string; data: UpdateDriverInput }): Promise<DriverDetail> {
   const res = await apiClient.put<DriverDetail>(`/master/drivers/${id}`, data);
@@ -20,8 +21,7 @@ export function useUpdateDriver() {
       toast.success('Cập nhật hồ sơ tài xế thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể cập nhật hồ sơ tài xế';
-      toast.error(msg);
+      showApiError(err, 'Không thể cập nhật hồ sơ tài xế');
     },
   });
 }

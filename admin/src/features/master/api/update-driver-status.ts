@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function updateDriverStatus({ id, status }: { id: string; status: 'active' | 'blocked' | 'inactive' }): Promise<{ status: string }> {
   const res = await apiClient.patch<{ status: string }>(`/master/drivers/${id}/status`, { status });
@@ -24,8 +25,7 @@ export function useUpdateDriverStatus() {
       toast.success(labels[vars.status] || 'Cập nhật trạng thái thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể cập nhật trạng thái tài xế';
-      toast.error(msg);
+      showApiError(err, 'Không thể cập nhật trạng thái tài xế');
     },
   });
 }

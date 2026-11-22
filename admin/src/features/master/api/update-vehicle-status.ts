@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function updateVehicleStatus({ id, status }: { id: string; status: 'active' | 'banned' }): Promise<{ status: string }> {
   const res = await apiClient.patch<{ status: string }>(`/master/vehicles/${id}/status`, { status });
@@ -19,8 +20,7 @@ export function useUpdateVehicleStatus() {
       toast.success(vars.status === 'active' ? 'Đã kích hoạt phương tiện' : 'Đã khóa quyền đổ nhiên liệu của xe');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể đổi trạng thái xe';
-      toast.error(msg);
+      showApiError(err, 'Không thể đổi trạng thái xe');
     },
   });
 }

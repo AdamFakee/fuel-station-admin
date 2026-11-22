@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { CreateIssueInput, StockIssue } from '../types';
 import { issueKeys } from './get-issues';
+import { showApiError } from '@/lib/api-error';
 
 export async function createIssue(data: CreateIssueInput): Promise<StockIssue> {
   const res = await apiClient.post<StockIssue>('/inventory/issues', data);
@@ -19,8 +20,7 @@ export function useCreateIssue() {
       toast.success('Lập phiếu xuất điều chỉnh thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể lập phiếu xuất';
-      toast.error(msg);
+      showApiError(err, 'Không thể lập phiếu xuất');
     },
   });
 }

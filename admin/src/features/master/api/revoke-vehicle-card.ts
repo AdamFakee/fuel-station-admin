@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function revokeVehicleCard(id: string): Promise<{ message: string }> {
   const res = await apiClient.delete<{ message: string }>(`/master/vehicles/${id}/card`);
@@ -19,8 +20,7 @@ export function useRevokeVehicleCard() {
       toast.success('Đã thu hồi thẻ NFC của xe');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể thu hồi thẻ NFC';
-      toast.error(msg);
+      showApiError(err, 'Không thể thu hồi thẻ NFC');
     },
   });
 }

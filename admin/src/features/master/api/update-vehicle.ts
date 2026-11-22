@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { UpdateVehicleInput, VehicleDetail } from '../types';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function updateVehicle({ id, data }: { id: string; data: UpdateVehicleInput }): Promise<VehicleDetail> {
   const res = await apiClient.put<VehicleDetail>(`/master/vehicles/${id}`, data);
@@ -20,8 +21,7 @@ export function useUpdateVehicle() {
       toast.success('Cập nhật phương tiện thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể cập nhật phương tiện';
-      toast.error(msg);
+      showApiError(err, 'Không thể cập nhật phương tiện');
     },
   });
 }

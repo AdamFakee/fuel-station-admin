@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { showApiError } from '@/lib/api-error';
 import { apiClient } from '@/lib/axios';
 import type { CreateFeedbackInput, Feedback, FeedbackStatus } from '../types';
 
@@ -42,17 +43,12 @@ export async function fetchAllFeedback(params: Omit<FeedbackListParams, 'page' |
   return all;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-  return message || fallback;
-}
-
 export function useCreateFeedback() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateFeedbackInput) => (await apiClient.post<Feedback>('/feedback', input)).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: feedbackKeys.all }),
-    onError: (error) => toast.error(errorMessage(error, 'Không gửi được góp ý, vui lòng thử lại')),
+    onError: (error) => showApiError(error, 'Không gửi được góp ý, vui lòng thử lại'),
   });
 }
 
@@ -65,7 +61,7 @@ export function useUpdateFeedbackStatus() {
       toast.success('Đã cập nhật góp ý');
       queryClient.invalidateQueries({ queryKey: feedbackKeys.all });
     },
-    onError: (error) => toast.error(errorMessage(error, 'Không cập nhật được góp ý')),
+    onError: (error) => showApiError(error, 'Không cập nhật được góp ý'),
   });
 }
 
@@ -79,6 +75,6 @@ export function useDeleteFeedback() {
       toast.success('Đã xóa góp ý');
       queryClient.invalidateQueries({ queryKey: feedbackKeys.all });
     },
-    onError: (error) => toast.error(errorMessage(error, 'Không xóa được góp ý')),
+    onError: (error) => showApiError(error, 'Không xóa được góp ý'),
   });
 }

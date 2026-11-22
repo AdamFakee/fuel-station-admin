@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { masterKeys } from './get-catalogs-summary';
+import { showApiError } from '@/lib/api-error';
 
 export async function deleteDriver(id: string): Promise<{ message: string }> {
   const res = await apiClient.delete<{ message: string }>(`/master/drivers/${id}`);
@@ -18,8 +19,7 @@ export function useDeleteDriver() {
       toast.success('Đã xóa tài xế khỏi danh mục');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể xóa hồ sơ tài xế';
-      toast.error(msg);
+      showApiError(err, 'Không thể xóa hồ sơ tài xế');
     },
   });
 }

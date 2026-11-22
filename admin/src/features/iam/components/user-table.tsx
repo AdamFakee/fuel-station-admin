@@ -106,7 +106,6 @@ export function UserTable({ users, isLoading, onEdit, onResetPassword, currentUs
               <TableHead className="text-left">Họ và tên</TableHead>
               <TableHead className="text-left">Email đăng nhập</TableHead>
               <TableHead className="text-left">Vai trò</TableHead>
-              <TableHead className="text-left">Trạm xăng</TableHead>
               <TableHead className="text-left w-[110px]">Trạng thái</TableHead>
               <TableHead className="text-right tabular-nums w-[170px]">Đăng nhập cuối</TableHead>
               {showActions && <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>}
@@ -133,14 +132,6 @@ export function UserTable({ users, isLoading, onEdit, onResetPassword, currentUs
                     <Badge variant="outline" className="font-normal text-xs">
                       {u.role_name}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-left">
-                    <div
-                      className="max-w-[200px] truncate text-xs text-muted-foreground"
-                      title={u.branch_names?.join(', ') || '—'}
-                    >
-                      {u.branch_names && u.branch_names.length > 0 ? u.branch_names.join(', ') : '—'}
-                    </div>
                   </TableCell>
                   <TableCell className="text-left">
                     <StatusBadge tone={isLocked ? 'danger' : 'success'}>
@@ -223,6 +214,7 @@ export function UserTable({ users, isLoading, onEdit, onResetPassword, currentUs
         title={detail?.full_name ?? ''}
         description={'Tài khoản người dùng'}
         sections={detail ? userDetail(detail) : []}
+        layout="stacked"
       />
       </div>
 

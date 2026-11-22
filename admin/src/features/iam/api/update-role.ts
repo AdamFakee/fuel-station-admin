@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { toast } from 'sonner';
 import { RoleDetail, UpdateRoleInput } from '../types';
 import { roleKeys } from './get-roles';
+import { showApiError } from '@/lib/api-error';
 
 export async function updateRole({ id, data }: { id: string; data: UpdateRoleInput }): Promise<RoleDetail> {
   const res = await apiClient.put<RoleDetail>(`/iam/roles/${id}`, data);
@@ -20,8 +21,7 @@ export function useUpdateRole() {
       toast.success('Cập nhật vai trò thành công');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Không thể cập nhật vai trò';
-      toast.error(msg);
+      showApiError(err, 'Không thể cập nhật vai trò');
     },
   });
 }

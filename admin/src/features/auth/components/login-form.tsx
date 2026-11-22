@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { loginSchema, LoginInput } from '../types';
 import { useLogin } from '../api/login';
+import { showApiError } from '@/lib/api-error';
 
 export function LoginForm() {
   const router = useRouter();
@@ -42,9 +43,8 @@ export function LoginForm() {
       toast.success('Đăng nhập thành công');
       router.push('/');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      const message = axiosErr?.response?.data?.message || 'Email hoặc mật khẩu không chính xác';
-      toast.error(message);
+      // Đăng nhập sai (401) giữ câu rõ nghĩa của màn đăng nhập; các lỗi khác ánh xạ theo mã lỗi backend
+      showApiError(err, 'Đăng nhập không thành công');
     }
   };
 
