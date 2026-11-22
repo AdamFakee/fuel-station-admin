@@ -10,7 +10,7 @@ import (
 )
 
 type Repository interface {
-	GetDashboardData(ctx context.Context, tenantID string, branchIDs []string) (*DashboardResponse, error)
+	GetDashboardData(ctx context.Context, tenantID string) (*DashboardResponse, error)
 }
 
 type postgresRepository struct {
@@ -21,7 +21,7 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 	return &postgresRepository{pool: pool}
 }
 
-func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID string, branchIDs []string) (*DashboardResponse, error) {
+func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID string) (*DashboardResponse, error) {
 	if r.pool == nil {
 		return nil, errors.New("db pool not initialized")
 	}
@@ -35,10 +35,9 @@ func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID stri
 		JOIN station.branch b ON b.id = ts.branch_id AND b.tenant_id = ts.tenant_id
 		LEFT JOIN station.fuel_type ft ON ft.id = ts.fuel_type_id
 		WHERE ts.tenant_id = $1
-		  AND (cardinality($2::uuid[]) = 0 OR ts.branch_id = ANY($2::uuid[]))
 		ORDER BY b.name, ts.code
 	`
-	tRows, err := r.pool.Query(ctx, tankSQL, tenantID, branchIDs)
+	tRows, err := r.pool.Query(ctx, tankSQL, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("query tank stock: %w", err)
 	}
@@ -78,11 +77,10 @@ func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID stri
 		LEFT JOIN station.edge_station es ON es.branch_id = p.branch_id AND es.tenant_id = p.tenant_id
 		LEFT JOIN station.dispense_session ds ON ds.pump_id = p.id AND ds.tenant_id = p.tenant_id
 		WHERE p.tenant_id = $1
-		  AND (cardinality($2::uuid[]) = 0 OR p.branch_id = ANY($2::uuid[]))
 		GROUP BY p.id, p.code, p.name, p.edge_pump_id, b.name, es.last_seen_at
 		ORDER BY p.code
 	`
-	pRows, err := r.pool.Query(ctx, pumpSQL, tenantID, branchIDs)
+	pRows, err := r.pool.Query(ctx, pumpSQL, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("query pump statuses: %w", err)
 	}
@@ -111,11 +109,10 @@ func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID stri
 		       dispensed_ml, status, finished_at, received_at
 		FROM station.dispense_session
 		WHERE tenant_id = $1
-		  AND (cardinality($2::uuid[]) = 0 OR branch_id = ANY($2::uuid[]))
 		ORDER BY COALESCE(finished_at, received_at) DESC
 		LIMIT 10
 	`
-	sRows, err := r.pool.Query(ctx, sessionSQL, tenantID, branchIDs)
+	sRows, err := r.pool.Query(ctx, sessionSQL, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("query recent sessions: %w", err)
 	}
@@ -147,12 +144,11 @@ func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID stri
 			COUNT(id) FILTER (WHERE status IN ('failed', 'cancelled')) AS today_failed
 		FROM station.dispense_session
 		WHERE tenant_id = $1
-		  AND (cardinality($2::uuid[]) = 0 OR branch_id = ANY($2::uuid[]))
 		  AND (finished_at >= (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date OR (finished_at IS NULL AND received_at >= (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date))
 	`
 	var todayLitersML int64
 	var kpi DashboardKpi
-	_ = r.pool.QueryRow(ctx, kpiSQL, tenantID, branchIDs).Scan(
+	_ = r.pool.QueryRow(ctx, kpiSQL, tenantID).Scan(
 		&todayLitersML, &kpi.TodayTotalSessions, &kpi.TodayCompletedSessions, &kpi.TodayFailedSessions,
 	)
 	kpi.TodayTotalLiters = float64(todayLitersML) / 1000.0
@@ -164,10 +160,9 @@ func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID stri
 		SELECT COUNT(id)
 		FROM station.edge_station
 		WHERE tenant_id = $1
-		  AND (cardinality($2::uuid[]) = 0 OR branch_id = ANY($2::uuid[]))
 		  AND last_seen_at IS NOT NULL AND last_seen_at >= now() - interval '5 minutes'
 	`
-	_ = r.pool.QueryRow(ctx, onlineStationSQL, tenantID, branchIDs).Scan(&kpi.OnlineStations)
+	_ = r.pool.QueryRow(ctx, onlineStationSQL, tenantID).Scan(&kpi.OnlineStations)
 
 	// Lượng cấp phát 7 ngày gần nhất (kể cả hôm nay); ngày không có phiên vẫn có dòng với số 0.
 	dailySQL := `
@@ -180,13 +175,12 @@ func (r *postgresRepository) GetDashboardData(ctx context.Context, tenantID stri
 		       interval '1 day') AS d(day)
 		LEFT JOIN station.dispense_session ds
 		       ON ds.tenant_id = $1
-		      AND (cardinality($2::uuid[]) = 0 OR ds.branch_id = ANY($2::uuid[]))
 		      AND (COALESCE(ds.finished_at, ds.received_at) AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = d.day::date
 		GROUP BY d.day
 		ORDER BY d.day
 	`
 	daily := make([]DailyDispenseItem, 0, 7)
-	if dRows, dErr := r.pool.Query(ctx, dailySQL, tenantID, branchIDs); dErr == nil {
+	if dRows, dErr := r.pool.Query(ctx, dailySQL, tenantID); dErr == nil {
 		defer dRows.Close()
 		for dRows.Next() {
 			var item DailyDispenseItem

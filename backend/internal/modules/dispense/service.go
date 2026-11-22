@@ -40,7 +40,7 @@ func getTenantAndPrincipal(ctx context.Context) (uuid.UUID, authz.Principal, err
 }
 
 func (s *Service) ListSessions(ctx context.Context, q SessionListQuery) (*PagedResponse[DispenseSessionListItem], error) {
-	tenantID, principal, err := getTenantAndPrincipal(ctx)
+	tenantID, _, err := getTenantAndPrincipal(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -56,21 +56,6 @@ func (s *Service) ListSessions(ctx context.Context, q SessionListQuery) (*PagedR
 	whereClauses := []string{"s.tenant_id = $1"}
 	args := []any{tenantID}
 	argIdx := 2
-
-	// Branch restrictions
-	if len(principal.BranchIDs) > 0 {
-		branchUUIDs := make([]uuid.UUID, 0, len(principal.BranchIDs))
-		for _, b := range principal.BranchIDs {
-			if id, err := uuid.Parse(b); err == nil {
-				branchUUIDs = append(branchUUIDs, id)
-			}
-		}
-		if len(branchUUIDs) > 0 {
-			whereClauses = append(whereClauses, fmt.Sprintf("s.branch_id = ANY($%d)", argIdx))
-			args = append(args, branchUUIDs)
-			argIdx++
-		}
-	}
 
 	if q.BranchID != "" {
 		if bUUID, err := uuid.Parse(q.BranchID); err == nil {
@@ -172,13 +157,13 @@ func (s *Service) ListSessions(ctx context.Context, q SessionListQuery) (*PagedR
 	var items []DispenseSessionListItem
 	for rows.Next() {
 		var (
-			item          DispenseSessionListItem
-			sUUID         uuid.UUID
-			branchUUID    uuid.UUID
-			pumpUUID      uuid.UUID
-			tankUUID      *uuid.UUID
-			vehicleUUID   *uuid.UUID
-			driverUUID    *uuid.UUID
+			item        DispenseSessionListItem
+			sUUID       uuid.UUID
+			branchUUID  uuid.UUID
+			pumpUUID    uuid.UUID
+			tankUUID    *uuid.UUID
+			vehicleUUID *uuid.UUID
+			driverUUID  *uuid.UUID
 		)
 
 		err := rows.Scan(
@@ -236,7 +221,7 @@ func (s *Service) ListSessions(ctx context.Context, q SessionListQuery) (*PagedR
 }
 
 func (s *Service) GetSession(ctx context.Context, idStr string) (*DispenseSessionDetail, error) {
-	tenantID, principal, err := getTenantAndPrincipal(ctx)
+	tenantID, _, err := getTenantAndPrincipal(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -288,11 +273,6 @@ func (s *Service) GetSession(ctx context.Context, idStr string) (*DispenseSessio
 			return nil, apperr.ErrNotFound
 		}
 		return nil, fmt.Errorf("query session: %w", err)
-	}
-
-	// Check branch access if principal restricted
-	if len(principal.BranchIDs) > 0 && !principal.HasBranch(branchUUID.String()) {
-		return nil, apperr.ErrForbidden
 	}
 
 	item.ID = sUUID.String()
@@ -372,7 +352,7 @@ func (s *Service) GetSession(ctx context.Context, idStr string) (*DispenseSessio
 }
 
 func (s *Service) ListAccessEvents(ctx context.Context, q AccessEventListQuery) (*PagedResponse[AccessEventListItem], error) {
-	tenantID, principal, err := getTenantAndPrincipal(ctx)
+	tenantID, _, err := getTenantAndPrincipal(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -388,20 +368,6 @@ func (s *Service) ListAccessEvents(ctx context.Context, q AccessEventListQuery) 
 	whereClauses := []string{"ae.tenant_id = $1"}
 	args := []any{tenantID}
 	argIdx := 2
-
-	if len(principal.BranchIDs) > 0 {
-		branchUUIDs := make([]uuid.UUID, 0, len(principal.BranchIDs))
-		for _, b := range principal.BranchIDs {
-			if id, err := uuid.Parse(b); err == nil {
-				branchUUIDs = append(branchUUIDs, id)
-			}
-		}
-		if len(branchUUIDs) > 0 {
-			whereClauses = append(whereClauses, fmt.Sprintf("ae.branch_id = ANY($%d)", argIdx))
-			args = append(args, branchUUIDs)
-			argIdx++
-		}
-	}
 
 	if q.BranchID != "" {
 		if bUUID, err := uuid.Parse(q.BranchID); err == nil {
@@ -518,7 +484,7 @@ func (s *Service) ListAccessEvents(ctx context.Context, q AccessEventListQuery) 
 }
 
 func (s *Service) GetSummary(ctx context.Context, branchIDStr string) (*DispenseSummary, error) {
-	tenantID, principal, err := getTenantAndPrincipal(ctx)
+	tenantID, _, err := getTenantAndPrincipal(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -526,20 +492,6 @@ func (s *Service) GetSummary(ctx context.Context, branchIDStr string) (*Dispense
 	whereClauses := []string{"tenant_id = $1"}
 	args := []any{tenantID}
 	argIdx := 2
-
-	if len(principal.BranchIDs) > 0 {
-		branchUUIDs := make([]uuid.UUID, 0, len(principal.BranchIDs))
-		for _, b := range principal.BranchIDs {
-			if id, err := uuid.Parse(b); err == nil {
-				branchUUIDs = append(branchUUIDs, id)
-			}
-		}
-		if len(branchUUIDs) > 0 {
-			whereClauses = append(whereClauses, fmt.Sprintf("branch_id = ANY($%d)", argIdx))
-			args = append(args, branchUUIDs)
-			argIdx++
-		}
-	}
 
 	if branchIDStr != "" {
 		if bUUID, err := uuid.Parse(branchIDStr); err == nil {

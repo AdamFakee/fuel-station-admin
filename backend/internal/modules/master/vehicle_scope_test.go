@@ -2,7 +2,6 @@ package master_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -43,7 +42,7 @@ func scopeSetup(t *testing.T) (*master.Service, *pgxpool.Pool, context.Context, 
 	}
 
 	ctx = middleware.WithTenantID(ctx, scopeTenantID)
-	ctx = authz.WithPrincipal(ctx, authz.NewPrincipal(scopeAdminID, scopeTenantID, "MANAGER", nil, []authz.Permission{
+	ctx = authz.WithPrincipal(ctx, authz.NewPrincipal(scopeAdminID, scopeTenantID, "MANAGER", []authz.Permission{
 		"master.vehicle:view", "master.vehicle:create", "master.vehicle:update", "master.vehicle:delete",
 		"master.driver:view", "master.driver:create", "master.driver:update",
 	}))
@@ -159,39 +158,5 @@ func TestDriverHasNoStoreOrPosition(t *testing.T) {
 	// Mã do hệ thống sinh, chỉ chữ và số (dùng làm employeeNo trên máy chấm công).
 	if !strings.HasPrefix(created.Code, "TX") || strings.ContainsAny(created.Code, "-_ ") {
 		t.Fatalf("expected a generated alphanumeric code TX..., got %q", created.Code)
-	}
-}
-
-// Người thao tác chỉ có trạm xăng B không được thấy hay sửa xe chỉ được đổ ở trạm xăng A.
-func TestVehicleBranchScopeIsolation(t *testing.T) {
-	svc, pool, ctx, fuelTypeID := scopeSetup(t)
-	defer pool.Close()
-
-	a, _ := uuid.Parse(scopeBranchA)
-	suffix := time.Now().UnixNano() % 1000000
-	created, err := svc.CreateVehicle(ctx, master.CreateVehicleRequest{
-		Plate: fmt.Sprintf("99S-%d", suffix), FuelTypeID: fuelTypeID, BranchIDs: []uuid.UUID{a},
-		CardNumber: fmt.Sprintf("%010d", 4000000000+suffix),
-	})
-	if err != nil {
-		t.Fatalf("CreateVehicle failed: %v", err)
-	}
-	defer func() { _ = svc.DeleteVehicle(ctx, created.ID) }()
-
-	onlyB := authz.WithPrincipal(ctx, authz.NewPrincipal(scopeAdminID, scopeTenantID, "MANAGER", []string{scopeBranchB}, []authz.Permission{
-		"master.vehicle:view", "master.vehicle:update",
-	}))
-	if _, err := svc.GetVehicle(onlyB, created.ID); !errors.Is(err, apperr.ErrNotFound) {
-		t.Fatalf("expected ErrNotFound for a vehicle outside the scope, got %v", err)
-	}
-	if err := svc.DeleteVehicle(onlyB, created.ID); !errors.Is(err, apperr.ErrNotFound) {
-		t.Fatalf("expected ErrNotFound when deleting a vehicle outside the scope, got %v", err)
-	}
-	// Không được tự gán xe sang trạm xăng khác phạm vi của mình
-	if _, err := svc.CreateVehicle(onlyB, master.CreateVehicleRequest{
-		Plate: fmt.Sprintf("99T-%d", suffix), FuelTypeID: fuelTypeID, BranchIDs: []uuid.UUID{a},
-		CardNumber: fmt.Sprintf("%010d", 5000000000+suffix),
-	}); !errors.Is(err, apperr.ErrForbidden) {
-		t.Fatalf("expected ErrForbidden when assigning an out-of-scope store, got %v", err)
 	}
 }

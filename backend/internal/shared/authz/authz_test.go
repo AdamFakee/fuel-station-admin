@@ -15,7 +15,6 @@ func TestPrincipal_Can(t *testing.T) {
 		"user-1",
 		"tenant-1",
 		"MANAGER",
-		[]string{"branch-1", "branch-2"},
 		[]authz.Permission{"master.vehicle:view", "master.vehicle:create"},
 	)
 
@@ -27,26 +26,6 @@ func TestPrincipal_Can(t *testing.T) {
 	}
 	if p.Can("inventory.issue:approve") {
 		t.Errorf("did not expect principal to have 'inventory.issue:approve'")
-	}
-}
-
-func TestPrincipal_HasBranch(t *testing.T) {
-	p := authz.NewPrincipal(
-		"user-1",
-		"tenant-1",
-		"ACCOUNTANT",
-		[]string{"branch-1", "branch-2"},
-		nil,
-	)
-
-	if !p.HasBranch("branch-1") {
-		t.Errorf("expected principal to have branch-1")
-	}
-	if p.HasBranch("branch-99") {
-		t.Errorf("did not expect principal to have branch-99")
-	}
-	if !p.HasAnyBranch("branch-99", "branch-2") {
-		t.Errorf("expected HasAnyBranch to return true")
 	}
 }
 
@@ -66,7 +45,7 @@ func TestRequirePermission_Middleware(t *testing.T) {
 	}
 
 	// Case 2: Authenticated but missing permission -> 403
-	pWithoutPerm := authz.NewPrincipal("u1", "t1", "IT", nil, []authz.Permission{"dashboard:view"})
+	pWithoutPerm := authz.NewPrincipal("u1", "t1", "IT", []authz.Permission{"dashboard:view"})
 	req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req2 = req2.WithContext(authz.WithPrincipal(req2.Context(), pWithoutPerm))
 	rr2 := httptest.NewRecorder()
@@ -76,7 +55,7 @@ func TestRequirePermission_Middleware(t *testing.T) {
 	}
 
 	// Case 3: Authenticated with permission -> 200
-	pWithPerm := authz.NewPrincipal("u1", "t1", "MANAGER", nil, []authz.Permission{"master.vehicle:view"})
+	pWithPerm := authz.NewPrincipal("u1", "t1", "MANAGER", []authz.Permission{"master.vehicle:view"})
 	req3 := httptest.NewRequest(http.MethodGet, "/test", nil)
 	req3 = req3.WithContext(authz.WithPrincipal(req3.Context(), pWithPerm))
 	rr3 := httptest.NewRecorder()

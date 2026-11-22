@@ -16,12 +16,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// SessionUserData holds user identity, tenant, role, branch scopes, and permissions.
+// SessionUserData holds user identity, tenant, role, and permissions.
 type SessionUserData struct {
 	UserID      string
 	TenantID    string
 	RoleCode    string
-	BranchIDs   []string
 	Permissions []string
 }
 
@@ -87,28 +86,10 @@ func (v *PostgresSessionValidator) ValidateToken(ctx context.Context, tokenHash 
 		perms = append(perms, p)
 	}
 
-	// Fetch assigned branch IDs
-	branchQuery := `SELECT branch_id FROM station.user_branch WHERE tenant_id = $1 AND user_id = $2`
-	bRows, err := v.pool.Query(ctx, branchQuery, tenantID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("query branches: %w", err)
-	}
-	defer bRows.Close()
-
-	var branchIDs []string
-	for bRows.Next() {
-		var b string
-		if err := bRows.Scan(&b); err != nil {
-			return nil, fmt.Errorf("scan branch: %w", err)
-		}
-		branchIDs = append(branchIDs, b)
-	}
-
 	return &SessionUserData{
 		UserID:      userID,
 		TenantID:    tenantID,
 		RoleCode:    roleCode,
-		BranchIDs:   branchIDs,
 		Permissions: perms,
 	}, nil
 }
@@ -160,7 +141,6 @@ func RequireAuth(validator SessionValidator, log *slog.Logger) func(http.Handler
 				userData.UserID,
 				userData.TenantID,
 				userData.RoleCode,
-				userData.BranchIDs,
 				perms,
 			)
 

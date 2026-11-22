@@ -112,10 +112,6 @@ func (s *Service) CheckCapacity(ctx context.Context, req CapacityCheckRequest) (
 		return nil, err
 	}
 
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.tank", req.TankID); err != nil {
-		return nil, err
-	}
-
 	query := `
 		SELECT t.id, t.name, t.max_usable_capacity_ml,
 		       COALESCE((
@@ -169,7 +165,6 @@ func (s *Service) ListReceipts(ctx context.Context, q ReceiptListQuery) ([]Stock
 	where := []string{"r.tenant_id = $1"}
 	args := []any{tenantID}
 	argIdx := 2
-	authz.AddBranchScope(ctx, "r.branch_id", &where, &args, &argIdx)
 
 	if q.BranchID != "" {
 		where = append(where, fmt.Sprintf("r.branch_id = $%d", argIdx))
@@ -253,10 +248,6 @@ func (s *Service) GetReceipt(ctx context.Context, id string) (*StockReceipt, err
 		return nil, err
 	}
 
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.stock_receipt", id); err != nil {
-		return nil, err
-	}
-
 	query := `
 		SELECT r.id, r.tenant_id, r.branch_id, b.name AS branch_name,
 		       r.code, r.received_at, r.supplier_id, sup.name AS supplier_name,
@@ -332,9 +323,6 @@ func (s *Service) CreateReceipt(ctx context.Context, req CreateReceiptRequest) (
 		return nil, err
 	}
 
-	if err := authz.EnsureBranch(ctx, req.BranchID); err != nil {
-		return nil, err
-	}
 	principal, ok := authz.FromContext(ctx)
 	if !ok || principal.UserID == "" {
 		return nil, apperr.ErrUnauthorized
@@ -424,10 +412,6 @@ func (s *Service) UpdateReceipt(ctx context.Context, id string, req UpdateReceip
 		return nil, err
 	}
 
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.stock_receipt", id); err != nil {
-		return nil, err
-	}
-
 	// Check status
 	var currentStatus, currentCode string
 	err = s.pool.QueryRow(ctx, "SELECT status, code FROM station.stock_receipt WHERE tenant_id = $1 AND id = $2", tenantID, id).Scan(&currentStatus, &currentCode)
@@ -495,10 +479,6 @@ func (s *Service) UpdateReceipt(ctx context.Context, id string, req UpdateReceip
 func (s *Service) SubmitForApproval(ctx context.Context, id string) (*StockReceipt, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.stock_receipt", id); err != nil {
 		return nil, err
 	}
 
@@ -644,10 +624,6 @@ func (s *Service) DeleteReceipt(ctx context.Context, id string) error {
 		return err
 	}
 
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.stock_receipt", id); err != nil {
-		return err
-	}
-
 	var code, status string
 	err = s.pool.QueryRow(ctx, "SELECT code, status FROM station.stock_receipt WHERE tenant_id = $1 AND id = $2", tenantID, id).Scan(&code, &status)
 	if err != nil {
@@ -712,7 +688,6 @@ func (s *Service) ListIssues(ctx context.Context, q IssueListQuery) ([]StockIssu
 	where := []string{"i.tenant_id = $1"}
 	args := []any{tenantID}
 	argIdx := 2
-	authz.AddBranchScope(ctx, "i.branch_id", &where, &args, &argIdx)
 
 	if q.BranchID != "" {
 		where = append(where, fmt.Sprintf("i.branch_id = $%d", argIdx))
@@ -813,10 +788,6 @@ func (s *Service) GetIssue(ctx context.Context, id string) (*StockIssue, error) 
 		return nil, err
 	}
 
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.stock_issue", id); err != nil {
-		return nil, err
-	}
-
 	query := `
 		SELECT i.id, i.tenant_id, i.branch_id, b.name AS branch_name,
 		       i.code, i.kind, i.tank_id, tk.code AS tank_code, tk.name AS tank_name,
@@ -867,9 +838,6 @@ func (s *Service) CreateIssue(ctx context.Context, req CreateIssueRequest) (*Sto
 		return nil, err
 	}
 
-	if err := authz.EnsureBranch(ctx, req.BranchID); err != nil {
-		return nil, err
-	}
 	principal, ok := authz.FromContext(ctx)
 	if !ok || principal.UserID == "" {
 		return nil, apperr.ErrUnauthorized
@@ -979,10 +947,6 @@ func (s *Service) UpdateIssue(ctx context.Context, id string, req UpdateIssueReq
 		return nil, err
 	}
 
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.stock_issue", id); err != nil {
-		return nil, err
-	}
-
 	var currentCode, currentStatus string
 	err = s.pool.QueryRow(ctx, "SELECT code, status FROM station.stock_issue WHERE tenant_id = $1 AND id = $2", tenantID, id).Scan(&currentCode, &currentStatus)
 	if err != nil {
@@ -1066,10 +1030,6 @@ func (s *Service) DeleteIssue(ctx context.Context, id string) error {
 		return err
 	}
 
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.stock_issue", id); err != nil {
-		return err
-	}
-
 	var code, status string
 	err = s.pool.QueryRow(ctx, "SELECT code, status FROM station.stock_issue WHERE tenant_id = $1 AND id = $2", tenantID, id).Scan(&code, &status)
 	if err != nil {
@@ -1103,10 +1063,6 @@ func (s *Service) DeleteIssue(ctx context.Context, id string) error {
 func (s *Service) SubmitIssueForApproval(ctx context.Context, id string) (*StockIssue, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.stock_issue", id); err != nil {
 		return nil, err
 	}
 
@@ -1308,12 +1264,6 @@ func (s *Service) ListTankStocks(ctx context.Context, branchID string) ([]TankSt
 		argIdx++
 	}
 
-	if p, ok := authz.FromContext(ctx); ok && len(p.BranchIDs) > 0 {
-		query += fmt.Sprintf(" AND ts.branch_id = ANY($%d)", argIdx)
-		args = append(args, p.BranchIDs)
-		argIdx++
-	}
-
 	query += " ORDER BY b.name ASC, ts.code ASC"
 
 	rows, err := s.pool.Query(ctx, query, args...)
@@ -1344,10 +1294,6 @@ func (s *Service) ListTankStocks(ctx context.Context, branchID string) ([]TankSt
 func (s *Service) ListTankStockLedger(ctx context.Context, tankID string, page, pageSize int) ([]StockLedgerItem, int, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
-		return nil, 0, err
-	}
-
-	if err := authz.EnsureRecordInScope(ctx, s.pool, "station.tank", tankID); err != nil {
 		return nil, 0, err
 	}
 

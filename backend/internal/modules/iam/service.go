@@ -54,7 +54,9 @@ func getTenantAndActor(ctx context.Context) (tenantID, actorUserID uuid.UUID, ac
 	return tID, uID, p.RoleCode, nil
 }
 
-// roleAdmin là vai trò cao nhất ("Quản trị hệ thống"), chỉ người cùng vai trò mới được tạo/sửa/khóa/xóa.
+// roleAdmin là vai trò cao nhất ("Quản trị hệ thống"). Ai có quyền quản lý tài khoản cũng thấy và gán được,
+// nhưng chỉ người cùng vai trò mới sửa/khóa/xóa/đổi mật khẩu được tài khoản đang giữ vai trò này; vai trò này
+// là mặc định của hệ thống nên không ai sửa được ma trận quyền.
 const roleAdmin = "ADMIN"
 
 // isTopRole: các vai trò quản trị phải luôn còn ít nhất một tài khoản hoạt động.
@@ -73,8 +75,8 @@ func actorIsAdmin(ctx context.Context) bool {
 	return ok && p.RoleCode == roleAdmin
 }
 
-// ensureCanTouchRole chặn người không phải Quản trị hệ thống động tới tài khoản hoặc vai trò Quản trị hệ thống
-// (nếu không, Quản lý có thể tự nâng quyền hoặc khóa người cấp trên).
+// ensureCanTouchRole chặn người không phải Quản trị hệ thống sửa, khóa, xóa hay đổi mật khẩu
+// tài khoản đang giữ vai trò Quản trị hệ thống.
 func ensureCanTouchRole(ctx context.Context, roleCode string) error {
 	if roleCode == roleAdmin && !actorIsAdmin(ctx) {
 		return fmt.Errorf("%w: chỉ tài khoản Quản trị hệ thống mới được thao tác với tài khoản Quản trị hệ thống", apperr.ErrForbidden)
@@ -106,13 +108,6 @@ func (s *Service) ListUsers(ctx context.Context, q UserListQuery) (*PagedRespons
 	}
 	args := []any{tenantID}
 	argIdx := 2
-
-	if scope := authz.BranchScope(ctx); scope != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf(
-			"EXISTS (SELECT 1 FROM station.user_branch ub WHERE ub.user_id = u.id AND ub.branch_id = ANY($%d::uuid[]))", argIdx))
-		args = append(args, scope)
-		argIdx++
-	}
 
 	if q.Search != "" {
 		searchPattern := "%" + strings.TrimSpace(q.Search) + "%"
@@ -153,15 +148,10 @@ func (s *Service) ListUsers(ctx context.Context, q UserListQuery) (*PagedRespons
 		SELECT 
 			u.id, u.employee_code, u.full_name, u.email, COALESCE(u.phone, ''), u.username,
 			u.role_id, r.code, r.name, u.status, u.must_change_password,
-			u.last_login_at, u.created_at, u.updated_at,
-			COALESCE(array_agg(b.id) FILTER (WHERE b.id IS NOT NULL), '{}') AS branch_ids,
-			COALESCE(array_agg(b.name) FILTER (WHERE b.name IS NOT NULL), '{}') AS branch_names
+			u.last_login_at, u.created_at, u.updated_at
 		FROM station.app_user u
 		JOIN station.role r ON r.id = u.role_id AND r.tenant_id = u.tenant_id
-		LEFT JOIN station.user_branch ub ON ub.user_id = u.id AND ub.tenant_id = u.tenant_id
-		LEFT JOIN station.branch b ON b.id = ub.branch_id AND b.tenant_id = u.tenant_id
 		WHERE %s
-		GROUP BY u.id, r.code, r.name
 		ORDER BY u.created_at DESC
 		LIMIT $%d OFFSET $%d
 	`, whereSQL, argIdx, argIdx+1)
@@ -177,18 +167,15 @@ func (s *Service) ListUsers(ctx context.Context, q UserListQuery) (*PagedRespons
 	var items []UserListItem
 	for rows.Next() {
 		var (
-			item        UserListItem
-			userUUID    uuid.UUID
-			roleUUID    uuid.UUID
-			branchUUIDs []uuid.UUID
-			branchNames []string
+			item     UserListItem
+			userUUID uuid.UUID
+			roleUUID uuid.UUID
 		)
 
 		err := rows.Scan(
 			&userUUID, &item.EmployeeCode, &item.FullName, &item.Email, &item.Phone, &item.Username,
 			&roleUUID, &item.RoleCode, &item.RoleName, &item.Status, &item.MustChangePassword,
 			&item.LastLoginAt, &item.CreatedAt, &item.UpdatedAt,
-			&branchUUIDs, &branchNames,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
@@ -196,11 +183,6 @@ func (s *Service) ListUsers(ctx context.Context, q UserListQuery) (*PagedRespons
 
 		item.ID = userUUID.String()
 		item.RoleID = roleUUID.String()
-		item.BranchIDs = make([]string, len(branchUUIDs))
-		for i, b := range branchUUIDs {
-			item.BranchIDs[i] = b.String()
-		}
-		item.BranchNames = branchNames
 		items = append(items, item)
 	}
 
@@ -223,10 +205,6 @@ func (s *Service) GetUser(ctx context.Context, idStr string) (*UserDetail, error
 	userUUID, err := uuid.Parse(idStr)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
-	}
-
-	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
-		return nil, err
 	}
 
 	var (
@@ -259,52 +237,12 @@ func (s *Service) GetUser(ctx context.Context, idStr string) (*UserDetail, error
 	item.ID = userUUID.String()
 	item.RoleID = roleUUID.String()
 
-	// Load branches
-	bRows, err := s.pool.Query(ctx, `
-		SELECT b.id, b.code, b.name, COALESCE(b.address, '')
-		FROM station.user_branch ub
-		JOIN station.branch b ON b.id = ub.branch_id AND b.tenant_id = ub.tenant_id
-		WHERE ub.tenant_id = $1 AND ub.user_id = $2
-	`, tenantID, userUUID)
-	if err != nil {
-		return nil, fmt.Errorf("load user branches: %w", err)
-	}
-	defer bRows.Close()
-
-	var branches []BranchOption
-	for bRows.Next() {
-		var (
-			bID   uuid.UUID
-			bCode string
-			bName string
-			bAddr string
-		)
-		if err := bRows.Scan(&bID, &bCode, &bName, &bAddr); err != nil {
-			return nil, err
-		}
-		branches = append(branches, BranchOption{
-			ID:      bID.String(),
-			Code:    bCode,
-			Name:    bName,
-			Address: bAddr,
-		})
-		item.BranchIDs = append(item.BranchIDs, bID.String())
-		item.BranchNames = append(item.BranchNames, bName)
-	}
-
-	return &UserDetail{
-		UserListItem: item,
-		Branches:     branches,
-	}, nil
+	return &UserDetail{UserListItem: item}, nil
 }
 
 func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserDetail, error) {
 	tenantID, actorUserID, actorName, err := getTenantAndActor(ctx)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := ensureAssignableBranches(ctx, req.BranchIDs); err != nil {
 		return nil, err
 	}
 
@@ -334,13 +272,10 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 	}
 
 	// Verify role exists in tenant
-	var newRoleCode string
-	err = s.pool.QueryRow(ctx, `SELECT code FROM station.role WHERE tenant_id = $1 AND id = $2`, tenantID, roleUUID).Scan(&newRoleCode)
-	if err != nil {
+	var roleExists bool
+	err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM station.role WHERE tenant_id = $1 AND id = $2)`, tenantID, roleUUID).Scan(&roleExists)
+	if err != nil || !roleExists {
 		return nil, fmt.Errorf("%w: vai trò không tồn tại trong hệ thống", apperr.ErrNotFound)
-	}
-	if err := ensureCanTouchRole(ctx, newRoleCode); err != nil {
-		return nil, err
 	}
 
 	// Email là tài khoản đăng nhập nên phải duy nhất.
@@ -390,22 +325,6 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 		return nil, fmt.Errorf("insert user: %w", err)
 	}
 
-	// Insert branches
-	for _, bStr := range req.BranchIDs {
-		bUUID, err := uuid.Parse(bStr)
-		if err != nil {
-			continue
-		}
-		_, err = tx.Exec(ctx, `
-			INSERT INTO station.user_branch (tenant_id, user_id, branch_id)
-			VALUES ($1, $2, $3)
-			ON CONFLICT DO NOTHING
-		`, tenantID, newUserID, bUUID)
-		if err != nil {
-			return nil, fmt.Errorf("assign branch: %w", err)
-		}
-	}
-
 	// Audit Log
 	err = audit.Record(ctx, tx, audit.Entry{
 		Action:      audit.ActionCreate,
@@ -420,7 +339,6 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 			"full_name":     req.FullName,
 			"email":         req.Email,
 			"role_id":       roleUUID.String(),
-			"branches":      req.BranchIDs,
 		},
 	})
 	if err != nil {
@@ -440,17 +358,9 @@ func (s *Service) UpdateUser(ctx context.Context, idStr string, req UpdateUserRe
 		return nil, err
 	}
 
-	if err := ensureAssignableBranches(ctx, req.BranchIDs); err != nil {
-		return nil, err
-	}
-
 	userUUID, err := uuid.Parse(idStr)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
-	}
-
-	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
-		return nil, err
 	}
 
 	req.FullName = strings.TrimSpace(req.FullName)
@@ -493,13 +403,6 @@ func (s *Service) UpdateUser(ctx context.Context, idStr string, req UpdateUserRe
 	if err := ensureCanTouchRole(ctx, oldRoleCode); err != nil {
 		return nil, err
 	}
-	var newRoleCode string
-	if err := s.pool.QueryRow(ctx, `SELECT code FROM station.role WHERE tenant_id = $1 AND id = $2`, tenantID, newRoleUUID).Scan(&newRoleCode); err == nil {
-		if err := ensureCanTouchRole(ctx, newRoleCode); err != nil {
-			return nil, err
-		}
-	}
-
 	// SAFETY RULE: Prevent self-demotion from a top role
 	if userUUID == actorUserID && isTopRole(oldRoleCode) && oldRoleID != newRoleUUID {
 		return nil, fmt.Errorf("%w: bạn không thể tự hạ quyền của chính mình", apperr.ErrForbidden)
@@ -554,27 +457,6 @@ func (s *Service) UpdateUser(ctx context.Context, idStr string, req UpdateUserRe
 		return nil, fmt.Errorf("update user: %w", err)
 	}
 
-	// Replace branch assignments
-	_, err = tx.Exec(ctx, `DELETE FROM station.user_branch WHERE tenant_id = $1 AND user_id = $2`, tenantID, userUUID)
-	if err != nil {
-		return nil, fmt.Errorf("clear branches: %w", err)
-	}
-
-	for _, bStr := range req.BranchIDs {
-		bUUID, err := uuid.Parse(bStr)
-		if err != nil {
-			continue
-		}
-		_, err = tx.Exec(ctx, `
-			INSERT INTO station.user_branch (tenant_id, user_id, branch_id)
-			VALUES ($1, $2, $3)
-			ON CONFLICT DO NOTHING
-		`, tenantID, userUUID, bUUID)
-		if err != nil {
-			return nil, fmt.Errorf("assign branch: %w", err)
-		}
-	}
-
 	// Audit Log
 	err = audit.Record(ctx, tx, audit.Entry{
 		Action:      audit.ActionUpdate,
@@ -594,7 +476,6 @@ func (s *Service) UpdateUser(ctx context.Context, idStr string, req UpdateUserRe
 			"email":     req.Email,
 			"phone":     req.Phone,
 			"role_id":   newRoleUUID.String(),
-			"branches":  req.BranchIDs,
 		},
 	})
 	if err != nil {
@@ -617,10 +498,6 @@ func (s *Service) UpdateUserStatus(ctx context.Context, idStr, newStatus string)
 	userUUID, err := uuid.Parse(idStr)
 	if err != nil {
 		return fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
-	}
-
-	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
-		return err
 	}
 
 	if newStatus != "active" && newStatus != "locked" {
@@ -737,10 +614,6 @@ func (s *Service) ResetPassword(ctx context.Context, idStr, newPassword string) 
 		return fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
 	}
 
-	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
-		return err
-	}
-
 	if len(newPassword) < 8 {
 		return fmt.Errorf("%w: mật khẩu mới phải từ 8 ký tự trở lên", apperr.ErrInvalidInput)
 	}
@@ -817,10 +690,6 @@ func (s *Service) DeleteUser(ctx context.Context, idStr string) error {
 	userUUID, err := uuid.Parse(idStr)
 	if err != nil {
 		return fmt.Errorf("%w: invalid user ID", apperr.ErrInvalidInput)
-	}
-
-	if err := s.ensureUserInScope(ctx, userUUID); err != nil {
-		return err
 	}
 
 	// SAFETY RULE: cannot delete self
@@ -926,12 +795,11 @@ func (s *Service) ListRoles(ctx context.Context) ([]RoleListItem, error) {
 		LEFT JOIN station.app_user u ON u.role_id = r.id AND u.tenant_id = r.tenant_id
 		LEFT JOIN station.role_permission rp ON rp.role_id = r.id
 		WHERE r.tenant_id = $1
-		  AND ($2 OR r.code <> 'ADMIN')
 		GROUP BY r.id
 		ORDER BY r.is_system DESC, r.code ASC
 	`
 
-	rows, err := s.pool.Query(ctx, query, tenantID, actorIsAdmin(ctx))
+	rows, err := s.pool.Query(ctx, query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("list roles: %w", err)
 	}
@@ -1116,6 +984,10 @@ func (s *Service) UpdateRole(ctx context.Context, idStr string, req UpdateRoleRe
 		return nil, fmt.Errorf("query role: %w", err)
 	}
 
+	if oldCode == roleAdmin {
+		return nil, fmt.Errorf("%w: vai trò Quản trị hệ thống là mặc định của hệ thống, không chỉnh sửa được", apperr.ErrForbidden)
+	}
+
 	// SAFETY RULE: If this is the current actor's role, actor cannot strip crucial management permissions
 	p, ok := authz.FromContext(ctx)
 	if ok && p.RoleCode == oldCode {
@@ -1288,22 +1160,19 @@ func (s *Service) ListPermissions(ctx context.Context) ([]PermissionItem, error)
 	return perms, nil
 }
 
+// ListBranches trả danh sách trạm xăng đang hoạt động của công ty (dùng cho ô lọc theo trạm ở các màn hình).
 func (s *Service) ListBranches(ctx context.Context) ([]BranchOption, error) {
 	tenantID, _, _, err := getTenantAndActor(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	where := []string{"tenant_id = $1", "status = 'active'"}
-	args := []any{tenantID}
-	argIdx := 2
-	authz.AddBranchScope(ctx, "id", &where, &args, &argIdx)
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, code, name, COALESCE(address, '')
 		FROM station.branch
-		WHERE `+strings.Join(where, " AND ")+`
+		WHERE tenant_id = $1 AND status = 'active'
 		ORDER BY code ASC
-	`, args...)
+	`, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("list branches: %w", err)
 	}
@@ -1320,52 +1189,7 @@ func (s *Service) ListBranches(ctx context.Context) ([]BranchOption, error) {
 		if err := rows.Scan(&bID, &bCode, &bName, &bAddr); err != nil {
 			return nil, err
 		}
-		branches = append(branches, BranchOption{
-			ID:      bID.String(),
-			Code:    bCode,
-			Name:    bName,
-			Address: bAddr,
-		})
+		branches = append(branches, BranchOption{ID: bID.String(), Code: bCode, Name: bName, Address: bAddr})
 	}
 	return branches, nil
-}
-
-// ensureUserInScope: người thao tác bị giới hạn trạm xăng chỉ được đụng tới tài khoản chung ít nhất một trạm xăng.
-// Tài khoản ngoài phạm vi trả `ErrNotFound` như thể không tồn tại.
-func (s *Service) ensureUserInScope(ctx context.Context, userID uuid.UUID) error {
-	scope := authz.BranchScope(ctx)
-	if scope == nil {
-		return nil
-	}
-	var shared bool
-	err := s.pool.QueryRow(ctx, `
-		SELECT EXISTS (
-			SELECT 1 FROM station.user_branch ub
-			WHERE ub.user_id = $1 AND ub.branch_id = ANY($2::uuid[])
-		)
-	`, userID, scope).Scan(&shared)
-	if err != nil {
-		return fmt.Errorf("check user branch scope: %w", err)
-	}
-	if !shared {
-		return apperr.ErrNotFound
-	}
-	return nil
-}
-
-// ensureAssignableBranches: người thao tác bị giới hạn trạm xăng phải gán cho tài khoản ít nhất một trạm xăng
-// và chỉ được gán trạm xăng nằm trong phạm vi của mình (không được tạo tài khoản toàn công ty hay trạm xăng khác).
-func ensureAssignableBranches(ctx context.Context, branchIDs []string) error {
-	if authz.BranchScope(ctx) == nil {
-		return nil
-	}
-	if len(branchIDs) == 0 {
-		return fmt.Errorf("%w: chọn ít nhất một trạm xăng cho tài khoản", apperr.ErrInvalidInput)
-	}
-	for _, id := range branchIDs {
-		if err := authz.EnsureBranch(ctx, id); err != nil {
-			return err
-		}
-	}
-	return nil
 }

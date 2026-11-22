@@ -12,12 +12,12 @@ import (
 )
 
 type mockRepo struct {
-	getStationsStatusFunc func(ctx context.Context, tenantID string, branchIDs []string) ([]syncmonitor.EdgeStationStatus, error)
+	getStationsStatusFunc func(ctx context.Context, tenantID string) ([]syncmonitor.EdgeStationStatus, error)
 }
 
-func (m *mockRepo) GetStationsStatus(ctx context.Context, tenantID string, branchIDs []string) ([]syncmonitor.EdgeStationStatus, error) {
+func (m *mockRepo) GetStationsStatus(ctx context.Context, tenantID string) ([]syncmonitor.EdgeStationStatus, error) {
 	if m.getStationsStatusFunc != nil {
-		return m.getStationsStatusFunc(ctx, tenantID, branchIDs)
+		return m.getStationsStatusFunc(ctx, tenantID)
 	}
 	return nil, nil
 }
@@ -33,7 +33,7 @@ func TestSyncMonitor_GetStationsSummary(t *testing.T) {
 	errText := "timeout connecting sensor COM7"
 
 	repo := &mockRepo{
-		getStationsStatusFunc: func(ctx context.Context, tenantID string, branchIDs []string) ([]syncmonitor.EdgeStationStatus, error) {
+		getStationsStatusFunc: func(ctx context.Context, tenantID string) ([]syncmonitor.EdgeStationStatus, error) {
 			return []syncmonitor.EdgeStationStatus{
 				{
 					ID:           "st-1",
@@ -57,7 +57,7 @@ func TestSyncMonitor_GetStationsSummary(t *testing.T) {
 	}
 
 	svc := syncmonitor.NewService(repo, testLogger())
-	principal := authz.NewPrincipal("u1", "t1", "MANAGER", []string{"b1"}, []authz.Permission{"sync.monitor:view"})
+	principal := authz.NewPrincipal("u1", "t1", "MANAGER", []authz.Permission{"sync.monitor:view"})
 	ctx := authz.WithPrincipal(context.Background(), principal)
 
 	resp, err := svc.GetStations(ctx)

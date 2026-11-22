@@ -26,6 +26,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 
 		// Users API
 		protected.With(authz.RequirePermission("iam.user:view", h.log)).Get("/iam/users", h.ListUsers)
+		protected.With(authz.RequirePermission("iam.user:view", h.log)).Get("/iam/branches", h.ListBranches)
 		protected.With(authz.RequirePermission("iam.user:create", h.log)).Post("/iam/users", h.CreateUser)
 		protected.With(authz.RequirePermission("iam.user:view", h.log)).Get("/iam/users/{id}", h.GetUser)
 		protected.With(authz.RequirePermission("iam.user:update", h.log)).Put("/iam/users/{id}", h.UpdateUser)
@@ -42,7 +43,6 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 
 		// Metadata API
 		protected.With(authz.RequirePermission("iam.role:view", h.log)).Get("/iam/permissions", h.ListPermissions)
-		protected.With(authz.RequirePermission("iam.user:view", h.log)).Get("/iam/branches", h.ListBranches)
 	})
 }
 

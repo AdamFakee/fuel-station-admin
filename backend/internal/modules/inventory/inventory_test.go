@@ -37,7 +37,6 @@ func setupTest(t *testing.T) (*inventory.Service, *pgxpool.Pool, context.Context
 		adminUserID,
 		defaultTenantID,
 		"MANAGER",
-		nil,
 		[]authz.Permission{
 			"inventory.receipt:view", "inventory.receipt:create",
 			"inventory.receipt:update", "inventory.receipt:delete",
@@ -215,7 +214,6 @@ func TestReceiptLifecycleAndStockLedgerIntegration(t *testing.T) {
 		accountantID,
 		defaultTenantID,
 		"MANAGER",
-		[]string{branchID},
 		[]authz.Permission{"inventory.receipt:approve", "inventory.receipt:view"},
 	)
 	approverCtx = authz.WithPrincipal(approverCtx, approverPrincipal)
@@ -337,7 +335,6 @@ func TestStockIssueLifecycleAndLedger(t *testing.T) {
 		accountantID,
 		defaultTenantID,
 		"ACCOUNTANT",
-		[]string{branchID},
 		[]authz.Permission{"inventory.issue:approve", "inventory.issue:view"},
 	)
 	approverCtx = authz.WithPrincipal(approverCtx, approverPrincipal)

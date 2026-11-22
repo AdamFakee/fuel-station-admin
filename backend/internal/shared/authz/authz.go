@@ -16,28 +16,23 @@ type Permission string
 
 // Principal represents the authenticated actor context, multi-tenant scope, and role permissions.
 type Principal struct {
-	UserID    string
-	TenantID  string
-	RoleCode  string
-	BranchIDs []string
-	perms     map[Permission]struct{}
+	UserID   string
+	TenantID string
+	RoleCode string
+	perms    map[Permission]struct{}
 }
 
 // NewPrincipal creates a new Principal.
-func NewPrincipal(userID, tenantID, roleCode string, branchIDs []string, perms []Permission) Principal {
+func NewPrincipal(userID, tenantID, roleCode string, perms []Permission) Principal {
 	m := make(map[Permission]struct{}, len(perms))
 	for _, p := range perms {
 		m[p] = struct{}{}
 	}
-	branches := make([]string, len(branchIDs))
-	copy(branches, branchIDs)
-
 	return Principal{
-		UserID:    userID,
-		TenantID:  tenantID,
-		RoleCode:  roleCode,
-		BranchIDs: branches,
-		perms:     m,
+		UserID:   userID,
+		TenantID: tenantID,
+		RoleCode: roleCode,
+		perms:    m,
 	}
 }
 
@@ -48,29 +43,6 @@ func (p Principal) Can(perm Permission) bool {
 	}
 	_, ok := p.perms[perm]
 	return ok
-}
-
-// HasBranch checks if principal has access to a specific branch.
-func (p Principal) HasBranch(branchID string) bool {
-	for _, b := range p.BranchIDs {
-		if b == branchID {
-			return true
-		}
-	}
-	return false
-}
-
-// HasAnyBranch checks if principal has access to any of the specified branches.
-func (p Principal) HasAnyBranch(branchIDs ...string) bool {
-	if len(branchIDs) == 0 {
-		return true
-	}
-	for _, b := range branchIDs {
-		if p.HasBranch(b) {
-			return true
-		}
-	}
-	return false
 }
 
 // WithPrincipal adds Principal to context.

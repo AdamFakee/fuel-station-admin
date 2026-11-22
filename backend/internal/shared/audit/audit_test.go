@@ -45,7 +45,7 @@ func TestRecord_InsertsAuditLog(t *testing.T) {
 	ctx = middleware.WithTenantID(ctx, tenantID.String())
 	ctx = context.WithValue(ctx, middleware.RequestIDKey, "req-xyz-123")
 
-	principal := authz.NewPrincipal(userID.String(), tenantID.String(), "MANAGER", nil, nil)
+	principal := authz.NewPrincipal(userID.String(), tenantID.String(), "MANAGER", nil)
 	ctx = authz.WithPrincipal(ctx, principal)
 
 	mockDB := &mockQueryer{}

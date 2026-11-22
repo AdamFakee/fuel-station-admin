@@ -31,7 +31,7 @@ func (s *service) GetStations(ctx context.Context) (*SyncMonitorResponse, error)
 		return nil, apperr.ErrUnauthorized
 	}
 
-	stations, err := s.repo.GetStationsStatus(ctx, principal.TenantID, principal.BranchIDs)
+	stations, err := s.repo.GetStationsStatus(ctx, principal.TenantID)
 	if err != nil {
 		return nil, fmt.Errorf("get stations status: %w", err)
 	}

@@ -36,7 +36,6 @@ func TestAuth_Middleware(t *testing.T) {
 			UserID:      "usr-001",
 			TenantID:    "tnt-001",
 			RoleCode:    "MANAGER",
-			BranchIDs:   []string{"br-1"},
 			Permissions: []string{"master.vehicle:view"},
 		},
 	}

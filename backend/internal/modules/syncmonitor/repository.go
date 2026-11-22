@@ -9,7 +9,7 @@ import (
 )
 
 type Repository interface {
-	GetStationsStatus(ctx context.Context, tenantID string, branchIDs []string) ([]EdgeStationStatus, error)
+	GetStationsStatus(ctx context.Context, tenantID string) ([]EdgeStationStatus, error)
 }
 
 type postgresRepository struct {
@@ -20,7 +20,7 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 	return &postgresRepository{pool: pool}
 }
 
-func (r *postgresRepository) GetStationsStatus(ctx context.Context, tenantID string, branchIDs []string) ([]EdgeStationStatus, error) {
+func (r *postgresRepository) GetStationsStatus(ctx context.Context, tenantID string) ([]EdgeStationStatus, error) {
 	if r.pool == nil {
 		return nil, errors.New("db pool not initialized")
 	}
@@ -33,11 +33,10 @@ func (r *postgresRepository) GetStationsStatus(ctx context.Context, tenantID str
 		FROM station.edge_station s
 		JOIN station.branch b ON b.id = s.branch_id AND b.tenant_id = s.tenant_id
 		WHERE s.tenant_id = $1
-		  AND (cardinality($2::uuid[]) = 0 OR s.branch_id = ANY($2::uuid[]))
 		ORDER BY s.code ASC
 	`
 
-	rows, err := r.pool.Query(ctx, query, tenantID, branchIDs)
+	rows, err := r.pool.Query(ctx, query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("query edge stations status: %w", err)
 	}

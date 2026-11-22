@@ -232,7 +232,7 @@ func TestAuthService_ChangePassword(t *testing.T) {
 	}
 	svc := auth.NewService(repo, nil, testLogger())
 
-	principal := authz.NewPrincipal("u1", "t1", "MANAGER", []string{"b1"}, nil)
+	principal := authz.NewPrincipal("u1", "t1", "MANAGER", nil)
 	ctx := authz.WithPrincipal(context.Background(), principal)
 
 	// Short password

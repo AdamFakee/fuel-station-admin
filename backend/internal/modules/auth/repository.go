@@ -47,7 +47,6 @@ type Repository interface {
 	RevokeSession(ctx context.Context, tokenHash string) error
 	RevokeAllUserSessions(ctx context.Context, tenantID, userID string) error
 	GetUserPermissions(ctx context.Context, roleID string) ([]string, error)
-	GetUserBranchIDs(ctx context.Context, tenantID, userID string) ([]string, error)
 	UpdatePassword(ctx context.Context, tenantID, userID, newHash string) error
 	GetUserProfile(ctx context.Context, tenantID, userID string) (*UserRecord, error)
 }
@@ -314,29 +313,6 @@ func (r *postgresRepository) GetUserPermissions(ctx context.Context, roleID stri
 		perms = append(perms, p)
 	}
 	return perms, nil
-}
-
-func (r *postgresRepository) GetUserBranchIDs(ctx context.Context, tenantID, userID string) ([]string, error) {
-	if r.pool == nil {
-		return nil, errors.New("db pool not initialized")
-	}
-
-	query := `SELECT branch_id FROM station.user_branch WHERE tenant_id = $1 AND user_id = $2`
-	rows, err := r.pool.Query(ctx, query, tenantID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("get branch ids: %w", err)
-	}
-	defer rows.Close()
-
-	var branchIDs []string
-	for rows.Next() {
-		var b string
-		if err := rows.Scan(&b); err != nil {
-			return nil, fmt.Errorf("scan branch id: %w", err)
-		}
-		branchIDs = append(branchIDs, b)
-	}
-	return branchIDs, nil
 }
 
 func (r *postgresRepository) UpdatePassword(ctx context.Context, tenantID, userID, newHash string) error {

@@ -37,7 +37,6 @@ func setupTest(t *testing.T) (*iam.Service, *pgxpool.Pool, context.Context) {
 		adminUserID,
 		defaultTenantID,
 		"MANAGER",
-		[]string{branch1ID},
 		[]authz.Permission{
 			"iam.user:view", "iam.user:create", "iam.user:update", "iam.user:delete",
 			"iam.role:view", "iam.role:create", "iam.role:update", "iam.role:delete",
@@ -59,14 +58,6 @@ func TestListPermissionsAndBranches(t *testing.T) {
 	}
 	if len(perms) != 57 {
 		t.Errorf("expected 57 permissions according to seed, got %d", len(perms))
-	}
-
-	branches, err := svc.ListBranches(ctx)
-	if err != nil {
-		t.Fatalf("ListBranches failed: %v", err)
-	}
-	if len(branches) == 0 {
-		t.Errorf("expected at least 1 branch, got %d", len(branches))
 	}
 }
 
@@ -121,12 +112,11 @@ func TestUserLifecycleAndProtections(t *testing.T) {
 
 	// 2. Create User
 	req := iam.CreateUserRequest{
-		FullName:  "Nhân Viên Thử Nghiệm",
-		Email:     "test.user99@petrovn.vn",
-		Phone:     "0911223344",
-		Password:  "Password@123456",
-		RoleID:    accRoleID,
-		BranchIDs: []string{branch1ID},
+		FullName: "Nhân Viên Thử Nghiệm",
+		Email:    "test.user99@petrovn.vn",
+		Phone:    "0911223344",
+		Password: "Password@123456",
+		RoleID:   accRoleID,
 	}
 
 	created, err := svc.CreateUser(ctx, req)
@@ -143,7 +133,6 @@ func TestUserLifecycleAndProtections(t *testing.T) {
 
 	defer func() {
 		// Clean up created user if still exists
-		_, _ = pool.Exec(context.Background(), `DELETE FROM station.user_branch WHERE user_id = $1`, created.ID)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM station.app_user WHERE id = $1`, created.ID)
 	}()
 
@@ -164,11 +153,10 @@ func TestUserLifecycleAndProtections(t *testing.T) {
 
 	// 5. Update User
 	updateReq := iam.UpdateUserRequest{
-		FullName:  "Nhân Viên Đã Cập Nhật",
-		Email:     "test.updated99@petrovn.vn",
-		Phone:     "0988776655",
-		RoleID:    accRoleID,
-		BranchIDs: []string{branch1ID},
+		FullName: "Nhân Viên Đã Cập Nhật",
+		Email:    "test.updated99@petrovn.vn",
+		Phone:    "0988776655",
+		RoleID:   accRoleID,
 	}
 	updated, err := svc.UpdateUser(ctx, created.ID, updateReq)
 	if err != nil {

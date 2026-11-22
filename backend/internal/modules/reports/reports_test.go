@@ -98,7 +98,6 @@ func TestReportsRBACProtection(t *testing.T) {
 				uuid.New().String(),
 				uuid.New().String(),
 				"IT",
-				nil,
 				[]authz.Permission{"dashboard:view"},
 			)
 			ctx := authz.WithPrincipal(r.Context(), principal)

@@ -12,12 +12,12 @@ import (
 )
 
 type mockRepo struct {
-	getDashboardDataFunc func(ctx context.Context, tenantID string, branchIDs []string) (*dashboard.DashboardResponse, error)
+	getDashboardDataFunc func(ctx context.Context, tenantID string) (*dashboard.DashboardResponse, error)
 }
 
-func (m *mockRepo) GetDashboardData(ctx context.Context, tenantID string, branchIDs []string) (*dashboard.DashboardResponse, error) {
+func (m *mockRepo) GetDashboardData(ctx context.Context, tenantID string) (*dashboard.DashboardResponse, error) {
 	if m.getDashboardDataFunc != nil {
-		return m.getDashboardDataFunc(ctx, tenantID, branchIDs)
+		return m.getDashboardDataFunc(ctx, tenantID)
 	}
 	return nil, nil
 }
@@ -28,7 +28,7 @@ func testLogger() *slog.Logger {
 
 func TestDashboard_GetDashboardData(t *testing.T) {
 	repo := &mockRepo{
-		getDashboardDataFunc: func(ctx context.Context, tenantID string, branchIDs []string) (*dashboard.DashboardResponse, error) {
+		getDashboardDataFunc: func(ctx context.Context, tenantID string) (*dashboard.DashboardResponse, error) {
 			return &dashboard.DashboardResponse{
 				Kpi: dashboard.DashboardKpi{
 					TodayTotalLiters:       1500.5,
@@ -79,7 +79,7 @@ func TestDashboard_GetDashboardData(t *testing.T) {
 	}
 
 	svc := dashboard.NewService(repo, testLogger())
-	principal := authz.NewPrincipal("u1", "t1", "MANAGER", []string{"b1"}, []authz.Permission{"dashboard:view"})
+	principal := authz.NewPrincipal("u1", "t1", "MANAGER", []authz.Permission{"dashboard:view"})
 	ctx := authz.WithPrincipal(context.Background(), principal)
 
 	resp, err := svc.GetDashboard(ctx)

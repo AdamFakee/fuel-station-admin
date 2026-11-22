@@ -31,7 +31,7 @@ func (s *service) GetDashboard(ctx context.Context) (*DashboardResponse, error) 
 		return nil, apperr.ErrUnauthorized
 	}
 
-	data, err := s.repo.GetDashboardData(ctx, principal.TenantID, principal.BranchIDs)
+	data, err := s.repo.GetDashboardData(ctx, principal.TenantID)
 	if err != nil {
 		return nil, fmt.Errorf("load dashboard data: %w", err)
 	}

@@ -36,7 +36,6 @@ func setupTest(t *testing.T) (*dispense.Service, *pgxpool.Pool, context.Context)
 		adminUserID,
 		defaultTenantID,
 		"MANAGER",
-		[]string{branch1ID},
 		[]authz.Permission{"dispense.session:view"},
 	)
 	ctx = authz.WithPrincipal(ctx, principal)

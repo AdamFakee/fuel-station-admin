@@ -33,7 +33,6 @@ type UserProfile struct {
 	RoleName           string     `json:"role_name"`
 	Status             string     `json:"status"`
 	MustChangePassword bool       `json:"must_change_password"`
-	BranchIDs          []string   `json:"branch_ids"`
 	Permissions        []string   `json:"permissions"`
 	LastLoginAt        *time.Time `json:"last_login_at,omitempty"`
 }

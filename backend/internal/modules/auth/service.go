@@ -145,9 +145,8 @@ func (s *service) Login(ctx context.Context, req LoginRequest, ip, userAgent str
 		return nil, fmt.Errorf("save auth session: %w", sErr)
 	}
 
-	// 6. Fetch permissions & branch scopes
+	// 6. Fetch permissions
 	perms, _ := s.repo.GetUserPermissions(ctx, user.RoleID)
-	branches, _ := s.repo.GetUserBranchIDs(ctx, user.TenantID, user.ID)
 
 	// 7. Audit log
 	_ = s.recordAudit(ctx, user.TenantID, user.ID, user.FullName, audit.ActionLogin, "app_user", user.ID, user.Username, cleanIP, "Đăng nhập thành công")
@@ -169,7 +168,6 @@ func (s *service) Login(ctx context.Context, req LoginRequest, ip, userAgent str
 			RoleName:           user.RoleName,
 			Status:             user.Status,
 			MustChangePassword: user.MustChangePassword,
-			BranchIDs:          branches,
 			Permissions:        perms,
 		},
 	}, nil
@@ -187,7 +185,6 @@ func (s *service) Me(ctx context.Context) (*MeResponse, error) {
 	}
 
 	perms, _ := s.repo.GetUserPermissions(ctx, user.RoleID)
-	branches, _ := s.repo.GetUserBranchIDs(ctx, user.TenantID, user.ID)
 
 	return &MeResponse{
 		User: UserProfile{
@@ -204,7 +201,6 @@ func (s *service) Me(ctx context.Context) (*MeResponse, error) {
 			RoleName:           user.RoleName,
 			Status:             user.Status,
 			MustChangePassword: user.MustChangePassword,
-			BranchIDs:          branches,
 			Permissions:        perms,
 		},
 	}, nil

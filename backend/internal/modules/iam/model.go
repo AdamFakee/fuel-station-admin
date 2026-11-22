@@ -18,8 +18,6 @@ type UserListItem struct {
 	RoleName           string     `json:"role_name"`
 	Status             string     `json:"status"`
 	MustChangePassword bool       `json:"must_change_password"`
-	BranchIDs          []string   `json:"branch_ids"`
-	BranchNames        []string   `json:"branch_names"`
 	LastLoginAt        *time.Time `json:"last_login_at,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
@@ -27,26 +25,23 @@ type UserListItem struct {
 
 type UserDetail struct {
 	UserListItem
-	Branches []BranchOption `json:"branches"`
 }
 
 type CreateUserRequest struct {
-	EmployeeCode string   `json:"employee_code"`
-	FullName     string   `json:"full_name"`
-	Email        string   `json:"email"`
-	Phone        string   `json:"phone"`
-	Username     string   `json:"username"`
-	Password     string   `json:"password"`
-	RoleID       string   `json:"role_id"`
-	BranchIDs    []string `json:"branch_ids"`
+	EmployeeCode string `json:"employee_code"`
+	FullName     string `json:"full_name"`
+	Email        string `json:"email"`
+	Phone        string `json:"phone"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	RoleID       string `json:"role_id"`
 }
 
 type UpdateUserRequest struct {
-	FullName  string   `json:"full_name"`
-	Email     string   `json:"email"`
-	Phone     string   `json:"phone"`
-	RoleID    string   `json:"role_id"`
-	BranchIDs []string `json:"branch_ids"`
+	FullName string `json:"full_name"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	RoleID   string `json:"role_id"`
 }
 
 type UpdateUserStatusRequest struct {

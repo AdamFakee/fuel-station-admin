@@ -42,7 +42,7 @@ func TestFacePhotoSizeLimitEnforcement(t *testing.T) {
 
 	ctx := context.Background()
 	tenantID := uuid.New().String()
-	p := authz.NewPrincipal(uuid.New().String(), tenantID, "MANAGER", nil, []authz.Permission{"master.driver:update"})
+	p := authz.NewPrincipal(uuid.New().String(), tenantID, "MANAGER", []authz.Permission{"master.driver:update"})
 	ctx = authz.WithPrincipal(ctx, p)
 	ctx = middleware.WithTenantID(ctx, tenantID)
 
@@ -80,7 +80,7 @@ func TestMasterRoutes_PermissionChecks(t *testing.T) {
 	}
 
 	// 2. Authenticated but missing master.vehicle:view -> 403
-	pWithoutPerm := authz.NewPrincipal("u1", "t1", "GUEST", nil, []authz.Permission{"other:view"})
+	pWithoutPerm := authz.NewPrincipal("u1", "t1", "GUEST", []authz.Permission{"other:view"})
 	req2 := httptest.NewRequest(http.MethodGet, "/master/vehicles", nil)
 	req2 = req2.WithContext(authz.WithPrincipal(req2.Context(), pWithoutPerm))
 	req2 = req2.WithContext(middleware.WithTenantID(req2.Context(), "t1"))
@@ -103,7 +103,7 @@ func TestMasterRoutes_PermissionChecks(t *testing.T) {
 	// 4. Authenticated with master.vehicle:create -> POST /master/vehicles allowed through authz
 	validTenant := uuid.New().String()
 	validUser := uuid.New().String()
-	pWithCreate := authz.NewPrincipal(validUser, validTenant, "MANAGER", nil, []authz.Permission{"master.vehicle:create"})
+	pWithCreate := authz.NewPrincipal(validUser, validTenant, "MANAGER", []authz.Permission{"master.vehicle:create"})
 	req4 := httptest.NewRequest(http.MethodPost, "/master/vehicles", bytes.NewBufferString("{}"))
 	req4 = req4.WithContext(authz.WithPrincipal(req4.Context(), pWithCreate))
 	req4 = req4.WithContext(middleware.WithTenantID(req4.Context(), validTenant))

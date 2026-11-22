@@ -35,7 +35,7 @@ func setup(t *testing.T) (*feedback.Service, *pgxpool.Pool, context.Context) {
 	}
 
 	ctx = middleware.WithTenantID(ctx, defaultTenantID)
-	ctx = authz.WithPrincipal(ctx, authz.NewPrincipal(adminUserID, defaultTenantID, "MANAGER", nil, []authz.Permission{
+	ctx = authz.WithPrincipal(ctx, authz.NewPrincipal(adminUserID, defaultTenantID, "MANAGER", []authz.Permission{
 		"feedback.item:create", "feedback.item:view", "feedback.item:update", "feedback.item:delete",
 	}))
 	return feedback.NewService(pool), pool, ctx
