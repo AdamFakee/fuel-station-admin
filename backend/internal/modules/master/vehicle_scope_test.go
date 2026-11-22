@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -147,16 +148,17 @@ func TestDriverHasNoStoreOrPosition(t *testing.T) {
 	svc, pool, ctx, _ := scopeSetup(t)
 	defer pool.Close()
 
-	suffix := time.Now().UnixNano() % 1000000
-	created, err := svc.CreateDriver(ctx, master.CreateDriverRequest{
-		Code: fmt.Sprintf("DS%d", suffix), FullName: "Tài xế cấp công ty",
-	})
+	created, err := svc.CreateDriver(ctx, master.CreateDriverRequest{FullName: "Tài xế cấp công ty"})
 	if err != nil {
 		t.Fatalf("CreateDriver without branch/position failed: %v", err)
 	}
 	defer func() { _ = svc.DeleteDriver(ctx, created.ID) }()
 	if created.Status != "active" {
 		t.Fatalf("expected default status active, got %s", created.Status)
+	}
+	// Mã do hệ thống sinh, chỉ chữ và số (dùng làm employeeNo trên máy chấm công).
+	if !strings.HasPrefix(created.Code, "TX") || strings.ContainsAny(created.Code, "-_ ") {
+		t.Fatalf("expected a generated alphanumeric code TX..., got %q", created.Code)
 	}
 }
 

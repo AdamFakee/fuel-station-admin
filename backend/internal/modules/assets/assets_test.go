@@ -194,7 +194,9 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 	comSuffix := time.Now().UnixNano() % 800000
 	comPort := fmt.Sprintf("COM%d", 100+comSuffix)
 	var serial uint32 = 4567
-	termHost := "192.168.1.150"
+	// Địa chỉ máy chấm công riêng cho từng lần chạy: DB dùng chung nên địa chỉ cố định sẽ trùng với lần chạy trước.
+	runID := time.Now().UnixNano()
+	termHost := fmt.Sprintf("10.%d.%d.%d", runID%250+1, (runID/250)%250+1, (runID/62500)%250+1)
 	termPass := "HikSecure@999"
 
 	pump, err := svc.CreatePump(ctx, assets.CreatePumpRequest{
@@ -210,6 +212,8 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreatePump failed: %v", err)
 	}
+	// Dọn trụ thử khi xong để không để rác (và địa chỉ máy chấm công) lại trong DB dùng chung.
+	defer func() { _ = svc.DeletePump(ctx, pump.ID) }()
 	// Mã trụ do hệ thống sinh (TR-năm-số thứ tự), không lấy từ client.
 	if !strings.HasPrefix(pump.Code, "TR-") || pump.Code == pumpCode {
 		t.Fatalf("expected a generated pump code TR-..., got %s", pump.Code)
@@ -234,7 +238,7 @@ func TestPumpAndDeviceLifecycle(t *testing.T) {
 		t.Fatalf("UpdateSensor failed: %v", err)
 	}
 
-	newHost := "192.168.1.155"
+	newHost := fmt.Sprintf("10.%d.%d.%d", (runID+7)%250+1, (runID/250)%250+1, (runID/62500)%250+1)
 	newPass := "NewPass@123"
 	newTerminalCode := fmt.Sprintf("TN%d", time.Now().UnixNano()%100000)
 	_, err = svc.UpdateTerminal(ctx, pump.ID, assets.UpdateTerminalRequest{

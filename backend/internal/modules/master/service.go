@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -414,7 +415,7 @@ func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail,
 	// Active Card Credential
 	var cred CredentialItem
 	credErr := s.pool.QueryRow(ctx, `
-		SELECT id, method, external_id, status, face_file_id, biometric_template_id, version, created_at, revoked_at
+		SELECT id, method, external_id, status, face_file_id, COALESCE(biometric_template_id, ''), version, created_at, revoked_at
 		FROM station.credential
 		WHERE tenant_id = $1 AND vehicle_id = $2 AND method = 'card' AND status = 'active'
 	`, tenantID, id).Scan(
@@ -923,7 +924,7 @@ func (s *Service) ListDrivers(ctx context.Context, q DriverListQuery) ([]DriverL
 
 	if q.Search != "" {
 		trimmed := strings.TrimSpace(q.Search)
-		whereClauses = append(whereClauses, fmt.Sprintf("(d.code ILIKE $%d OR d.full_name ILIKE $%d OR d.phone ILIKE $%d OR d.department ILIKE $%d)", argIdx, argIdx, argIdx, argIdx))
+		whereClauses = append(whereClauses, fmt.Sprintf("(d.code ILIKE $%d OR d.full_name ILIKE $%d OR d.phone ILIKE $%d)", argIdx, argIdx, argIdx))
 		args = append(args, "%"+trimmed+"%")
 		argIdx++
 	}
@@ -931,12 +932,6 @@ func (s *Service) ListDrivers(ctx context.Context, q DriverListQuery) ([]DriverL
 	if q.Status != "" {
 		whereClauses = append(whereClauses, fmt.Sprintf("d.status = $%d", argIdx))
 		args = append(args, q.Status)
-		argIdx++
-	}
-
-	if q.Department != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("d.department ILIKE $%d", argIdx))
-		args = append(args, "%"+strings.TrimSpace(q.Department)+"%")
 		argIdx++
 	}
 
@@ -951,7 +946,7 @@ func (s *Service) ListDrivers(ctx context.Context, q DriverListQuery) ([]DriverL
 	querySQL := fmt.Sprintf(`
 		SELECT 
 			d.id, d.code, d.full_name,
-			COALESCE(d.phone, '') AS phone, COALESCE(d.department, '') AS department,
+			COALESCE(d.phone, '') AS phone,
 			d.status, d.valid_from, d.valid_to, COALESCE(d.note, '') AS note,
 			COALESCE(card.external_id, '') AS card_number,
 			(face.id IS NOT NULL) AS has_face,
@@ -980,7 +975,7 @@ func (s *Service) ListDrivers(ctx context.Context, q DriverListQuery) ([]DriverL
 		var item DriverListItem
 		err := rows.Scan(
 			&item.ID, &item.Code, &item.FullName,
-			&item.Phone, &item.Department, &item.Status,
+			&item.Phone, &item.Status,
 			&item.ValidFrom, &item.ValidTo, &item.Note,
 			&item.CardNumber, &item.HasFace, &item.FaceFileID, &item.HasFingerprint,
 			&item.Version, &item.CreatedAt, &item.UpdatedAt,
@@ -1004,7 +999,7 @@ func (s *Service) GetDriver(ctx context.Context, id uuid.UUID) (*DriverDetail, e
 	err = s.pool.QueryRow(ctx, `
 		SELECT 
 			d.id, d.code, d.full_name,
-			COALESCE(d.phone, '') AS phone, COALESCE(d.department, '') AS department,
+			COALESCE(d.phone, '') AS phone,
 			d.status, d.valid_from, d.valid_to, COALESCE(d.note, '') AS note,
 			COALESCE(card.external_id, '') AS card_number,
 			(face.id IS NOT NULL) AS has_face,
@@ -1018,7 +1013,7 @@ func (s *Service) GetDriver(ctx context.Context, id uuid.UUID) (*DriverDetail, e
 		WHERE d.tenant_id = $1 AND d.id = $2 AND d.deleted_at IS NULL
 	`, tenantID, id).Scan(
 		&d.ID, &d.Code, &d.FullName,
-		&d.Phone, &d.Department, &d.Status,
+		&d.Phone, &d.Status,
 		&d.ValidFrom, &d.ValidTo, &d.Note,
 		&d.CardNumber, &d.HasFace, &d.FaceFileID, &d.HasFingerprint,
 		&d.Version, &d.CreatedAt, &d.UpdatedAt,
@@ -1033,7 +1028,7 @@ func (s *Service) GetDriver(ctx context.Context, id uuid.UUID) (*DriverDetail, e
 	// Fetch credentials list
 	d.Credentials = make([]CredentialItem, 0)
 	cRows, err := s.pool.Query(ctx, `
-		SELECT id, method, external_id, status, face_file_id, biometric_template_id, version, created_at, revoked_at
+		SELECT id, method, external_id, status, face_file_id, COALESCE(biometric_template_id, ''), version, created_at, revoked_at
 		FROM station.credential
 		WHERE tenant_id = $1 AND driver_id = $2
 		ORDER BY created_at DESC
@@ -1058,11 +1053,6 @@ func (s *Service) CreateDriver(ctx context.Context, req CreateDriverRequest) (*D
 	tenantID, actorID, actorName, err := getTenantAndActor(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	req.Code = strings.TrimSpace(req.Code)
-	if !rxMachineCode.MatchString(req.Code) {
-		return nil, fmt.Errorf("%w: driver code must be 1-32 alphanumeric characters", apperr.ErrInvalidInput)
 	}
 
 	req.FullName = strings.TrimSpace(req.FullName)
@@ -1092,7 +1082,13 @@ func (s *Service) CreateDriver(ctx context.Context, req CreateDriverRequest) (*D
 	}
 	defer tx.Rollback(ctx)
 
-	// Check code duplicate
+	// Mã tài xế do hệ thống sinh (không nhận từ client). Dùng làm employeeNo trên máy chấm công nên chỉ gồm chữ và số:
+	// kind 'TX' + năm + số thứ tự, ví dụ TX20260001.
+	if err := tx.QueryRow(ctx, `SELECT replace(station.next_code($1, 'TX'), '-', '')`, tenantID).Scan(&req.Code); err != nil {
+		return nil, fmt.Errorf("generate driver code: %w", err)
+	}
+
+	// Check code duplicate (mã sinh tự động nên gần như không trùng; vẫn kiểm để bắt trường hợp dữ liệu cũ nhập tay)
 	var codeExists bool
 	err = tx.QueryRow(ctx, `
 		SELECT EXISTS(SELECT 1 FROM station.driver WHERE tenant_id = $1 AND code = $2 AND deleted_at IS NULL)
@@ -1121,11 +1117,11 @@ func (s *Service) CreateDriver(ctx context.Context, req CreateDriverRequest) (*D
 	driverID := uuid.New()
 	_, err = tx.Exec(ctx, `
 		INSERT INTO station.driver (
-			id, tenant_id, code, full_name, phone, department,
+			id, tenant_id, code, full_name, phone,
 			status, valid_from, valid_to, note, version, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, now(), now())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, now(), now())
 	`, driverID, tenantID, req.Code, req.FullName,
-		req.Phone, req.Department, req.Status,
+		req.Phone, req.Status,
 		req.ValidFrom, req.ValidTo, req.Note)
 	if err != nil {
 		return nil, fmt.Errorf("insert driver: %w", err)
@@ -1193,10 +1189,10 @@ func (s *Service) UpdateDriver(ctx context.Context, id uuid.UUID, req UpdateDriv
 
 	_, err = s.pool.Exec(ctx, `
 		UPDATE station.driver
-		SET full_name = $1, phone = $2, department = $3,
-		    valid_from = $4, valid_to = $5, note = $6, updated_at = now()
-		WHERE tenant_id = $7 AND id = $8 AND deleted_at IS NULL
-	`, req.FullName, req.Phone, req.Department,
+		SET full_name = $1, phone = $2,
+		    valid_from = $3, valid_to = $4, note = $5, updated_at = now()
+		WHERE tenant_id = $6 AND id = $7 AND deleted_at IS NULL
+	`, req.FullName, req.Phone,
 		req.ValidFrom, req.ValidTo, req.Note, tenantID, id)
 	if err != nil {
 		return nil, fmt.Errorf("update driver: %w", err)
@@ -1210,8 +1206,7 @@ func (s *Service) UpdateDriver(ctx context.Context, id uuid.UUID, req UpdateDriv
 		ActorUserID: &actorID,
 		ActorName:   actorName,
 		NewData: map[string]any{
-			"full_name":  req.FullName,
-			"department": req.Department,
+			"full_name": req.FullName,
 		},
 	})
 
@@ -1383,11 +1378,16 @@ func (s *Service) UploadDriverFace(
 	defer tx.Rollback(ctx)
 
 	now := time.Now().UTC()
-	// Revoke old face credentials
+	// Ảnh cũ của tài xế này (kể cả ảnh của các lần thay trước): gom lại để xóa sau khi lưu ảnh mới thành công.
+	oldFiles, err := faceFilesOf(ctx, tx, tenantID, driverID)
+	if err != nil {
+		return nil, err
+	}
+	// Thu hồi thẻ mặt cũ và bỏ liên kết ảnh (ảnh sẽ bị xóa, edge cũng không còn phải tải ảnh của thẻ đã thu hồi)
 	_, err = tx.Exec(ctx, `
 		UPDATE station.credential
-		SET status = 'revoked', revoked_at = $1, updated_at = $1
-		WHERE tenant_id = $2 AND driver_id = $3 AND method = 'face' AND status = 'active'
+		SET status = 'revoked', revoked_at = COALESCE(revoked_at, $1), updated_at = $1, face_file_id = NULL
+		WHERE tenant_id = $2 AND driver_id = $3 AND method = 'face' AND (status = 'active' OR face_file_id IS NOT NULL)
 	`, now, tenantID, driverID)
 	if err != nil {
 		return nil, fmt.Errorf("revoke old face credential: %w", err)
@@ -1417,6 +1417,9 @@ func (s *Service) UploadDriverFace(
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
 	}
+
+	// Đổi ảnh mới thì xóa ảnh cũ để không để tệp rác trên đĩa và trong DB
+	s.purgeFiles(ctx, tenantID, oldFiles)
 
 	return &CredentialItem{
 		ID:         credID,
@@ -1521,13 +1524,22 @@ func (s *Service) RevokeDriverCredential(ctx context.Context, driverID uuid.UUID
 	}
 
 	now := time.Now().UTC()
+	// Ảnh của thẻ mặt bị thu hồi cũng bị xóa (lấy mã tệp trước khi bỏ liên kết)
+	var faceFileID *uuid.UUID
+	_ = s.pool.QueryRow(ctx, `
+		SELECT face_file_id FROM station.credential WHERE tenant_id = $1 AND driver_id = $2 AND id = $3 AND method = 'face'
+	`, tenantID, driverID, credID).Scan(&faceFileID)
 	cmd, err := s.pool.Exec(ctx, `
 		UPDATE station.credential
-		SET status = 'revoked', revoked_at = $1, updated_at = $1
+		SET status = 'revoked', revoked_at = $1, updated_at = $1,
+		    face_file_id = CASE WHEN method = 'face' THEN NULL ELSE face_file_id END
 		WHERE tenant_id = $2 AND driver_id = $3 AND id = $4 AND status = 'active'
 	`, now, tenantID, driverID, credID)
 	if err != nil {
 		return fmt.Errorf("revoke driver credential: %w", err)
+	}
+	if cmd.RowsAffected() > 0 && faceFileID != nil {
+		s.purgeFiles(ctx, tenantID, []uuid.UUID{*faceFileID})
 	}
 
 	if cmd.RowsAffected() > 0 {
@@ -1643,7 +1655,7 @@ func (s *Service) ImportDrivers(ctx context.Context, req ImportDriversRequest) (
 	result := &ImportDriversResult{Failed: make([]ImportRowError, 0)}
 	for index, row := range req.Rows {
 		if _, err := s.CreateDriver(ctx, row); err != nil {
-			result.Failed = append(result.Failed, ImportRowError{Row: index + 1, Code: row.Code, Message: err.Error()})
+			result.Failed = append(result.Failed, ImportRowError{Row: index + 1, Message: err.Error()})
 			continue
 		}
 		result.Created++
@@ -1708,4 +1720,36 @@ func (s *Service) ensureVehicleBranchesAllowed(ctx context.Context, vehicleID uu
 		}
 	}
 	return nil
+}
+
+// faceFilesOf trả mã các tệp ảnh khuôn mặt đang gắn với thẻ mặt của một tài xế.
+func faceFilesOf(ctx context.Context, q interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}, tenantID, driverID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.Query(ctx, `
+		SELECT face_file_id FROM station.credential
+		WHERE tenant_id = $1 AND driver_id = $2 AND method = 'face' AND face_file_id IS NOT NULL
+	`, tenantID, driverID)
+	if err != nil {
+		return nil, fmt.Errorf("list face files: %w", err)
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan face file: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// purgeFiles xóa các tệp đã không còn dùng. Lỗi chỉ ghi nhật ký (không làm hỏng thao tác chính): tệp sót lại chỉ là rác, không sai dữ liệu.
+func (s *Service) purgeFiles(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) {
+	for _, id := range ids {
+		if err := s.storage.Delete(ctx, tenantID, id); err != nil {
+			slog.WarnContext(ctx, "không xóa được tệp ảnh cũ", "file_id", id, "err", err)
+		}
+	}
 }

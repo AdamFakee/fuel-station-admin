@@ -252,11 +252,10 @@ func (h *Handler) ListDrivers(w http.ResponseWriter, r *http.Request) {
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
 
 	q := DriverListQuery{
-		Page:       page,
-		PageSize:   pageSize,
-		Search:     r.URL.Query().Get("q"),
-		Status:     r.URL.Query().Get("status"),
-		Department: r.URL.Query().Get("department"),
+		Page:     page,
+		PageSize: pageSize,
+		Search:   r.URL.Query().Get("q"),
+		Status:   r.URL.Query().Get("status"),
 	}
 
 	items, total, err := h.service.ListDrivers(r.Context(), q)

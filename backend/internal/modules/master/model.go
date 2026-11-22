@@ -104,7 +104,6 @@ type DriverListItem struct {
 	Code           string     `json:"code"`
 	FullName       string     `json:"full_name"`
 	Phone          string     `json:"phone,omitempty"`
-	Department     string     `json:"department,omitempty"`
 	Status         string     `json:"status"` // 'active' | 'blocked' | 'inactive'
 	ValidFrom      *time.Time `json:"valid_from,omitempty"`
 	ValidTo        *time.Time `json:"valid_to,omitempty"`
@@ -124,10 +123,10 @@ type DriverDetail struct {
 }
 
 type CreateDriverRequest struct {
-	Code       string     `json:"code"`
+	// Mã tài xế do hệ thống sinh (không nhận từ client), dùng làm employeeNo trên máy chấm công.
+	Code       string     `json:"-"`
 	FullName   string     `json:"full_name"`
 	Phone      string     `json:"phone"`
-	Department string     `json:"department"`
 	Status     string     `json:"status"` // 'active' | 'blocked' | 'inactive'
 	ValidFrom  *time.Time `json:"valid_from"`
 	ValidTo    *time.Time `json:"valid_to"`
@@ -136,12 +135,11 @@ type CreateDriverRequest struct {
 }
 
 type UpdateDriverRequest struct {
-	FullName   string     `json:"full_name"`
-	Phone      string     `json:"phone"`
-	Department string     `json:"department"`
-	ValidFrom  *time.Time `json:"valid_from"`
-	ValidTo    *time.Time `json:"valid_to"`
-	Note       string     `json:"note"`
+	FullName  string     `json:"full_name"`
+	Phone     string     `json:"phone"`
+	ValidFrom *time.Time `json:"valid_from"`
+	ValidTo   *time.Time `json:"valid_to"`
+	Note      string     `json:"note"`
 }
 
 type UpdateDriverStatusRequest struct {
@@ -157,11 +155,10 @@ type RegisterDriverFingerprintRequest struct {
 }
 
 type DriverListQuery struct {
-	Page       int
-	PageSize   int
-	Search     string
-	Status     string
-	Department string
+	Page     int
+	PageSize int
+	Search   string
+	Status   string
 }
 
 // ------------------------------------------------------------------------------------------------

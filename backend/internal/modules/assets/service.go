@@ -793,13 +793,15 @@ func (s *Service) ListPumps(ctx context.Context, q PumpListQuery) ([]PumpDetail,
 
 		// Terminal
 		var at AccessTerminal
+		var passwordEnc []byte
 		err = s.pool.QueryRow(ctx, `
-			SELECT id, tenant_id, pump_id, terminal_code, host, port, https, username, version, created_at, updated_at
+			SELECT id, tenant_id, pump_id, terminal_code, host, port, https, username, version, created_at, updated_at, password_enc
 			FROM station.access_terminal
 			WHERE tenant_id = $1 AND pump_id = $2
-		`, tenantID, p.ID).Scan(&at.ID, &at.TenantID, &at.PumpID, &at.TerminalCode, &at.Host, &at.Port, &at.HTTPS, &at.Username, &at.Version, &at.CreatedAt, &at.UpdatedAt)
+		`, tenantID, p.ID).Scan(&at.ID, &at.TenantID, &at.PumpID, &at.TerminalCode, &at.Host, &at.Port, &at.HTTPS, &at.Username, &at.Version, &at.CreatedAt, &at.UpdatedAt, &passwordEnc)
 		if err == nil {
 			at.HasPassword = true
+			at.PasswordHint = s.passwordHint(passwordEnc)
 			p.Terminal = &at
 		}
 	}
@@ -934,6 +936,10 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 	encPass, err := crypto.EncryptAESGCM([]byte(rawPass), s.cryptoKey)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt terminal password: %w", err)
+	}
+
+	if err := ensureTerminalAddressFree(ctx, tx, tenantID, p.ID, host, port); err != nil {
+		return nil, err
 	}
 
 	var at AccessTerminal
@@ -1103,13 +1109,15 @@ func (s *Service) ListDevices(ctx context.Context, branchID string) ([]DeviceVie
 
 		// Terminal
 		var at AccessTerminal
+		var passwordEnc []byte
 		err = s.pool.QueryRow(ctx, `
-			SELECT id, tenant_id, pump_id, terminal_code, host, port, https, username, version, created_at, updated_at
+			SELECT id, tenant_id, pump_id, terminal_code, host, port, https, username, version, created_at, updated_at, password_enc
 			FROM station.access_terminal
 			WHERE tenant_id = $1 AND pump_id = $2
-		`, tenantID, d.PumpID).Scan(&at.ID, &at.TenantID, &at.PumpID, &at.TerminalCode, &at.Host, &at.Port, &at.HTTPS, &at.Username, &at.Version, &at.CreatedAt, &at.UpdatedAt)
+		`, tenantID, d.PumpID).Scan(&at.ID, &at.TenantID, &at.PumpID, &at.TerminalCode, &at.Host, &at.Port, &at.HTTPS, &at.Username, &at.Version, &at.CreatedAt, &at.UpdatedAt, &passwordEnc)
 		if err == nil {
 			at.HasPassword = true
+			at.PasswordHint = s.passwordHint(passwordEnc)
 			d.Terminal = &at
 		}
 	}
@@ -1181,6 +1189,10 @@ func (s *Service) UpdateTerminal(ctx context.Context, pumpID string, req UpdateT
 	}
 	req.Port = terminalPort
 
+	if err := ensureTerminalAddressFree(ctx, s.pool, tenantID, pumpID, req.Host, int(req.Port)); err != nil {
+		return nil, err
+	}
+
 	var at AccessTerminal
 	if req.Password != nil && *req.Password != "" {
 		encPass, err := crypto.EncryptAESGCM([]byte(*req.Password), s.cryptoKey)
@@ -1232,4 +1244,47 @@ func (s *Service) UpdateTerminal(ctx context.Context, pumpID string, req UpdateT
 	})
 
 	return &at, nil
+}
+
+// rowQuerier là phần chung của pool và transaction để dùng lại cùng một hàm kiểm tra.
+type rowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// ensureTerminalAddressFree chặn hai máy chấm công cùng địa chỉ IP và cổng trong cùng một trạm xăng:
+// edge không chạy được cấu hình như vậy (cả trạm bị từ chối), nên phải báo ngay khi nhập.
+func ensureTerminalAddressFree(ctx context.Context, q rowQuerier, tenantID, pumpID, host string, port int) error {
+	var otherPump string
+	err := q.QueryRow(ctx, `
+		SELECT p.name
+		FROM station.access_terminal t
+		JOIN station.pump p ON p.id = t.pump_id
+		WHERE t.tenant_id = $1 AND t.pump_id <> $2 AND t.host = $3 AND t.port = $4
+		  AND p.branch_id = (SELECT branch_id FROM station.pump WHERE id = $2)
+		LIMIT 1
+	`, tenantID, pumpID, strings.TrimSpace(host), port).Scan(&otherPump)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("check terminal address: %w", err)
+	}
+	return fmt.Errorf("%w: địa chỉ máy chấm công %s:%d đã được %s dùng, mỗi trụ bơm cần một máy chấm công có địa chỉ riêng", apperr.ErrConflict, strings.TrimSpace(host), port, otherPump)
+}
+
+// passwordHint trả mật khẩu máy chấm công dạng che để người quản trị nhận ra đúng mật khẩu nào, ví dụ `••••••123`:
+// chỉ lộ 3 ký tự cuối, và chỉ khi mật khẩu từ 8 ký tự trở lên (mật khẩu ngắn che hết để không lộ phần đáng kể). Lỗi giải mã thì trả rỗng.
+func (s *Service) passwordHint(encrypted []byte) string {
+	if len(encrypted) == 0 {
+		return ""
+	}
+	plain, err := crypto.DecryptAESGCM(encrypted, s.cryptoKey)
+	if err != nil {
+		return ""
+	}
+	runes := []rune(string(plain))
+	if len(runes) < 8 {
+		return "••••••"
+	}
+	return "••••••" + string(runes[len(runes)-3:])
 }

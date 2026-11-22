@@ -155,6 +155,7 @@ type AccessTerminal struct {
 	HTTPS        bool      `json:"https"`
 	Username     string    `json:"username"`
 	HasPassword  bool      `json:"has_password"`
+	PasswordHint string    `json:"password_hint,omitempty"` // dạng che, chỉ lộ 3 ký tự cuối
 	Version      int64     `json:"version"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

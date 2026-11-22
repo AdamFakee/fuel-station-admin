@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -32,6 +33,8 @@ type StoredFile struct {
 type Storage interface {
 	Save(ctx context.Context, tenantID uuid.UUID, fileName, contentType string, createdBy *uuid.UUID, r io.Reader) (*StoredFile, error)
 	Open(ctx context.Context, tenantID uuid.UUID, storageKey string) (io.ReadCloser, error)
+	// Delete xóa hẳn một tệp (dòng trong DB rồi tệp trên đĩa). Tệp không còn thì coi như đã xóa.
+	Delete(ctx context.Context, tenantID uuid.UUID, fileID uuid.UUID) error
 }
 
 // LocalDiskStorage implements Storage on local file system with database tracking.
@@ -141,4 +144,31 @@ func (s *LocalDiskStorage) Open(ctx context.Context, tenantID uuid.UUID, storage
 	}
 
 	return file, nil
+}
+
+// Delete xóa dòng metadata rồi xóa tệp trên đĩa. Tệp còn được bản ghi khác tham chiếu (khóa ngoại) thì DB từ chối, tệp giữ nguyên
+// và trả lỗi. Không có dòng nào khớp thì không làm gì (đã xóa trước đó).
+func (s *LocalDiskStorage) Delete(ctx context.Context, tenantID uuid.UUID, fileID uuid.UUID) error {
+	if s.pool == nil {
+		return errors.New("storage: delete needs a database pool")
+	}
+	var storageKey string
+	err := s.pool.QueryRow(ctx, `
+		DELETE FROM station.stored_file WHERE tenant_id = $1 AND id = $2 RETURNING storage_key
+	`, tenantID, fileID).Scan(&storageKey)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("storage: delete file record: %w", err)
+	}
+
+	cleanKey := filepath.Clean(filepath.FromSlash(storageKey))
+	if filepath.IsAbs(cleanKey) || len(cleanKey) > 0 && cleanKey[0] == '.' {
+		return errors.New("storage: invalid storage key")
+	}
+	if err := os.Remove(filepath.Join(s.baseDir, tenantID.String(), cleanKey)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("storage: remove file: %w", err)
+	}
+	return nil
 }

@@ -79,8 +79,6 @@ var scopedTables = map[string]struct{}{
 	"station.pump":                 {},
 	"station.stock_receipt":        {},
 	"station.stock_issue":          {},
-	"station.stock_reconciliation": {},
-	"station.alert":                {},
 	"station.dispense_session":     {},
 }
 
