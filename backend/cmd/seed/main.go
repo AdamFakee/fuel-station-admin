@@ -149,8 +149,8 @@ func seedAdminOnly(ctx context.Context, pool *pgxpool.Pool) {
 	if email == "" || name == "" {
 		must(fmt.Errorf("thiếu ADMIN_EMAIL hoặc ADMIN_NAME"), "đọc thông tin tài khoản")
 	}
-	if len(password) < 12 {
-		must(fmt.Errorf("ADMIN_PASSWORD phải từ 12 ký tự trở lên"), "kiểm tra mật khẩu")
+	if len(password) < 6 {
+		must(fmt.Errorf("ADMIN_PASSWORD phải từ 6 ký tự trở lên"), "kiểm tra mật khẩu")
 	}
 
 	// Phải đúng một công ty: nhiều công ty thì không đoán được tài khoản thuộc công ty nào.

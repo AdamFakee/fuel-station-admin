@@ -5,7 +5,7 @@ name: Tạo tài khoản Quản trị hệ thống
 # Chạy lại an toàn: email đã có thì giữ nguyên, không đổi mật khẩu.
 #
 # Mật khẩu lấy từ secret ADMIN_PASSWORD nếu có, không thì dùng secret SEED_PASSWORD sẵn có của lần seed trước
-# (từ 12 ký tự trở lên, nếu ngắn hơn thì tạo tài khoản sẽ bị từ chối). Mật khẩu chỉ nằm trong GitHub Secrets,
+# (từ 6 ký tự trở lên, nếu ngắn hơn thì tạo tài khoản sẽ bị từ chối). Mật khẩu chỉ nằm trong GitHub Secrets,
 # không ghi vào mã nguồn hay nhật ký. Email và tên nhập lúc bấm Run workflow nên không nằm trong repo.
 
 on:
