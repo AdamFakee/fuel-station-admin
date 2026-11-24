@@ -25,8 +25,9 @@ apiClient.interceptors.response.use(
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }
-    } else if (status === 403) {
-      // Thiếu quyền -> Hiển thị Modal 403, KHÔNG tự động logout
+    } else if (status === 403 && isReadRequest(error)) {
+      // Tải dữ liệu của trang bị từ chối (không đủ quyền xem trang) -> Hiển thị Modal 403, KHÔNG tự động logout.
+      // Thao tác ghi (duyệt, sửa, xóa) bị 403 thì KHÔNG hiện hộp này: nơi gọi báo lý do cụ thể (quyền hay quy tắc nghiệp vụ).
       show403Popup();
     } else if (isReadRequest(error) && (!error.response || status >= 500)) {
       // Lỗi mạng, timeout hoặc 5xx khi TẢI dữ liệu -> báo lỗi (đã ánh xạ theo mã lỗi), KHÔNG mặc định logout.
