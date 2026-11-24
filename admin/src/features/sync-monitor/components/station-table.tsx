@@ -18,6 +18,14 @@ import { Empty } from '@/components/empty';
 import { DetailDialog } from '@/components/detail-dialog';
 import { rowClick } from '@/lib/row-click';
 import { stationDetail } from '@/lib/row-details';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/status-badge';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useIssueApiKey } from '../api/issue-api-key';
+import { useRevokeApiKey } from '../api/revoke-api-key';
+import { IssuedKeyDialog } from './issued-key-dialog';
+import { IssuedApiKey } from '../types';
 
 interface StationTableProps {
   stations: EdgeStationStatus[];
@@ -26,6 +34,21 @@ interface StationTableProps {
 
 export function StationTable({ stations, isLoading }: StationTableProps) {
   const [detail, setDetail] = React.useState<EdgeStationStatus | null>(null);
+  const [issued, setIssued] = React.useState<IssuedApiKey | null>(null);
+  const [reissueFor, setReissueFor] = React.useState<EdgeStationStatus | null>(null);
+  const [revokeFor, setRevokeFor] = React.useState<EdgeStationStatus | null>(null);
+  const { hasPermission } = useAuth();
+  const canManageKey = hasPermission('sync.monitor:update');
+  const issueKey = useIssueApiKey();
+  const revokeKey = useRevokeApiKey();
+
+  const runIssue = (st: EdgeStationStatus) =>
+    issueKey.mutate(st.branch_id, {
+      onSuccess: (result) => {
+        setReissueFor(null);
+        setIssued(result);
+      },
+    });
 
   if (!isLoading && stations.length === 0) {
     return (
@@ -44,6 +67,7 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
             <TableHead className="w-[120px] text-left">Mã trạm</TableHead>
             <TableHead className="text-left">Tên trạm / Thiết bị</TableHead>
             <TableHead className="text-left">Trạm xăng trực thuộc</TableHead>
+            <TableHead className="text-left">Khóa API</TableHead>
             <TableHead className="text-left">Trạng thái kết nối</TableHead>
             <TableHead className="text-right justify-end">Lần thấy cuối (Heartbeat)</TableHead>
             <TableHead className="text-right justify-end">Lần đồng bộ cuối</TableHead>
@@ -54,20 +78,48 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
         </TableHeader>
         <TableBody>
           {stations.map((st) => (
-            <TableRow key={st.id} className="hover:bg-muted/20" onClick={rowClick(() => setDetail(st))}>
+            <TableRow key={st.branch_id} className="hover:bg-muted/20" onClick={rowClick(() => setDetail(st))}>
               {/* Mã trạm (font-mono, left) */}
               <TableCell className="font-mono text-xs font-semibold text-primary">
-                {st.code}
+                {st.code || '—'}
               </TableCell>
 
               {/* Tên trạm */}
               <TableCell className="font-medium">
-                {st.name}
+                {st.has_station ? st.name : <span className="font-normal text-muted-foreground">Chưa có trạm Edge</span>}
               </TableCell>
 
               {/* Trạm xăng */}
               <TableCell className="text-muted-foreground text-xs">
                 {st.branch_name} ({st.branch_code})
+              </TableCell>
+
+              {/* Khóa API: trạng thái, và nút cấp, cấp lại, thu hồi cho người có quyền */}
+              <TableCell>
+                <div className="flex items-center gap-2" data-row-action>
+                  {st.has_api_key ? (
+                    <StatusBadge tone="success">Đang hiệu lực</StatusBadge>
+                  ) : st.has_station ? (
+                    <StatusBadge tone="neutral">Đã thu hồi</StatusBadge>
+                  ) : (
+                    <StatusBadge tone="warning">Chưa cấp</StatusBadge>
+                  )}
+                  {canManageKey &&
+                    (st.has_api_key ? (
+                      <>
+                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setReissueFor(st)}>
+                          Cấp lại
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-destructive" onClick={() => setRevokeFor(st)}>
+                          Thu hồi
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" className="h-7 px-2 text-xs" disabled={issueKey.isPending} onClick={() => runIssue(st)}>
+                        Cấp khóa
+                      </Button>
+                    ))}
+                </div>
               </TableCell>
 
               {/* Trạng thái kết nối: Online vs Offline */}
@@ -141,6 +193,39 @@ export function StationTable({ stations, isLoading }: StationTableProps) {
           ))}
         </TableBody>
       </Table>
+
+      <IssuedKeyDialog issued={issued} onClose={() => setIssued(null)} />
+
+      <ConfirmDialog
+        open={reissueFor !== null}
+        onOpenChange={(open) => !open && setReissueFor(null)}
+        level="security"
+        title="Cấp lại khóa API"
+        description={reissueFor ? `Trạm ${reissueFor.code} (${reissueFor.branch_name})` : undefined}
+        consequences={[
+          'Khóa cũ mất hiệu lực ngay lập tức.',
+          'Trạm mất kết nối với server cho đến khi bạn đặt khóa mới vào mini server.',
+          'Dữ liệu chưa gửi vẫn nằm trong hàng đợi của trạm và tự gửi bù khi kết nối lại.',
+        ]}
+        confirmText="Cấp lại khóa"
+        loading={issueKey.isPending}
+        onConfirm={() => reissueFor && runIssue(reissueFor)}
+      />
+
+      <ConfirmDialog
+        open={revokeFor !== null}
+        onOpenChange={(open) => !open && setRevokeFor(null)}
+        level="security"
+        title="Thu hồi khóa API"
+        description={revokeFor ? `Trạm ${revokeFor.code} (${revokeFor.branch_name})` : undefined}
+        consequences={[
+          'Khóa hiện tại mất hiệu lực ngay, trạm chuyển sang ngừng hoạt động.',
+          'Trạm không đẩy được dữ liệu lên server cho đến khi cấp khóa mới.',
+        ]}
+        confirmText="Thu hồi"
+        loading={revokeKey.isPending}
+        onConfirm={() => revokeFor && revokeKey.mutate(revokeFor.branch_id, { onSuccess: () => setRevokeFor(null) })}
+      />
 
       <DetailDialog
         open={detail !== null}

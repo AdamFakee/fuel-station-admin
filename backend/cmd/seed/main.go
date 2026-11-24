@@ -92,12 +92,16 @@ func main() {
 			uuid.MustParse(st.id), tenantID, st.name, st.address, st.managerName, st.phone)
 		must(err, "tạo trạm xăng "+st.name)
 
-		sum := sha256.Sum256([]byte(edgePrefix + "_" + st.edgeKey))
+		rawKey := edgePrefix + "_" + st.edgeKey
+		sum := sha256.Sum256([]byte(rawKey))
+		// api_key_hint: 7 ký tự cuối của khóa để trang admin nhận ra khóa. Trạm đã có từ trước chỉ được điền gợi ý khi khóa
+		// đang lưu đúng là khóa mẫu này (không ghi đè khóa đã được cấp lại).
 		_, err = pool.Exec(ctx, `
-			INSERT INTO station.edge_station (tenant_id, branch_id, code, name, api_key_hash, status, agent_version)
-			VALUES ($1, $2, $3, $4, $5, 'active', '1.0.0')
-			ON CONFLICT (branch_id) DO NOTHING`,
-			tenantID, uuid.MustParse(st.id), st.edgeCode, "Edge Agent "+st.name, hex.EncodeToString(sum[:]))
+			INSERT INTO station.edge_station (tenant_id, branch_id, code, name, api_key_hash, api_key_hint, status, agent_version)
+			VALUES ($1, $2, $3, $4, $5, $6, 'active', '1.0.0')
+			ON CONFLICT (branch_id) DO UPDATE SET api_key_hint = EXCLUDED.api_key_hint
+			WHERE station.edge_station.api_key_hash = EXCLUDED.api_key_hash AND station.edge_station.api_key_hint IS NULL`,
+			tenantID, uuid.MustParse(st.id), st.edgeCode, "Edge Agent "+st.name, hex.EncodeToString(sum[:]), rawKey[len(rawKey)-7:])
 		must(err, "tạo trạm Edge "+st.name)
 	}
 

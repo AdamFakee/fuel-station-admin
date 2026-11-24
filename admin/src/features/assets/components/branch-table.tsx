@@ -19,7 +19,10 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusIcon, PencilSquareIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, NoSymbolIcon, KeyIcon } from '@heroicons/react/24/outline';
+import { StationKeyDialog } from '@/features/sync-monitor/components/station-key-dialog';
+import { useSyncStations } from '@/features/sync-monitor/api/get-stations';
+import { apiKeyLabel } from '@/lib/row-details';
 import { Branch } from '../types';
 import { useBranches } from '../api/get-branches';
 import { useDeleteBranch } from '../api/delete-branch';
@@ -35,7 +38,22 @@ export function BranchTable() {
   const canCreate = hasPermission('org.branch:create');
   const canUpdate = hasPermission('org.branch:update');
   const canDelete = hasPermission('org.branch:delete');
-  const showActions = canUpdate || canDelete;
+  // Khóa API của trạm: cấp, cấp lại, thu hồi (chỉ ADMIN)
+  const canManageKey = hasPermission('sync.monitor:update');
+  const [keyBranch, setKeyBranch] = React.useState<Branch | null>(null);
+  // Trạng thái khóa của từng trạm để hiện ở phần chi tiết (chỉ tải khi người dùng có quyền xem trạng thái trạm)
+  const showKeyColumn = hasPermission('sync.monitor:view');
+  const stations = useSyncStations({ enabled: showKeyColumn });
+  const stationOf = (branchId: string) => stations.data?.stations.find((st) => st.branch_id === branchId);
+  const showActions = canUpdate || canDelete || canManageKey;
+  // Nhãn khóa của một trạm xăng; null chỉ khi danh sách trạm chưa tải xong. Chi nhánh không có trong danh sách (đang tạm dừng,
+  // chưa có trạm Edge) là chưa cấp khóa.
+  const keyLabelOf = (branchId: string) => {
+    if (!stations.data) return null;
+    const st = stationOf(branchId);
+    return apiKeyLabel(st?.has_api_key ?? false, st?.api_key_hint, st?.has_station ?? false);
+  };
+  const columnCount = 6 + (showKeyColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
   const [search, setSearch] = React.useState('');
@@ -104,15 +122,16 @@ export function BranchTable() {
               <TableHead className="text-left">Người quản lý</TableHead>
               <TableHead className="text-right tabular-nums">Số điện thoại</TableHead>
               <TableHead className="text-center w-[110px]">Trạng thái</TableHead>
+              {showKeyColumn && <TableHead className="text-left w-[150px]">Khóa API</TableHead>}
               <TableHead className="text-right tabular-nums w-[120px]">Ngày tạo</TableHead>
-              {showActions && <TableHead className={`${ACTION_HEAD_CLASS} w-[90px]`}>Thao tác</TableHead>}
+              {showActions && <TableHead className={`${ACTION_HEAD_CLASS} w-[120px]`}>Thao tác</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableEmptyRow colSpan={showActions ? 8 : 7} loading title="Đang tải danh sách trạm xăng..." />
+              <TableEmptyRow colSpan={columnCount} loading title="Đang tải danh sách trạm xăng..." />
             ) : branches.length === 0 ? (
-              <TableEmptyRow colSpan={showActions ? 8 : 7} title="Chưa có trạm xăng nào được khai báo." />
+              <TableEmptyRow colSpan={columnCount} title="Chưa có trạm xăng nào được khai báo." />
             ) : (
               branches.map((b) => (
                 <TableRow key={b.id} className="hover:bg-muted/20" onClick={rowClick(() => setDetail(b))}>
@@ -126,6 +145,21 @@ export function BranchTable() {
                       {b.status === 'active' ? 'Hoạt động' : 'Tạm dừng'}
                     </StatusBadge>
                   </TableCell>
+                  {showKeyColumn && (
+                    <TableCell className="text-left">
+                      {stations.isLoading ? (
+                        <span className="text-xs text-muted-foreground">…</span>
+                      ) : (
+                        (() => {
+                          const st = stationOf(b.id);
+                          if (st?.has_api_key) {
+                            return <StatusBadge tone="success">Đã cấp</StatusBadge>;
+                          }
+                          return st?.has_station ? <StatusBadge tone="neutral">Đã thu hồi</StatusBadge> : <StatusBadge tone="warning">Chưa cấp</StatusBadge>;
+                        })()
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                     {formatDateVN(b.created_at)}
                   </TableCell>
@@ -141,6 +175,17 @@ export function BranchTable() {
                             className="h-7 w-7 text-muted-foreground hover:text-destructive"
                           >
                             <NoSymbolIcon className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {canManageKey && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setKeyBranch(b)}
+                            title="Khóa API của trạm"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          >
+                            <KeyIcon className="h-3.5 w-3.5" />
                           </Button>
                         )}
                         {canUpdate && (
@@ -167,7 +212,28 @@ export function BranchTable() {
         onOpenChange={(open) => !open && setDetail(null)}
         title={detail?.name ?? ''}
         description={'Trạm xăng'}
-        sections={detail ? branchDetail(detail) : []}
+        layout="stacked"
+        sections={
+          detail
+            ? [
+                ...branchDetail(detail),
+                ...(hasPermission('sync.monitor:view') && keyLabelOf(detail.id)
+                  ? [
+                      {
+                        title: 'Khóa API của trạm',
+                        fields: [
+                          {
+                            label: 'Khóa API',
+                            value: <span className="font-mono">{keyLabelOf(detail.id)}</span>,
+                            wide: true,
+                          },
+                        ],
+                      },
+                    ]
+                  : []),
+              ]
+            : []
+        }
       />
       </div>
 
@@ -182,6 +248,10 @@ export function BranchTable() {
       />
 
       <BranchDialog open={dialogOpen} onOpenChange={setDialogOpen} branch={selectedBranch} />
+
+      {canManageKey && (
+        <StationKeyDialog branch={keyBranch ? { id: keyBranch.id, code: keyBranch.code, name: keyBranch.name } : null} onClose={() => setKeyBranch(null)} />
+      )}
     </div>
   );
 }

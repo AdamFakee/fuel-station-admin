@@ -2,7 +2,7 @@
 
 > Phạm vi chốt với chủ dự án: **cây xăng nội bộ, không có tiền** (không đơn giá, thành tiền, VAT, giá vốn); **không realtime**
 > (không SignalR, SSE, WebSocket; dashboard làm mới thủ công hoặc 30 giây); **3 actor**; IT chỉ xem; Quản lý giữ toàn bộ quyền quản trị;
-> **không có màn cấp hay thu hồi token Edge Agent** (khóa đặt lúc triển khai).
+> khóa API của trạm Edge do **ADMIN cấp, cấp lại và thu hồi** ở trang Trạng thái trạm & Đồng bộ (quyền `sync.monitor:update`, có ghi nhật ký thao tác). Khóa chỉ hiện một lần, server chỉ giữ bản băm; mini server đặt khóa bằng `install.sh set-token` hoặc `install.ps1 -Action set-token` (xem `deploy/README.md` của repo fuel-station).
 
 ## 1. Ba actor và quyền
 
@@ -15,7 +15,7 @@
 | Nhà máy/chi nhánh, trụ bơm, bể chứa, thiết bị | xem | ✔ sửa | xem |
 | Xe, tài xế, thẻ, mặt, đồng bộ xuống máy | xem | ✔ | xem |
 | Định mức (lít) | xem | ✔ | xem |
-| Phiếu nhập bể: lập và duyệt (người duyệt khác người lập) | xem | ✔ | xem |
+| Phiếu nhập bể: lập và duyệt | xem | ✔ | xem |
 | Phiếu xuất điều chỉnh, hao hụt: lập | | ✔ | |
 | Phiếu xuất điều chỉnh, hao hụt: duyệt | | | ✔ |
 | Kiểm kê: nhập số đo thực tế | | ✔ | |
@@ -59,7 +59,7 @@ Quyết định thiết kế chính:
 - **Cô lập tenant ở tầng DB:** mọi bảng cha có `UNIQUE (tenant_id, id)` và bảng con dùng FK ghép, nên dữ liệu hai tenant không thể tham chiếu chéo nhau dù code có sai.
 - **Không có tiền:** không có cột giá hay thành tiền ở bất kỳ bảng nào. Thể tích là mililít (`_ml`), khớp Edge Agent.
 - **Tồn kho không sửa tay:** chỉ có `stock_ledger` (thêm, không sửa, không xóa). Trigger tự đánh `seq`, tính số dư, chặn tồn âm, chặn vượt dung tích khả dụng tối đa, và khóa dòng bể để ghi đồng thời không sai số dư.
-- **Chứng từ:** `draft → pending → approved | rejected`; đã duyệt thì không sửa, không xóa; người duyệt phải khác người lập (trừ khi `tenant_setting.allow_self_approval`).
+- **Chứng từ:** `draft → pending → approved | rejected`; đã duyệt thì không sửa, không xóa. Người có quyền duyệt duyệt được cả phiếu do chính mình lập (đã bỏ quy tắc người duyệt khác người lập ở migration 000022).
 - **Đồng bộ xuống trạm:** `version` tự tăng, trigger ghi `sync_change_log`; Edge Agent kéo `WHERE seq > cursor`.
 - **Idempotency lên server:** `UNIQUE (edge_station_id, edge_ref)` và `(edge_station_id, sensor_serial, sale_seq)`.
 - **Số thẻ** lưu đúng dạng máy chấm công báo `cardNo` (thập phân, byte đầu là byte thấp; UID `79:7F:3B:E6` là `3862658937`).
@@ -69,7 +69,7 @@ Không dùng RLS (Row Level Security) ở bước này; cô lập tenant dựa v
 
 ## 4. Hợp đồng với Edge Agent (không realtime, không có UI cấp token)
 
-Xác thực: header `X-Api-Key`, so băm với `edge_station.api_key_hash` (đặt lúc triển khai bằng CLI hoặc seed). Chi nhánh và tenant suy ra từ trạm.
+Xác thực: header `X-Api-Key`, so băm với `edge_station.api_key_hash` (cấp từ trang Trạng thái trạm trên admin; seed chỉ dùng cho dữ liệu demo). Chi nhánh và tenant suy ra từ trạm.
 
 | API | Việc | Ánh xạ vào Edge Agent |
 |---|---|---|

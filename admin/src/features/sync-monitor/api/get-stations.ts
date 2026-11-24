@@ -12,8 +12,9 @@ export async function getSyncStations(): Promise<SyncMonitorResponse> {
   return res.data;
 }
 
-export function useSyncStations() {
+export function useSyncStations(options: { enabled?: boolean } = {}) {
   return useQuery({
+    enabled: options.enabled ?? true,
     queryKey: syncMonitorKeys.stations(),
     queryFn: getSyncStations,
     // Không tự làm mới (không realtime, dashboard nặng): dữ liệu tải lại khi mở trang.

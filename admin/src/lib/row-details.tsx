@@ -266,6 +266,14 @@ export function stockLedgerLineDetail(l: StockLedgerLineItem): DetailSection[] {
 }
 
 /** Một trạm Edge Agent trong màn Trạng thái trạm & Đồng bộ. */
+/** Hiển thị khóa API: chỉ 7 ký tự cuối (khóa thật server không giữ), phần còn lại che bằng dấu chấm. */
+export function apiKeyLabel(hasKey: boolean, hint?: string, hasStation = true): string {
+  if (!hasKey) return hasStation ? 'Đã thu hồi' : 'Chưa cấp';
+  // Dạng che giống khóa thật (edge_ + 48 ký tự), chỉ lộ 7 ký tự cuối để đối chiếu với token trong edge.conf.
+  // Khóa cấp từ trước khi lưu 7 ký tự cuối không có gì để so, chỉ báo đã cấp.
+  return hint ? `edge_xxxxxxxx${hint}` : 'Đã cấp';
+}
+
 export function stationDetail(st: EdgeStationStatus): DetailSection[] {
   return [
     {
@@ -275,6 +283,7 @@ export function stationDetail(st: EdgeStationStatus): DetailSection[] {
         { label: 'Tên trạm / Thiết bị', value: st.name },
         { label: 'Trạm xăng trực thuộc', value: `${st.branch_name} (${st.branch_code})` },
         { label: 'Phiên bản', value: st.agent_version },
+        { label: 'Khóa API', value: <span className="font-mono">{apiKeyLabel(st.has_api_key, st.api_key_hint, st.has_station)}</span>, wide: true },
       ],
     },
     {
