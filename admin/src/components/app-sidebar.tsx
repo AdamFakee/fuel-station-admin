@@ -72,6 +72,12 @@ export function AppSidebar() {
       label: 'Vận hành & Cột bơm',
       items: [
         {
+          title: 'Trạm xăng',
+          href: '/branches',
+          icon: BuildingOffice2Icon,
+          permission: 'org.branch:view',
+        },
+        {
           title: 'Bể chứa nhiên liệu',
           href: '/tanks',
           icon: CircleStackIcon,
@@ -150,12 +156,6 @@ export function AppSidebar() {
           href: '/audit-logs',
           icon: ShieldCheckIcon,
           permission: 'audit.log:view',
-        },
-        {
-          title: 'Trạm xăng',
-          href: '/branches',
-          icon: BuildingOffice2Icon,
-          permission: 'org.branch:view',
         },
         {
           title: 'Tài khoản người dùng',
