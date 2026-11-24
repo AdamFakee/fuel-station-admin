@@ -197,38 +197,18 @@ func TestReceiptLifecycleAndStockLedgerIntegration(t *testing.T) {
 		t.Fatalf("expected status pending, got %s", rc.Status)
 	}
 
-	// 6. Test Two-Person Rule: Same user approving their own document
-	_, selfApproveErr := svc.ApproveReceipt(ctx, rc.ID, inventory.ApproveReceiptRequest{
-		Approved: true,
-	})
-
-	var allowSelf bool
-	_ = pool.QueryRow(ctx, "SELECT allow_self_approval FROM station.tenant_setting WHERE tenant_id = $1", defaultTenantID).Scan(&allowSelf)
-	if !allowSelf && selfApproveErr == nil {
-		t.Fatalf("expected error when approving own document without allow_self_approval")
-	}
-
-	// 7. Approve as a different user (e.g. accountantID or manager 2)
-	approverCtx := middleware.WithTenantID(ctx, defaultTenantID)
-	approverPrincipal := authz.NewPrincipal(
-		accountantID,
-		defaultTenantID,
-		"MANAGER",
-		[]authz.Permission{"inventory.receipt:approve", "inventory.receipt:view"},
-	)
-	approverCtx = authz.WithPrincipal(approverCtx, approverPrincipal)
-
-	approvedRc, err := svc.ApproveReceipt(approverCtx, rc.ID, inventory.ApproveReceiptRequest{
+	// 6. Người lập phiếu có quyền duyệt thì tự duyệt được (không còn quy tắc "người duyệt khác người lập")
+	approvedRc, err := svc.ApproveReceipt(ctx, rc.ID, inventory.ApproveReceiptRequest{
 		Approved: true,
 	})
 	if err != nil {
-		t.Fatalf("ApproveReceipt by second user failed: %v", err)
+		t.Fatalf("ApproveReceipt by the creator failed: %v", err)
 	}
 	if approvedRc.Status != "approved" {
 		t.Fatalf("expected status approved, got %s", approvedRc.Status)
 	}
 
-	// 8. Verify Stock Ledger has been credited!
+	// 7. Verify Stock Ledger has been credited!
 	var ledgerCount int
 	var ledgerDelta int64
 	err = pool.QueryRow(ctx, `
@@ -323,21 +303,8 @@ func TestStockIssueLifecycleAndLedger(t *testing.T) {
 		t.Fatalf("expected status pending, got %s", submitted.Status)
 	}
 
-	// 3. Try to self-approve with same user (should fail due to guard_document rule)
-	_, err = svc.ApproveIssue(ctx, issue.ID, inventory.ApproveIssueRequest{Approved: true})
-	if err == nil {
-		t.Fatalf("expected self-approval to be forbidden by guard_document, got nil")
-	}
-
-	// 4. Approve with Accountant (different user)
-	approverCtx := middleware.WithTenantID(context.Background(), defaultTenantID)
-	approverPrincipal := authz.NewPrincipal(
-		accountantID,
-		defaultTenantID,
-		"ACCOUNTANT",
-		[]authz.Permission{"inventory.issue:approve", "inventory.issue:view"},
-	)
-	approverCtx = authz.WithPrincipal(approverCtx, approverPrincipal)
+	// 3. Người lập duyệt chính phiếu của mình: được phép (đã bỏ quy tắc người duyệt khác người lập)
+	approverCtx := ctx
 
 	approved, err := svc.ApproveIssue(approverCtx, issue.ID, inventory.ApproveIssueRequest{Approved: true})
 	if err != nil {
@@ -475,4 +442,46 @@ func TestM12_TankStockAndLedger(t *testing.T) {
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+// Bể mới tạo với tồn đầu kỳ 0 (không có dòng sổ nào) vẫn nhập hàng được: dòng đầu tiên là nhập kho.
+// Xuất kho, điều chỉnh trên bể chưa có sổ vẫn bị chặn, và sau khi đã có sổ thì không đặt tồn đầu kỳ nữa.
+func TestLedgerFirstRowOnEmptyTank(t *testing.T) {
+	_, pool, ctx := setupTest(t)
+	defer pool.Close()
+
+	branchID, _, fuelTypeID := ensureTestTank(t, ctx, pool)
+	var tankID string
+	err := pool.QueryRow(ctx, `
+		INSERT INTO station.tank (tenant_id, branch_id, code, name, fuel_type_id, design_capacity_ml, max_usable_capacity_ml, low_stock_threshold_ml, loss_tolerance_pct)
+		VALUES ($1, $2, $3, 'Bể Test trống', $4, 50000000, 45000000, 3000000, 0.5)
+		RETURNING id
+	`, defaultTenantID, branchID, fmt.Sprintf("TK-E%d", time.Now().UnixNano()%1000000), fuelTypeID).Scan(&tankID)
+	if err != nil {
+		t.Fatalf("create empty tank: %v", err)
+	}
+	insert := func(kind string, delta int64) error {
+		_, err := pool.Exec(ctx, `INSERT INTO station.stock_ledger (tenant_id, tank_id, kind, delta_ml) VALUES ($1, $2, $3, $4)`, defaultTenantID, tankID, kind, delta)
+		return err
+	}
+
+	if err := insert("issue", -1000); err == nil {
+		t.Fatalf("expected issue on an empty tank to be rejected")
+	}
+	if err := insert("adjust", 1000); err == nil {
+		t.Fatalf("expected adjust as the first row to be rejected")
+	}
+	if err := insert("receipt", 5000000); err != nil {
+		t.Fatalf("first receipt on an empty tank must be accepted: %v", err)
+	}
+	var seq, balance int64
+	if err := pool.QueryRow(ctx, `SELECT seq, balance_after_ml FROM station.stock_ledger WHERE tank_id = $1`, tankID).Scan(&seq, &balance); err != nil {
+		t.Fatalf("read ledger: %v", err)
+	}
+	if seq != 1 || balance != 5000000 {
+		t.Fatalf("expected seq 1 and balance 5000000, got seq %d balance %d", seq, balance)
+	}
+	if err := insert("opening", 1000); err == nil {
+		t.Fatalf("expected opening after the ledger started to be rejected")
+	}
 }

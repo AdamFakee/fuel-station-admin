@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { StockReceipt } from '../types';
 import { useApproveReceipt } from '../api/approve-receipt';
 import { formatNumberVN, formatDateTimeVN } from '@/lib/format';
-import { CheckCircle2Icon, XCircleIcon, ShieldAlertIcon } from 'lucide-react';
+import { CheckCircle2Icon, XCircleIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { showApiError } from '@/lib/api-error';
 
@@ -82,7 +82,7 @@ export function ReceiptApproveDialog({
         <DialogHeader>
           <DialogTitle>Phê duyệt phiếu nhập bể {receipt.code}</DialogTitle>
           <DialogDescription>
-            Quy trình phê duyệt kép (Two-Person Rule): Người duyệt ghi nhận nhập kho vào Sổ thẻ kho (Stock Ledger).
+            Người duyệt ghi nhận nhập kho vào Sổ thẻ kho (Stock Ledger).
           </DialogDescription>
         </DialogHeader>
 
@@ -108,17 +108,6 @@ export function ReceiptApproveDialog({
               <span className="font-bold text-primary tabular-nums text-base">
                 {formatNumberVN(receipt.total_volume_ml / 1000)} Lít
               </span>
-            </div>
-          </div>
-
-          {/* Two-person rule notice */}
-          <div className="flex items-start gap-2.5 p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800">
-            <ShieldAlertIcon className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
-            <div>
-              <p className="font-semibold text-amber-900">Kiểm soát kép (Two-Person Rule)</p>
-              <p>
-                Người duyệt bắt buộc phải là tài khoản khác với người lập phiếu ({receipt.created_by_name || receipt.created_by}).
-              </p>
             </div>
           </div>
 

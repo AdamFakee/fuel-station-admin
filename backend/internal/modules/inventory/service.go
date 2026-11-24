@@ -568,7 +568,7 @@ func (s *Service) ApproveReceipt(ctx context.Context, id string, req ApproveRece
 	}
 
 	// Approval flow:
-	// 1. Update status to 'approved' (triggers guard_document which checks self-approval rules)
+	// 1. Update status to 'approved' (trigger guard_document chỉ còn chặn: thiếu người duyệt, chứng từ đã duyệt không sửa được)
 	_, err = tx.Exec(ctx, `
 		UPDATE station.stock_receipt
 		SET status = 'approved', decided_by = $3, decided_at = $4, updated_at = now()
