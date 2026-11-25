@@ -84,7 +84,7 @@ export function StationKeyDialog({ branch, onClose }: StationKeyDialogProps) {
                       </div>
                     )}
                     <div className="flex items-center justify-between px-3 py-2.5">
-                      <span className="text-muted-foreground">Mã trạm (station_id trong edge.conf)</span>
+                      <span className="text-muted-foreground">Mã trạm</span>
                       <span className="font-mono text-xs font-medium">{station?.code}</span>
                     </div>
                     <div className="flex items-center justify-between px-3 py-2.5">

@@ -65,12 +65,7 @@ export function IssuedKeyDialog({ issued, onClose }: IssuedKeyDialogProps) {
                 <p>Windows (PowerShell chạy bằng Administrator):</p>
                 <code className="block rounded-md border bg-muted px-3 py-2 font-mono text-foreground">.\install.ps1 -Action set-token</code>
                 <p>
-                  Lệnh sẽ hỏi khóa (dán khóa ở trên), ghi vào <span className="font-mono">edge.conf</span> rồi khởi động lại dịch vụ. Mã trạm trong{' '}
-                  <span className="font-mono">edge.conf</span> (<span className="font-mono">station_id</span>) là{' '}
-                  <button type="button" className="font-mono text-primary hover:underline" onClick={() => void copy(issued.station_code, 'mã trạm')}>
-                    {issued.station_code}
-                  </button>
-                  .
+                  Lệnh sẽ hỏi khóa (dán khóa ở trên), ghi vào <span className="font-mono">edge.conf</span> rồi khởi động lại dịch vụ. Khóa này tự xác định trạm, không cần nhập mã trạm.
                 </p>
               </div>
             </div>
