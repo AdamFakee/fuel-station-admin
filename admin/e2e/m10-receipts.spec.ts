@@ -358,9 +358,9 @@ test.describe('Module M10 - Nhập bể (Stock Receipts) & Kiểm soát Sức ch
   });
 
   // ----------------------------------------------------------------------------------------------
-  // Test 4: Phê duyệt hai người (Two-Person Rule) & Duyệt phiếu nhập
+  // Test 4: Duyệt phiếu nhập (đã bỏ quy tắc hai người)
   // ----------------------------------------------------------------------------------------------
-  test('TC-M10-04: Mở modal phê duyệt phiếu nhập với cảnh báo kiểm soát kép Two-Person Rule và duyệt thành công', async ({ page }) => {
+  test('TC-M10-04: Mở modal phê duyệt phiếu nhập (không còn quy tắc hai người) và duyệt thành công', async ({ page }) => {
     // Mock phiếu ở trạng thái pending do 'Nguyễn Văn Lập Phiếu' tạo
     await page.route('**/v1/inventory/receipts*', async (route) => {
       if (route.request().method() === 'GET') {
@@ -431,8 +431,8 @@ test.describe('Module M10 - Nhập bể (Stock Receipts) & Kiểm soát Sức ch
     // Kiểm tra Modal phê duyệt hiển thị
     await expect(page.getByRole('heading', { name: 'Phê duyệt phiếu nhập bể PN-2026-0099' })).toBeVisible();
 
-    // Kiểm tra cảnh báo Two-Person Rule
-    await expect(page.getByText('Kiểm soát kép (Two-Person Rule)')).toBeVisible();
+    // Quy tắc hai người đã bỏ: không còn cảnh báo kiểm soát kép; người có quyền duyệt được duyệt phiếu do người khác lập
+    await expect(page.getByText('Kiểm soát kép (Two-Person Rule)')).toHaveCount(0);
     await expect(page.getByText('Nguyễn Văn Lập Phiếu', { exact: true })).toBeVisible();
 
     // Bấm Xác nhận duyệt
