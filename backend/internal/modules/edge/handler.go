@@ -36,6 +36,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 		er.Use(authMiddleware)
 
 		er.Get("/catalog/changes", h.GetCatalogChanges)
+		er.Get("/whoami", h.WhoAmI)
 		er.Post("/dispense-sessions", h.CreateDispenseSession)
 		er.Post("/access-events", h.ReceiveAccessEvents)
 		er.Post("/heartbeat", h.Heartbeat)
@@ -64,6 +65,23 @@ func (h *Handler) GetCatalogChanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	httpx.JSON(w, http.StatusOK, resp)
+}
+
+// WhoAmI: kiểm tra khóa API và số thay đổi chưa kéo (?cursor=con-trỏ-của-trạm). Chỉ đọc.
+func (h *Handler) WhoAmI(w http.ResponseWriter, r *http.Request) {
+	var cursor int64
+	if cStr := r.URL.Query().Get("cursor"); cStr != "" {
+		if c, err := strconv.ParseInt(cStr, 10, 64); err == nil {
+			cursor = c
+		}
+	}
+	resp, err := h.service.WhoAmI(r.Context(), cursor)
+	if err != nil {
+		httpx.Error(w, r, h.log, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, http.StatusOK, resp)
 }
 

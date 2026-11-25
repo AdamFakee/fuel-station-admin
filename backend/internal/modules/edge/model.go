@@ -31,6 +31,19 @@ type CatalogChangesResponse struct {
 	HasMore    bool                `json:"has_more"`
 }
 
+// WhoAmIResponse là câu trả lời của GET /edge/v1/whoami: khóa API hợp lệ thuộc trạm nào, và còn bao nhiêu thay đổi danh mục chưa kéo.
+// Chỉ đọc, không ghi gì (khác heartbeat và catalog/changes đều cập nhật mốc thời gian của trạm).
+type WhoAmIResponse struct {
+	StationCode string `json:"station_code"`
+	StationName string `json:"station_name"`
+	// ServerCursor là số thứ tự lớn nhất của nhật ký danh mục trên server.
+	ServerCursor int64 `json:"server_cursor"`
+	// PendingChanges là số thay đổi sau con trỏ của trạm; dừng đếm ở PendingCap để câu hỏi luôn rẻ.
+	PendingChanges int64 `json:"pending_changes"`
+	// PendingCapped = true khi còn nhiều hơn PendingCap thay đổi (số trên chỉ là mốc chặn).
+	PendingCapped bool `json:"pending_capped"`
+}
+
 // DispenseSessionEventInput represents a state transition event in a session.
 type DispenseSessionEventInput struct {
 	FromState  *string   `json:"from_state"`

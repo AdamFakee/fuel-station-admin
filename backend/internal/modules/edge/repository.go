@@ -24,6 +24,8 @@ type Repository interface {
 	CreateDispenseSession(ctx context.Context, station *StationContext, req CreateDispenseSessionRequest) (*DispenseSessionResponse, error)
 	BatchInsertAccessEvents(ctx context.Context, station *StationContext, events []AccessEventInput) (int, error)
 	UpdateHeartbeat(ctx context.Context, stationID string, pendingQueue int, agentVersion string, lastError *string) error
+	// CatalogStats: số thay đổi sau cursor (dừng đếm ở limit) và số thứ tự lớn nhất của nhật ký danh mục. Chỉ đọc.
+	CatalogStats(ctx context.Context, tenantID string, cursor int64, limit int) (pending int64, maxSeq int64, err error)
 }
 
 type postgresRepository struct {
@@ -101,6 +103,21 @@ func (r *postgresRepository) UpdateLastSyncAt(ctx context.Context, stationID str
 	query := `UPDATE station.edge_station SET last_sync_at = now(), updated_at = now() WHERE id = $1`
 	_, err := r.pool.Exec(ctx, query, stationID)
 	return err
+}
+
+func (r *postgresRepository) CatalogStats(ctx context.Context, tenantID string, cursor int64, limit int) (int64, int64, error) {
+	if r.pool == nil {
+		return 0, 0, errors.New("db pool not initialized")
+	}
+	var maxSeq int64
+	if err := r.pool.QueryRow(ctx, `SELECT COALESCE(MAX(seq), 0) FROM station.sync_change_log WHERE tenant_id = $1`, tenantID).Scan(&maxSeq); err != nil {
+		return 0, 0, fmt.Errorf("max seq: %w", err)
+	}
+	var pending int64
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM (SELECT 1 FROM station.sync_change_log WHERE tenant_id = $1 AND seq > $2 LIMIT $3) t`, tenantID, cursor, limit).Scan(&pending); err != nil {
+		return 0, 0, fmt.Errorf("count pending: %w", err)
+	}
+	return pending, maxSeq, nil
 }
 
 func (r *postgresRepository) GetCatalogChanges(ctx context.Context, tenantID, branchID string, cursor int64, limit int) ([]CatalogChangeItem, int64, bool, error) {

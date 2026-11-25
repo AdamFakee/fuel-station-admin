@@ -15,6 +15,7 @@ type Service interface {
 	ReceiveDispenseSession(ctx context.Context, req CreateDispenseSessionRequest) (*DispenseSessionResponse, error)
 	ReceiveAccessEvents(ctx context.Context, events []AccessEventInput) (*BatchAccessEventsResponse, error)
 	Heartbeat(ctx context.Context, req HeartbeatRequest) (*HeartbeatResponse, error)
+	WhoAmI(ctx context.Context, cursor int64) (*WhoAmIResponse, error)
 }
 
 type service struct {
@@ -50,6 +51,35 @@ func (s *service) GetCatalogChanges(ctx context.Context, cursor int64, limit int
 		Changes:    changes,
 		NextCursor: nextCursor,
 		HasMore:    hasMore,
+	}, nil
+}
+
+// pendingCap giới hạn số dòng đếm khi trả số thay đổi chưa kéo, để câu hỏi luôn rẻ dù trạm tụt xa.
+const pendingCap = 10000
+
+// WhoAmI xác nhận khóa API (middleware đã kiểm) và cho biết trạm còn bao nhiêu thay đổi chưa kéo. Không ghi gì.
+func (s *service) WhoAmI(ctx context.Context, cursor int64) (*WhoAmIResponse, error) {
+	station, ok := StationFromContext(ctx)
+	if !ok || station.StationID == "" {
+		return nil, apperr.ErrUnauthorized
+	}
+	if cursor < 0 {
+		cursor = 0
+	}
+	pending, maxSeq, err := s.repo.CatalogStats(ctx, station.TenantID, cursor, pendingCap+1)
+	if err != nil {
+		return nil, fmt.Errorf("catalog stats: %w", err)
+	}
+	capped := pending > pendingCap
+	if capped {
+		pending = pendingCap
+	}
+	return &WhoAmIResponse{
+		StationCode:    station.StationCode,
+		StationName:    station.StationName,
+		ServerCursor:   maxSeq,
+		PendingChanges: pending,
+		PendingCapped:  capped,
 	}, nil
 }
 

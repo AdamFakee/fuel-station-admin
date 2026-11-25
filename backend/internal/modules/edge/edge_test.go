@@ -22,6 +22,14 @@ type mockRepo struct {
 	createDispenseSessionFunc   func(ctx context.Context, station *edge.StationContext, req edge.CreateDispenseSessionRequest) (*edge.DispenseSessionResponse, error)
 	batchInsertAccessEventsFunc func(ctx context.Context, station *edge.StationContext, events []edge.AccessEventInput) (int, error)
 	updateHeartbeatFunc         func(ctx context.Context, stationID string, pendingQueue int, agentVersion string, lastError *string) error
+	catalogStatsFunc            func(ctx context.Context, tenantID string, cursor int64, limit int) (int64, int64, error)
+}
+
+func (m *mockRepo) CatalogStats(ctx context.Context, tenantID string, cursor int64, limit int) (int64, int64, error) {
+	if m.catalogStatsFunc != nil {
+		return m.catalogStatsFunc(ctx, tenantID, cursor, limit)
+	}
+	return 0, 0, nil
 }
 
 func (m *mockRepo) FindStationByApiKeyHash(ctx context.Context, keyHash string) (*edge.StationContext, error) {
