@@ -115,6 +115,10 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if deviceKey != nil {
 		edgeRepo = edge.WithCryptoKey(edgeRepo, deviceKey)
 	}
+	if diskStorage != nil {
+		edgeRepo = edge.WithFileStore(edgeRepo, diskStorage)
+		edge.AuditFaceFiles(ctx, pool, diskStorage, log)
+	}
 	edgeService := edge.NewService(edgeRepo, log)
 	edgeHandler := edge.NewHandler(edgeService, log).WithFiles(edge.NewFileServer(pool, diskStorage))
 

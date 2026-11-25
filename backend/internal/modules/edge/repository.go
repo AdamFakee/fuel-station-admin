@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"fuel-station-backend/internal/platform/crypto"
+	"log/slog"
 	"time"
 
 	"fuel-station-backend/internal/shared/apperr"
+	"fuel-station-backend/internal/shared/storage"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -25,7 +28,8 @@ type Repository interface {
 
 type postgresRepository struct {
 	pool      *pgxpool.Pool
-	cryptoKey []byte // khóa giải mã mật khẩu máy chấm công gửi kèm cho Edge Agent (mạng LAN)
+	cryptoKey []byte          // khóa giải mã mật khẩu máy chấm công gửi kèm cho Edge Agent (mạng LAN)
+	files     storage.Storage // kho ảnh: dùng để chắc ảnh mặt đọc được trước khi báo cho trạm; nil thì không kiểm tra
 }
 
 func NewRepository(pool *pgxpool.Pool) Repository {
@@ -38,6 +42,35 @@ func WithCryptoKey(repo Repository, key []byte) Repository {
 		r.cryptoKey = key
 	}
 	return repo
+}
+
+// WithFileStore gắn kho ảnh để danh mục xuống trạm chỉ gồm thẻ mặt có ảnh đọc được thật sự.
+func WithFileStore(repo Repository, files storage.Storage) Repository {
+	if r, ok := repo.(*postgresRepository); ok {
+		r.files = files
+	}
+	return repo
+}
+
+// faceImageReadable chắc rằng ảnh của thẻ mặt có dòng trong stored_file VÀ mở đọc được từ kho. Dòng DB còn mà tệp mất
+// (xóa tay, đổi thư mục kho, sao lưu thiếu) thì trạm sẽ nhận 404 khi tải ảnh; không để lỗi đó đi tới trạm.
+func (r *postgresRepository) faceImageReadable(ctx context.Context, tenantID, fileID string) error {
+	if r.files == nil {
+		return nil
+	}
+	tenantUUID, err := uuid.Parse(tenantID)
+	if err != nil {
+		return fmt.Errorf("tenant_id không hợp lệ: %w", err)
+	}
+	var storageKey string
+	if err := r.pool.QueryRow(ctx, `SELECT storage_key FROM station.stored_file WHERE tenant_id = $1 AND id = $2`, tenantID, fileID).Scan(&storageKey); err != nil {
+		return fmt.Errorf("không có dòng stored_file: %w", err)
+	}
+	body, err := r.files.Open(ctx, tenantUUID, storageKey)
+	if err != nil {
+		return fmt.Errorf("tệp ảnh không đọc được: %w", err)
+	}
+	return body.Close()
 }
 
 func (r *postgresRepository) FindStationByApiKeyHash(ctx context.Context, keyHash string) (*StationContext, error) {
@@ -253,6 +286,15 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		err := r.pool.QueryRow(ctx, query, tenantID, entityID).Scan(&id, &vehicleID, &driverID, &method, &externalID, &status, &version, &faceFileID)
 		if err != nil {
 			return nil, err
+		}
+		// Thẻ mặt còn hiệu lực mà ảnh không đọc được thì KHÔNG đưa xuống trạm: bỏ dữ liệu của mục này (trạm bỏ qua mục không có
+		// dữ liệu) để một ảnh hỏng không làm hỏng cả đợt kéo danh mục. Ảnh được tải lại thì thẻ đổi phiên bản và được gửi lại.
+		if method == "face" && status == "active" && faceFileID != nil {
+			if err := r.faceImageReadable(ctx, tenantID, *faceFileID); err != nil {
+				slog.Error("thẻ mặt không có ảnh đọc được, không đưa xuống trạm: tải lại ảnh hoặc thu hồi thẻ",
+					"credential_id", id, "external_id", externalID, "face_file_id", *faceFileID, "err", err)
+				return nil, err
+			}
 		}
 		data["id"] = id
 		data["vehicle_id"] = vehicleID
