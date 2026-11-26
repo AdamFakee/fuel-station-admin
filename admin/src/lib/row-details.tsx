@@ -9,7 +9,7 @@ import type { DriverListItem, VehicleListItem } from '@/features/master/types';
 import type { AccessEventListItem } from '@/features/dispense/types';
 import type { EdgeStationStatus } from '@/features/sync-monitor/types';
 import type { StockLedgerLineItem, StockLedgerSummaryItem } from '@/features/reports/types';
-import { BRANCH_STATUS, DRIVER_STATUS, TANK_STATUS, USER_STATUS, VEHICLE_STATUS, pumpStatus, statusStyle, type StatusStyle } from '@/lib/status-labels';
+import { DRIVER_STATUS, USER_STATUS, VEHICLE_STATUS, pumpStatus, statusStyle, type StatusStyle } from '@/lib/status-labels';
 
 /**
  * Nội dung hộp thoại chi tiết cho từng loại dòng bảng. Chỉ đọc, gom một chỗ để mọi bảng hiển thị nhất quán.
@@ -34,7 +34,6 @@ export function branchDetail(b: Branch): DetailSection[] {
       title: 'Thông tin trạm xăng',
       fields: [
         { label: 'Mã trạm xăng', value: b.code },
-        { label: 'Trạng thái', value: statusBadge(statusStyle(BRANCH_STATUS, b.status)) },
         { label: 'Tên trạm xăng', value: b.name },
         { label: 'Người quản lý', value: b.manager_name },
         { label: 'Số điện thoại', value: b.phone },
@@ -51,7 +50,6 @@ export function tankDetail(t: Tank): DetailSection[] {
       title: 'Thông tin bể',
       fields: [
         { label: 'Mã bể', value: t.code },
-        { label: 'Trạng thái', value: statusBadge(statusStyle(TANK_STATUS, t.status)) },
         { label: 'Tên bể', value: t.name },
         { label: 'Trạm xăng', value: t.branch_name },
         { label: 'Loại nhiên liệu', value: t.fuel_type_name },

@@ -1,11 +1,9 @@
 'use client';
 
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DetailDialog } from '@/components/detail-dialog';
 import { rowClick } from '@/lib/row-click';
 import { tankDetail } from '@/lib/row-details';
 import { TableEmptyRow } from '@/components/table-empty-row';
-import { StatusBadge } from '@/components/status-badge';
 import * as React from 'react';
 import {
   Table,
@@ -23,8 +21,6 @@ import { Input } from '@/components/ui/input';
 import {
   PlusIcon,
   PencilSquareIcon,
-  PauseCircleIcon,
-  PlayCircleIcon,
   MagnifyingGlassIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
@@ -32,38 +28,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { exportReportToExcel } from '@/features/reports/lib/export-excel';
 import { Tank } from '../types';
 import { getTanks, useTanks } from '../api/get-tanks';
-import { useDeleteTank } from '../api/delete-tank';
-import { useUpdateTank } from '../api/update-tank';
 import { useBranches } from '../api/get-branches';
 import { TankDialog } from './tank-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { formatNumberVN } from '@/lib/format';
 import { toast } from 'sonner';
 import Paginator from '@/components/paginator';
-import { showApiError } from '@/lib/api-error';
-import { TANK_STATUS, statusStyle } from '@/lib/status-labels';
 
 export function TankTable() {
   const [detail, setDetail] = React.useState<Tank | null>(null);
   const { hasPermission } = useAuth();
   const canCreate = hasPermission('asset.tank:create');
   const canUpdate = hasPermission('asset.tank:update');
-  const canDelete = hasPermission('asset.tank:delete');
-  const showActions = canUpdate || canDelete;
+  const showActions = canUpdate;
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
   const [search, setSearch] = React.useState('');
   const [branchFilter, setBranchFilter] = React.useState('all');
-  const [statusFilter, setStatusFilter] = React.useState('all');
   const [isExporting, setIsExporting] = React.useState(false);
   const [selectedTank, setSelectedTank] = React.useState<Tank | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [deactivateTarget, setDeactivateTarget] = React.useState<Tank | null>(null);
-  const [reactivateTarget, setReactivateTarget] = React.useState<Tank | null>(null);
 
   React.useEffect(() => {
     setPage(1);
-  }, [search, branchFilter, statusFilter]);
+  }, [search, branchFilter]);
 
   const { data: branchData } = useBranches();
   const { data, isLoading } = useTanks({
@@ -71,10 +59,7 @@ export function TankTable() {
     page_size: pageSize,
     q: search || undefined,
     branch_id: branchFilter !== 'all' ? branchFilter : undefined,
-    status: statusFilter !== 'all' ? statusFilter : undefined,
   });
-  const deleteMutation = useDeleteTank();
-  const updateMutation = useUpdateTank();
 
   const tanks = data?.data || [];
   const branches = branchData?.data || [];
@@ -86,7 +71,6 @@ export function TankTable() {
       const filters = {
         q: search || undefined,
         branch_id: branchFilter !== 'all' ? branchFilter : undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
       };
       const allTanks: Tank[] = [];
       for (let exportPage = 1; ; exportPage++) {
@@ -130,7 +114,6 @@ export function TankTable() {
             width: 18,
             align: 'right',
           },
-          { header: 'Trạng thái', key: 'status_label', width: 14 },
         ],
         data: allTanks.map((tank) => ({
           code: tank.code,
@@ -141,7 +124,6 @@ export function TankTable() {
           usable_capacity_l: tank.max_usable_capacity_ml / 1000,
           current_stock_l: tank.current_stock_ml / 1000,
           loss_tolerance_pct: tank.loss_tolerance_pct,
-          status_label: statusStyle(TANK_STATUS, tank.status).label,
         })),
       });
     } catch {
@@ -159,41 +141,6 @@ export function TankTable() {
   const handleEdit = (tank: Tank) => {
     setSelectedTank(tank);
     setDialogOpen(true);
-  };
-
-  const handleDeactivate = async () => {
-    if (!deactivateTarget) return;
-    try {
-      await deleteMutation.mutateAsync(deactivateTarget.id);
-      toast.success(`Đã ngừng hoạt động bể ${deactivateTarget.name}`);
-      setDeactivateTarget(null);
-    } catch (err: any) {
-      showApiError(err, 'Có lỗi xảy ra');
-    }
-  };
-
-  const handleReactivate = async () => {
-    const target = reactivateTarget;
-    if (!target) return;
-    try {
-      await updateMutation.mutateAsync({
-        id: target.id,
-        // API cập nhật ghi đè cả bản ghi nên gửi lại đủ thông tin hiện tại
-        input: {
-          name: target.name,
-          fuel_type_id: target.fuel_type_id,
-          design_capacity_liters: target.design_capacity_ml / 1000,
-          max_usable_capacity_liters: target.max_usable_capacity_ml / 1000,
-          low_stock_threshold_liters: target.low_stock_threshold_ml / 1000,
-          loss_tolerance_pct: target.loss_tolerance_pct,
-          status: 'active',
-        },
-      });
-      toast.success(`Đã kích hoạt lại bể ${target.name}`);
-      setReactivateTarget(null);
-    } catch (err: any) {
-      showApiError(err, 'Có lỗi xảy ra');
-    }
   };
 
   return (
@@ -237,17 +184,6 @@ export function TankTable() {
             ))}
           </SelectContent>
         </Select>
-
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full lg:w-[190px]">
-            <SelectValue placeholder="Trạng thái" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tất cả trạng thái</SelectItem>
-            <SelectItem value="active">{TANK_STATUS.active.label}</SelectItem>
-            <SelectItem value="inactive">{TANK_STATUS.inactive.label}</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Data Table */}
@@ -263,15 +199,14 @@ export function TankTable() {
               <TableHead className="text-right tabular-nums">Khả dụng (Lít)</TableHead>
               <TableHead className="text-right tabular-nums font-semibold">Tồn hiện tại (Lít)</TableHead>
               <TableHead className="text-right tabular-nums">Hao hụt (%)</TableHead>
-              <TableHead className="text-center w-[100px]">Trạng thái</TableHead>
               {showActions && <TableHead className={`${ACTION_HEAD_CLASS} w-[80px]`}>Thao tác</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableEmptyRow colSpan={showActions ? 10 : 9} loading title="Đang tải danh sách bể chứa..." />
+              <TableEmptyRow colSpan={showActions ? 9 : 8} loading title="Đang tải danh sách bể chứa..." />
             ) : tanks.length === 0 ? (
-              <TableEmptyRow colSpan={showActions ? 10 : 9} title="Chưa có bể chứa nào được khai báo." />
+              <TableEmptyRow colSpan={showActions ? 9 : 8} title="Chưa có bể chứa nào được khai báo." />
             ) : (
               tanks.map((t) => {
                 const currentStockL = t.current_stock_ml / 1000;
@@ -298,34 +233,9 @@ export function TankTable() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-xs font-mono">{t.loss_tolerance_pct}%</TableCell>
-                    <TableCell className="text-center">
-                      <StatusBadge tone={statusStyle(TANK_STATUS, t.status).tone}>{statusStyle(TANK_STATUS, t.status).label}</StatusBadge>
-                    </TableCell>
                     {showActions && (
                       <TableCell className={ACTION_CELL_CLASS}>
                         <div className="flex justify-end gap-1">
-                          {canDelete && t.status === 'active' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeactivateTarget(t)}
-                              title="Ngừng hoạt động"
-                              className="h-7 w-7 text-amber-600 hover:text-amber-700"
-                            >
-                              <PauseCircleIcon className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {canUpdate && t.status === 'inactive' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setReactivateTarget(t)}
-                              title="Kích hoạt lại"
-                              className="h-7 w-7 text-green-600 hover:text-green-700"
-                            >
-                              <PlayCircleIcon className="h-4 w-4" />
-                            </Button>
-                          )}
                           {canUpdate && (
                           <Button
                             variant="ghost"
@@ -366,28 +276,6 @@ export function TankTable() {
       />
 
       <TankDialog open={dialogOpen} onOpenChange={setDialogOpen} tank={selectedTank} />
-
-      <ConfirmDialog
-        open={deactivateTarget !== null}
-        onOpenChange={(open) => !open && setDeactivateTarget(null)}
-        level="destructive"
-        title="Ngừng hoạt động bể chứa"
-        description={`Bạn có chắc chắn muốn ngừng hoạt động bể ${deactivateTarget?.name ?? ''}?`}
-        confirmText="Ngừng hoạt động"
-        loading={deleteMutation.isPending}
-        onConfirm={handleDeactivate}
-      />
-
-      <ConfirmDialog
-        open={reactivateTarget !== null}
-        onOpenChange={(open) => !open && setReactivateTarget(null)}
-        level="info"
-        title="Kích hoạt lại bể chứa"
-        description={`Bạn có chắc chắn muốn kích hoạt lại bể ${reactivateTarget?.name ?? ''}?`}
-        confirmText="Kích hoạt lại"
-        loading={updateMutation.isPending}
-        onConfirm={handleReactivate}
-      />
     </div>
   );
 }

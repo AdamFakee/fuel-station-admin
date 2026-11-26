@@ -20,8 +20,6 @@ const LOCKED: StatusStyle = { label: 'Bị khóa', tone: 'danger' }; // blocked,
 export const DRIVER_STATUS = { active: ACTIVE, blocked: LOCKED, inactive: INACTIVE } satisfies Record<string, StatusStyle>;
 export const VEHICLE_STATUS = { active: ACTIVE, banned: LOCKED } satisfies Record<string, StatusStyle>;
 export const USER_STATUS = { active: ACTIVE, locked: LOCKED } satisfies Record<string, StatusStyle>;
-export const BRANCH_STATUS = { active: ACTIVE, inactive: INACTIVE } satisfies Record<string, StatusStyle>;
-export const TANK_STATUS = { active: ACTIVE, inactive: INACTIVE } satisfies Record<string, StatusStyle>;
 
 /** Trụ bơm lưu bật/tắt (`enabled`) thay cho chuỗi trạng thái. */
 export const PUMP_STATUS = { enabled: ACTIVE, disabled: INACTIVE } satisfies Record<string, StatusStyle>;

@@ -9,16 +9,18 @@ import (
 // ------------------------------------------------------------------------------------------------
 
 type Branch struct {
-	ID          string    `json:"id"`
-	TenantID    string    `json:"tenant_id"`
-	Code        string    `json:"code"`
-	Name        string    `json:"name"`
-	Address     *string   `json:"address,omitempty"`
-	ManagerName *string   `json:"manager_name,omitempty"`
-	Phone       *string   `json:"phone,omitempty"`
-	Status      string    `json:"status"` // active, inactive
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string  `json:"id"`
+	TenantID    string  `json:"tenant_id"`
+	Code        string  `json:"code"`
+	Name        string  `json:"name"`
+	Address     *string `json:"address,omitempty"`
+	ManagerName *string `json:"manager_name,omitempty"`
+	Phone       *string `json:"phone,omitempty"`
+	Status      string  `json:"status"` // active, inactive
+	// Đã từng được cấp khóa API (kể cả đã thu hồi): trạm như vậy không xóa được. Chỉ điền ở danh sách và chi tiết.
+	EverHadAPIKey bool      `json:"ever_had_api_key"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type CreateBranchRequest struct {
@@ -34,7 +36,6 @@ type UpdateBranchRequest struct {
 	Address     *string `json:"address,omitempty"`
 	ManagerName *string `json:"manager_name,omitempty"`
 	Phone       *string `json:"phone,omitempty"`
-	Status      string  `json:"status"` // active, inactive
 }
 
 type BranchListQuery struct {
@@ -105,7 +106,6 @@ type UpdateTankRequest struct {
 	MaxUsableCapacityML int64   `json:"max_usable_capacity_ml"`
 	LowStockThresholdML int64   `json:"low_stock_threshold_ml"`
 	LossTolerancePct    float64 `json:"loss_tolerance_pct"`
-	Status              string  `json:"status"`
 }
 
 type TankListQuery struct {

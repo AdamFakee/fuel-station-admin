@@ -1,3 +1,4 @@
+import { branchKeys } from '@/features/assets/api/get-branches';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
 import { showApiError } from '@/lib/api-error';
@@ -16,7 +17,9 @@ export function useIssueApiKey() {
   return useMutation({
     mutationFn: issueApiKey,
     onSuccess: () => {
+      // Danh sách trạm xăng cho biết trạm đã từng được cấp khóa chưa (quyết định có nút xóa hay không)
       queryClient.invalidateQueries({ queryKey: syncMonitorKeys.stations() });
+      queryClient.invalidateQueries({ queryKey: branchKeys.all });
     },
     onError: (err: unknown) => {
       showApiError(err, 'Không thể cấp khóa API');

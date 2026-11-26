@@ -41,7 +41,6 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 		protected.With(authz.RequirePermission("asset.tank:create", h.log)).Post("/assets/tanks", h.CreateTank)
 		protected.With(authz.RequirePermission("asset.tank:view", h.log)).Get("/assets/tanks/{id}", h.GetTank)
 		protected.With(authz.RequirePermission("asset.tank:update", h.log)).Put("/assets/tanks/{id}", h.UpdateTank)
-		protected.With(authz.RequirePermission("asset.tank:delete", h.log)).Delete("/assets/tanks/{id}", h.DeleteTank)
 
 		// Pumps API (asset.pump permissions)
 		protected.With(authz.RequirePermission("asset.pump:view", h.log)).Get("/assets/pumps", h.ListPumps)
@@ -137,7 +136,7 @@ func (h *Handler) DeleteBranch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, map[string]string{
-		"message": "Trạm xăng đã được ngừng hoạt động",
+		"message": "Đã xóa trạm xăng",
 	})
 }
 
@@ -243,18 +242,6 @@ func (h *Handler) UpdateTank(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, tank)
-}
-
-func (h *Handler) DeleteTank(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if err := h.service.DeleteTank(r.Context(), id); err != nil {
-		httpx.Error(w, r, h.log, err)
-		return
-	}
-
-	httpx.JSON(w, http.StatusOK, map[string]string{
-		"message": "Bể chứa đã được ngừng vận hành",
-	})
 }
 
 // ------------------------------------------------------------------------------------------------

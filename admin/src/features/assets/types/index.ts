@@ -13,6 +13,8 @@ export interface Branch {
   manager_name?: string;
   phone?: string;
   status: 'active' | 'inactive';
+  /** Đã từng được cấp khóa API (kể cả đã thu hồi): không xóa được trạm. */
+  ever_had_api_key?: boolean;
   created_at: string;
   updated_at: string;
 }

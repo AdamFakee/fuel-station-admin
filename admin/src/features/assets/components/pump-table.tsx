@@ -344,7 +344,7 @@ export function PumpTable() {
         onOpenChange={(open) => !open && setDeactivateTarget(null)}
         level="destructive"
         title="Ngừng hoạt động trụ bơm"
-        description={`Bạn có chắc chắn muốn ngừng hoạt động trụ bơm ${deactivateTarget?.name ?? ''}?`}
+        description={`Bạn có chắc chắn muốn ngừng hoạt động trụ bơm ${deactivateTarget?.name ?? ''}? Trụ chỉ dừng sau khi trạm đồng bộ, rồi trạm xóa người trên máy chấm công của trụ. Trường hợp khẩn cấp, hãy ngắt tại chỗ.`}
         confirmText="Ngừng hoạt động"
         loading={deleteMutation.isPending}
         onConfirm={handleDeactivate}

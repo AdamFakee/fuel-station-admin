@@ -96,7 +96,8 @@ func (s *Service) ListBranches(ctx context.Context, q BranchListQuery) ([]Branch
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, tenant_id, code, name, address, manager_name, phone, status, created_at, updated_at
+		SELECT id, tenant_id, code, name, address, manager_name, phone, status, created_at, updated_at,
+		       EXISTS (SELECT 1 FROM station.edge_station es WHERE es.branch_id = station.branch.id)
 		FROM station.branch
 		WHERE %s
 		ORDER BY created_at DESC, id DESC
@@ -115,7 +116,7 @@ func (s *Service) ListBranches(ctx context.Context, q BranchListQuery) ([]Branch
 		var b Branch
 		if err := rows.Scan(
 			&b.ID, &b.TenantID, &b.Code, &b.Name, &b.Address,
-			&b.ManagerName, &b.Phone, &b.Status, &b.CreatedAt, &b.UpdatedAt,
+			&b.ManagerName, &b.Phone, &b.Status, &b.CreatedAt, &b.UpdatedAt, &b.EverHadAPIKey,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan branch: %w", err)
 		}
@@ -133,13 +134,14 @@ func (s *Service) GetBranch(ctx context.Context, id string) (*Branch, error) {
 
 	var b Branch
 	query := `
-		SELECT id, tenant_id, code, name, address, manager_name, phone, status, created_at, updated_at
+		SELECT id, tenant_id, code, name, address, manager_name, phone, status, created_at, updated_at,
+		       EXISTS (SELECT 1 FROM station.edge_station es WHERE es.branch_id = station.branch.id)
 		FROM station.branch
 		WHERE tenant_id = $1 AND id = $2
 	`
 	err = s.pool.QueryRow(ctx, query, tenantID, id).Scan(
 		&b.ID, &b.TenantID, &b.Code, &b.Name, &b.Address,
-		&b.ManagerName, &b.Phone, &b.Status, &b.CreatedAt, &b.UpdatedAt,
+		&b.ManagerName, &b.Phone, &b.Status, &b.CreatedAt, &b.UpdatedAt, &b.EverHadAPIKey,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -196,15 +198,6 @@ func (s *Service) CreateBranch(ctx context.Context, req CreateBranchRequest) (*B
 	return &b, nil
 }
 
-// validateStatusChange kiểm tra trạng thái gửi kèm khi cập nhật. Để trống nghĩa là giữ nguyên trạng thái hiện tại:
-// sửa thông tin của một mục đã ngừng không được tự bật nó lại.
-func validateStatusChange(status string) error {
-	if status != "" && status != "active" && status != "inactive" {
-		return fmt.Errorf("%w: status must be active or inactive", apperr.ErrInvalidInput)
-	}
-	return nil
-}
-
 func (s *Service) UpdateBranch(ctx context.Context, id string, req UpdateBranchRequest) (*Branch, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
@@ -214,18 +207,14 @@ func (s *Service) UpdateBranch(ctx context.Context, id string, req UpdateBranchR
 	if strings.TrimSpace(req.Name) == "" {
 		return nil, fmt.Errorf("%w: name is required", apperr.ErrInvalidInput)
 	}
-	if err := validateStatusChange(req.Status); err != nil {
-		return nil, err
-	}
-
 	var b Branch
 	query := `
 		UPDATE station.branch
-		SET name = $3, address = $4, manager_name = $5, phone = $6, status = COALESCE(NULLIF($7::text, ''), status), updated_at = now()
+		SET name = $3, address = $4, manager_name = $5, phone = $6, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
 		RETURNING id, tenant_id, code, name, address, manager_name, phone, status, created_at, updated_at
 	`
-	err = s.pool.QueryRow(ctx, query, tenantID, id, req.Name, req.Address, req.ManagerName, req.Phone, req.Status).Scan(
+	err = s.pool.QueryRow(ctx, query, tenantID, id, req.Name, req.Address, req.ManagerName, req.Phone).Scan(
 		&b.ID, &b.TenantID, &b.Code, &b.Name, &b.Address,
 		&b.ManagerName, &b.Phone, &b.Status, &b.CreatedAt, &b.UpdatedAt,
 	)
@@ -248,25 +237,64 @@ func (s *Service) UpdateBranch(ctx context.Context, id string, req UpdateBranchR
 	return &b, nil
 }
 
+// DeleteBranch xóa hẳn một trạm xăng tạo nhầm. Chỉ xóa được khi trạm CHƯA TỪNG được cấp khóa API (khóa đã thu hồi cũng tính là
+// đã cấp) và chưa có dữ liệu nào. Trạm xăng không có thao tác ngừng hoạt động: chưa có cách dừng an toàn ở trạm.
 func (s *Service) DeleteBranch(ctx context.Context, id string) error {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
 		return err
 	}
 
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin delete branch tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var code, name string
-	query := `
-		UPDATE station.branch
-		SET status = 'inactive', updated_at = now()
-		WHERE tenant_id = $1 AND id = $2
-		RETURNING code, name
-	`
-	err = s.pool.QueryRow(ctx, query, tenantID, id).Scan(&code, &name)
+	err = tx.QueryRow(ctx, `SELECT code, name FROM station.branch WHERE tenant_id = $1 AND id = $2 FOR UPDATE`, tenantID, id).Scan(&code, &name)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperr.ErrNotFound
 		}
-		return fmt.Errorf("deactivate branch: %w", err)
+		return fmt.Errorf("lock branch: %w", err)
+	}
+
+	var hadKey bool
+	var pumps, tanks int
+	err = tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM station.edge_station WHERE tenant_id = $1 AND branch_id = $2),
+		       (SELECT COUNT(*) FROM station.pump WHERE tenant_id = $1 AND branch_id = $2),
+		       (SELECT COUNT(*) FROM station.tank WHERE tenant_id = $1 AND branch_id = $2)
+	`, tenantID, id).Scan(&hadKey, &pumps, &tanks)
+	if err != nil {
+		return fmt.Errorf("check branch usage: %w", err)
+	}
+	if hadKey {
+		return fmt.Errorf("%w: không thể xóa trạm xăng đã từng được cấp khóa API", apperr.ErrConflict)
+	}
+	var blockers []string
+	for _, item := range []struct {
+		count int
+		label string
+	}{{pumps, "trụ bơm"}, {tanks, "bể chứa"}} {
+		if item.count > 0 {
+			blockers = append(blockers, fmt.Sprintf("%d %s", item.count, item.label))
+		}
+	}
+	if len(blockers) > 0 {
+		return fmt.Errorf("%w: không thể xóa trạm xăng đang có %s", apperr.ErrConflict, strings.Join(blockers, ", "))
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM station.branch WHERE tenant_id = $1 AND id = $2`, tenantID, id); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return fmt.Errorf("%w: không thể xóa trạm xăng đã có dữ liệu liên quan (%s)", apperr.ErrConflict, pgErr.TableName)
+		}
+		return fmt.Errorf("delete branch: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete branch: %w", err)
 	}
 
 	parsedID, _ := uuid.Parse(id)
@@ -275,7 +303,7 @@ func (s *Service) DeleteBranch(ctx context.Context, id string) error {
 		EntityType: "branch",
 		EntityID:   &parsedID,
 		EntityCode: code,
-		NewData:    map[string]any{"status": "inactive", "name": name},
+		NewData:    map[string]any{"deleted": true, "name": name},
 	})
 
 	return nil
@@ -582,15 +610,11 @@ func (s *Service) UpdateTank(ctx context.Context, id string, req UpdateTankReque
 	if strings.TrimSpace(req.Name) == "" {
 		return nil, fmt.Errorf("%w: name is required", apperr.ErrInvalidInput)
 	}
-	if err := validateStatusChange(req.Status); err != nil {
-		return nil, err
-	}
-
 	query := `
 		UPDATE station.tank
 		SET name = $3, fuel_type_id = $4, design_capacity_ml = $5,
 		    max_usable_capacity_ml = $6, low_stock_threshold_ml = $7,
-		    loss_tolerance_pct = $8, status = COALESCE(NULLIF($9::text, ''), status), updated_at = now()
+		    loss_tolerance_pct = $8, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
 		RETURNING id, tenant_id, branch_id, code, name, fuel_type_id,
 		          design_capacity_ml, max_usable_capacity_ml, low_stock_threshold_ml, loss_tolerance_pct,
@@ -600,7 +624,7 @@ func (s *Service) UpdateTank(ctx context.Context, id string, req UpdateTankReque
 	err = s.pool.QueryRow(
 		ctx, query,
 		tenantID, id, req.Name, req.FuelTypeID, req.DesignCapacityML,
-		req.MaxUsableCapacityML, req.LowStockThresholdML, req.LossTolerancePct, req.Status,
+		req.MaxUsableCapacityML, req.LowStockThresholdML, req.LossTolerancePct,
 	).Scan(
 		&tk.ID, &tk.TenantID, &tk.BranchID, &tk.Code, &tk.Name, &tk.FuelTypeID,
 		&tk.DesignCapacityML, &tk.MaxUsableCapacityML, &tk.LowStockThresholdML, &tk.LossTolerancePct,
@@ -623,38 +647,6 @@ func (s *Service) UpdateTank(ctx context.Context, id string, req UpdateTankReque
 	})
 
 	return &tk, nil
-}
-
-func (s *Service) DeleteTank(ctx context.Context, id string) error {
-	tenantID, err := getTenant(ctx)
-	if err != nil {
-		return err
-	}
-
-	var code, name string
-	err = s.pool.QueryRow(ctx, `
-		UPDATE station.tank
-		SET status = 'inactive', updated_at = now()
-		WHERE tenant_id = $1 AND id = $2
-		RETURNING code, name
-	`, tenantID, id).Scan(&code, &name)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return apperr.ErrNotFound
-		}
-		return fmt.Errorf("deactivate tank: %w", err)
-	}
-
-	parsedID, _ := uuid.Parse(id)
-	_ = audit.Record(ctx, s.pool, audit.Entry{
-		Action:     audit.ActionDelete,
-		EntityType: "tank",
-		EntityID:   &parsedID,
-		EntityCode: code,
-		NewData:    map[string]any{"status": "inactive", "name": name},
-	})
-
-	return nil
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -946,6 +938,31 @@ func (s *Service) CreatePump(ctx context.Context, req CreatePumpRequest) (*PumpD
 	return &p, nil
 }
 
+// checkTerminalAddressFree từ chối bật lại một trụ khi địa chỉ máy chấm công của nó đang thuộc một trụ khác đang hoạt động trong
+// cùng trạm xăng: trạm từ chối CẢ bản cấu hình có hai trụ trùng địa chỉ, nên các trụ còn lại cũng bị ảnh hưởng.
+func checkTerminalAddressFree(ctx context.Context, tx pgx.Tx, tenantID, pumpID string) error {
+	var host, otherCode string
+	var port int
+	err := tx.QueryRow(ctx, `
+		SELECT mine.host, mine.port, other_pump.code
+		FROM station.access_terminal mine
+		JOIN station.pump my_pump ON my_pump.id = mine.pump_id AND my_pump.tenant_id = mine.tenant_id
+		JOIN station.access_terminal other ON other.tenant_id = mine.tenant_id AND other.pump_id <> mine.pump_id
+		     AND other.host = mine.host AND other.port = mine.port
+		JOIN station.pump other_pump ON other_pump.id = other.pump_id AND other_pump.tenant_id = other.tenant_id
+		     AND other_pump.branch_id = my_pump.branch_id AND other_pump.enabled
+		WHERE mine.tenant_id = $1 AND mine.pump_id = $2
+		LIMIT 1
+	`, tenantID, pumpID).Scan(&host, &port, &otherCode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("check terminal address: %w", err)
+	}
+	return fmt.Errorf("%w: không thể kích hoạt lại, máy chấm công %s:%d đang được trụ %s sử dụng", apperr.ErrConflict, host, port, otherCode)
+}
+
 func (s *Service) UpdatePump(ctx context.Context, id string, req UpdatePumpRequest) (*PumpDetail, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
@@ -956,8 +973,29 @@ func (s *Service) UpdatePump(ctx context.Context, id string, req UpdatePumpReque
 		return nil, fmt.Errorf("%w: name is required", apperr.ErrInvalidInput)
 	}
 
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin update pump tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var wasEnabled bool
+	err = tx.QueryRow(ctx, `SELECT enabled FROM station.pump WHERE tenant_id = $1 AND id = $2 FOR UPDATE`, tenantID, id).Scan(&wasEnabled)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperr.ErrNotFound
+		}
+		return nil, fmt.Errorf("lock pump: %w", err)
+	}
+	reactivating := req.Enabled && !wasEnabled
+	if reactivating {
+		if err := checkTerminalAddressFree(ctx, tx, tenantID, id); err != nil {
+			return nil, err
+		}
+	}
+
 	var p PumpDetail
-	err = s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		UPDATE station.pump
 		SET name = $3, note = $4, enabled = $5, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
@@ -966,10 +1004,24 @@ func (s *Service) UpdatePump(ctx context.Context, id string, req UpdatePumpReque
 		&p.ID, &p.TenantID, &p.BranchID, &p.Code, &p.EdgePumpID, &p.Name, &p.Note, &p.Enabled, &p.Version, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperr.ErrNotFound
-		}
 		return nil, fmt.Errorf("update pump: %w", err)
+	}
+
+	// Trạm xóa hẳn cấu hình của trụ đã ngừng, nên khi bật lại phải gửi lại cả cảm biến và máy chấm công: cập nhật hai dòng này để
+	// trigger tăng version và ghi vào nhật ký đồng bộ. Trụ được ghi trước, vì ở trạm hai phần này gắn vào một trụ đã có.
+	if reactivating {
+		for _, query := range []string{
+			`UPDATE station.pump_sensor SET updated_at = now() WHERE tenant_id = $1 AND pump_id = $2`,
+			`UPDATE station.access_terminal SET updated_at = now() WHERE tenant_id = $1 AND pump_id = $2`,
+		} {
+			if _, err := tx.Exec(ctx, query, tenantID, id); err != nil {
+				return nil, fmt.Errorf("resend pump devices: %w", err)
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit update pump: %w", err)
 	}
 
 	parsedID, _ := uuid.Parse(p.ID)

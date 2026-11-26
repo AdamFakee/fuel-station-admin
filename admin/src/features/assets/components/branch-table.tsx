@@ -20,20 +20,18 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusIcon, PencilSquareIcon, PauseCircleIcon, PlayCircleIcon, KeyIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, KeyIcon } from '@heroicons/react/24/outline';
 import { StationKeyDialog } from '@/features/sync-monitor/components/station-key-dialog';
 import { useSyncStations } from '@/features/sync-monitor/api/get-stations';
 import { apiKeyLabel } from '@/lib/row-details';
 import { Branch } from '../types';
 import { useBranches } from '../api/get-branches';
 import { useDeleteBranch } from '../api/delete-branch';
-import { useUpdateBranch } from '../api/update-branch';
 import { BranchDialog } from './branch-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { formatDateVN } from '@/lib/format';
 import { toast } from 'sonner';
 import { showApiError } from '@/lib/api-error';
-import { BRANCH_STATUS, statusStyle } from '@/lib/status-labels';
 
 export function BranchTable() {
   const [detail, setDetail] = React.useState<Branch | null>(null);
@@ -56,14 +54,13 @@ export function BranchTable() {
     const st = stationOf(branchId);
     return apiKeyLabel(st?.has_api_key ?? false, st?.api_key_hint, st?.has_station ?? false);
   };
-  const columnCount = 6 + (showKeyColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
+  const columnCount = 5 + (showKeyColumn ? 1 : 0) + 1 + (showActions ? 1 : 0);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
   const [search, setSearch] = React.useState('');
   const [selectedBranch, setSelectedBranch] = React.useState<Branch | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [deactivateTarget, setDeactivateTarget] = React.useState<Branch | null>(null);
-  const [reactivateTarget, setReactivateTarget] = React.useState<Branch | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<Branch | null>(null);
 
   React.useEffect(() => {
     setPage(1);
@@ -71,7 +68,6 @@ export function BranchTable() {
 
   const { data, isLoading } = useBranches({ q: search || undefined, page, page_size: pageSize });
   const deleteMutation = useDeleteBranch();
-  const updateMutation = useUpdateBranch();
 
   const branches = data?.data || [];
 
@@ -85,34 +81,12 @@ export function BranchTable() {
     setDialogOpen(true);
   };
 
-  const handleDeactivate = async () => {
-    if (!deactivateTarget) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteMutation.mutateAsync(deactivateTarget.id);
-      toast.success(`Đã ngừng hoạt động trạm xăng ${deactivateTarget.name}`);
-      setDeactivateTarget(null);
-    } catch (err: any) {
-      showApiError(err, 'Có lỗi xảy ra');
-    }
-  };
-
-  const handleReactivate = async () => {
-    const target = reactivateTarget;
-    if (!target) return;
-    try {
-      await updateMutation.mutateAsync({
-        id: target.id,
-        // API cập nhật ghi đè cả bản ghi nên gửi lại đủ thông tin hiện tại
-        input: {
-          name: target.name,
-          address: target.address,
-          manager_name: target.manager_name,
-          phone: target.phone,
-          status: 'active',
-        },
-      });
-      toast.success(`Đã kích hoạt lại trạm xăng ${target.name}`);
-      setReactivateTarget(null);
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      toast.success(`Đã xóa trạm xăng ${deleteTarget.name}`);
+      setDeleteTarget(null);
     } catch (err: any) {
       showApiError(err, 'Có lỗi xảy ra');
     }
@@ -149,7 +123,6 @@ export function BranchTable() {
               <TableHead className="text-left">Địa chỉ</TableHead>
               <TableHead className="text-left">Người quản lý</TableHead>
               <TableHead className="text-right tabular-nums">Số điện thoại</TableHead>
-              <TableHead className="text-center w-[110px]">Trạng thái</TableHead>
               {showKeyColumn && <TableHead className="text-left w-[150px]">Khóa API</TableHead>}
               <TableHead className="text-right tabular-nums w-[120px]">Ngày tạo</TableHead>
               {showActions && <TableHead className={`${ACTION_HEAD_CLASS} w-[120px]`}>Thao tác</TableHead>}
@@ -168,9 +141,6 @@ export function BranchTable() {
                   <TableCell className="text-left text-xs text-muted-foreground">{b.address || '—'}</TableCell>
                   <TableCell className="text-left text-xs">{b.manager_name || '—'}</TableCell>
                   <TableCell className="text-right tabular-nums text-xs font-mono">{b.phone || '—'}</TableCell>
-                  <TableCell className="text-center">
-                    <StatusBadge tone={statusStyle(BRANCH_STATUS, b.status).tone}>{statusStyle(BRANCH_STATUS, b.status).label}</StatusBadge>
-                  </TableCell>
                   {showKeyColumn && (
                     <TableCell className="text-left">
                       {stations.isLoading ? (
@@ -192,26 +162,16 @@ export function BranchTable() {
                   {showActions && (
                     <TableCell className={ACTION_CELL_CLASS}>
                       <div className="flex justify-end gap-1">
-                        {canDelete && b.status === 'active' && (
+                        {/* Chỉ xóa được trạm tạo nhầm: chưa từng cấp khóa API (backend còn kiểm tra trạm chưa có dữ liệu) */}
+                        {canDelete && !b.ever_had_api_key && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setDeactivateTarget(b)}
-                            title="Ngừng hoạt động"
-                            className="h-7 w-7 text-amber-600 hover:text-amber-700"
+                            onClick={() => setDeleteTarget(b)}
+                            title="Xóa trạm xăng"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
                           >
-                            <PauseCircleIcon className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {canUpdate && b.status === 'inactive' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setReactivateTarget(b)}
-                            title="Kích hoạt lại"
-                            className="h-7 w-7 text-green-600 hover:text-green-700"
-                          >
-                            <PlayCircleIcon className="h-4 w-4" />
+                            <TrashIcon className="h-3.5 w-3.5" />
                           </Button>
                         )}
                         {canManageKey && (
@@ -287,25 +247,14 @@ export function BranchTable() {
       <BranchDialog open={dialogOpen} onOpenChange={setDialogOpen} branch={selectedBranch} />
 
       <ConfirmDialog
-        open={deactivateTarget !== null}
-        onOpenChange={(open) => !open && setDeactivateTarget(null)}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
         level="destructive"
-        title="Ngừng hoạt động trạm xăng"
-        description={`Bạn có chắc chắn muốn ngừng hoạt động trạm xăng ${deactivateTarget?.name ?? ''}?`}
-        confirmText="Ngừng hoạt động"
+        title="Xóa trạm xăng"
+        description={`Bạn có chắc chắn muốn xóa trạm xăng ${deleteTarget?.name ?? ''}? Chỉ xóa được trạm chưa có dữ liệu. Đã xóa thì không khôi phục được.`}
+        confirmText="Xóa trạm xăng"
         loading={deleteMutation.isPending}
-        onConfirm={handleDeactivate}
-      />
-
-      <ConfirmDialog
-        open={reactivateTarget !== null}
-        onOpenChange={(open) => !open && setReactivateTarget(null)}
-        level="info"
-        title="Kích hoạt lại trạm xăng"
-        description={`Bạn có chắc chắn muốn kích hoạt lại trạm xăng ${reactivateTarget?.name ?? ''}?`}
-        confirmText="Kích hoạt lại"
-        loading={updateMutation.isPending}
-        onConfirm={handleReactivate}
+        onConfirm={handleDelete}
       />
 
       {canManageKey && (

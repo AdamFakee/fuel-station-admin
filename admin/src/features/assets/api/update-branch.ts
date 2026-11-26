@@ -3,7 +3,7 @@ import { apiClient } from '@/lib/axios';
 import { Branch, BranchInput } from '../types';
 import { branchKeys } from './get-branches';
 
-export async function updateBranch({ id, input }: { id: string; input: Partial<BranchInput> & { status?: string } }): Promise<Branch> {
+export async function updateBranch({ id, input }: { id: string; input: Partial<BranchInput> }): Promise<Branch> {
   const res = await apiClient.put<Branch>(`/assets/branches/${id}`, input);
   return res.data;
 }

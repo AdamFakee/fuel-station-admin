@@ -227,7 +227,8 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
     await expect(page.getByText('Trạm Xăng Dầu Số 1')).toBeVisible();
     await expect(page.getByText('123 Đường Giải Phóng, Hà Nội')).toBeVisible();
     await expect(page.getByText('0901234567')).toBeVisible();
-    await expect(page.getByText('Hoạt động')).toBeVisible();
+    // Trạm xăng không có thao tác ngừng hoạt động nên không có cột trạng thái
+    await expect(page.getByRole('columnheader', { name: 'Trạng thái' })).toHaveCount(0);
 
     // Nút thêm trạm xăng cho Quản lý
     const createBtn = page.getByRole('button', { name: /Thêm trạm xăng/i });

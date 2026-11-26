@@ -89,7 +89,6 @@ func TestBranchLifecycle(t *testing.T) {
 		Address:     &addr,
 		ManagerName: &mgr,
 		Phone:       &phone,
-		Status:      "active",
 	})
 	if err != nil {
 		t.Fatalf("UpdateBranch failed: %v", err)
@@ -98,7 +97,7 @@ func TestBranchLifecycle(t *testing.T) {
 		t.Fatalf("expected updated name %s, got %s", updatedName, updated.Name)
 	}
 
-	// 4. Soft-delete / deactivate
+	// 4. Trạm chưa cấp khóa API, chưa có dữ liệu: xóa được
 	if err := svc.DeleteBranch(ctx, created.ID); err != nil {
 		t.Fatalf("DeleteBranch failed: %v", err)
 	}
@@ -154,7 +153,7 @@ func TestFuelTypeAndTankLifecycle(t *testing.T) {
 		t.Fatalf("expected list tank to have 15000000 ml, got %d", tanks[0].CurrentStockML)
 	}
 
-	// 4. Update and Deactivate Tank
+	// 4. Update Tank
 	_, err = svc.UpdateTank(ctx, tank.ID, assets.UpdateTankRequest{
 		Name:                "Bể dầu DO 01 (Đã đổi tên)",
 		FuelTypeID:          ft.ID,
@@ -162,14 +161,9 @@ func TestFuelTypeAndTankLifecycle(t *testing.T) {
 		MaxUsableCapacityML: 24000000,
 		LowStockThresholdML: 3000000,
 		LossTolerancePct:    0.4,
-		Status:              "active",
 	})
 	if err != nil {
 		t.Fatalf("UpdateTank failed: %v", err)
-	}
-
-	if err := svc.DeleteTank(ctx, tank.ID); err != nil {
-		t.Fatalf("DeleteTank failed: %v", err)
 	}
 }
 
