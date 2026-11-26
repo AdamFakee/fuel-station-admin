@@ -23,7 +23,7 @@ export function useRevokeDriverCredential() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: masterKeys.drivers() });
       queryClient.invalidateQueries({ queryKey: masterKeys.driverDetail(vars.driverId) });
-      toast.success('Đã thu hồi phương thức xác thực');
+      // Không báo thành công riêng: gỡ chạy trong lúc lưu form tài xế (có thể gỡ cả thẻ lẫn ảnh), form đã báo cập nhật thành công
     },
     onError: (err: any) => {
       showApiError(err, 'Không thể thu hồi phương thức xác thực');

@@ -36,6 +36,7 @@ import { PumpDialog } from './pump-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { toast } from 'sonner';
 import { showApiError } from '@/lib/api-error';
+import { PUMP_STATUS, pumpStatus } from '@/lib/status-labels';
 
 export function PumpTable() {
   const [detail, setDetail] = React.useState<PumpDetail | null>(null);
@@ -110,7 +111,7 @@ export function PumpTable() {
           com_port: pump.sensor?.com_port ?? '',
           serial: pump.sensor?.serial ?? '',
           terminal_host: pump.terminal?.host ?? '',
-          status_label: pump.enabled ? 'Sẵn sàng' : 'Vô hiệu hóa',
+          status_label: pumpStatus(pump.enabled).label,
         })),
       });
     } catch {
@@ -131,10 +132,10 @@ export function PumpTable() {
   };
 
   const handleDeactivate = async (pump: PumpDetail) => {
-    if (confirm(`Bạn có chắc chắn muốn ngừng vận hành trụ bơm ${pump.name}?`)) {
+    if (confirm(`Bạn có chắc chắn muốn ngừng hoạt động trụ bơm ${pump.name}?`)) {
       try {
         await deleteMutation.mutateAsync(pump.id);
-        toast.success(`Đã ngừng vận hành trụ bơm ${pump.name}`);
+        toast.success(`Đã ngừng hoạt động trụ bơm ${pump.name}`);
       } catch (err: any) {
         showApiError(err, 'Có lỗi xảy ra');
       }
@@ -189,8 +190,8 @@ export function PumpTable() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tất cả trạng thái</SelectItem>
-            <SelectItem value="enabled">Sẵn sàng</SelectItem>
-            <SelectItem value="disabled">Vô hiệu hóa</SelectItem>
+            <SelectItem value="enabled">{PUMP_STATUS.enabled.label}</SelectItem>
+            <SelectItem value="disabled">{PUMP_STATUS.disabled.label}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -249,9 +250,7 @@ export function PumpTable() {
                       {p.terminal ? <span>{p.terminal.host}</span> : '—'}
                     </TableCell>
                     <TableCell className="text-center">
-                      <StatusBadge tone={p.enabled ? 'success' : 'danger'}>
-                        {p.enabled ? 'Sẵn sàng' : 'Vô hiệu hóa'}
-                      </StatusBadge>
+                      <StatusBadge tone={pumpStatus(p.enabled).tone}>{pumpStatus(p.enabled).label}</StatusBadge>
                     </TableCell>
                     {showActions && (
                       <TableCell className={ACTION_CELL_CLASS}>
@@ -261,7 +260,7 @@ export function PumpTable() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDeactivate(p)}
-                              title="Ngừng vận hành"
+                              title="Ngừng hoạt động"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
                             >
                               <NoSymbolIcon className="h-3.5 w-3.5" />

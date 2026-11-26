@@ -17,7 +17,7 @@ export function useRevokeVehicleCard() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: masterKeys.vehicles() });
       queryClient.invalidateQueries({ queryKey: masterKeys.vehicleDetail(id) });
-      toast.success('Đã thu hồi thẻ NFC của xe');
+      // Không báo thành công riêng: gỡ thẻ chạy trong lúc lưu form xe, form đã báo cập nhật thành công
     },
     onError: (err: any) => {
       showApiError(err, 'Không thể thu hồi thẻ NFC');

@@ -19,8 +19,8 @@ export function useUpdateDriverStatus() {
       queryClient.invalidateQueries({ queryKey: masterKeys.driverDetail(vars.id) });
       const labels: Record<string, string> = {
         active: 'Đã mở khóa tài xế',
-        blocked: 'Đã tạm khóa tài xế',
-        inactive: 'Đã đánh dấu tài xế nghỉ việc',
+        blocked: 'Đã khóa tài xế',
+        inactive: 'Đã chuyển tài xế sang ngừng hoạt động',
       };
       toast.success(labels[vars.status] || 'Cập nhật trạng thái thành công');
     },

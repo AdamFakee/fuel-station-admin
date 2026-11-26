@@ -13,8 +13,8 @@ import { useCatalogsSummary } from '@/features/master/api/get-catalogs-summary';
 import { getVehicles, useVehicles } from '@/features/master/api/get-vehicles';
 import { VehicleTable } from '@/features/master/components/vehicle-table';
 import { VehicleDialogForm } from '@/features/master/components/vehicle-dialog-form';
-import { VehicleCardDialog } from '@/features/master/components/vehicle-card-dialog';
 import { VehicleListItem } from '@/features/master/types';
+import { VEHICLE_STATUS } from '@/lib/status-labels';
 
 export default function VehiclesPage() {
   const { hasPermission } = useAuth();
@@ -86,7 +86,7 @@ export default function VehiclesPage() {
           vehicle_type_name: vehicle.vehicle_type_name ?? '',
           fuel_type_name: vehicle.fuel_type_name,
           card_number: vehicle.card_number ?? '',
-          status_label: vehicle.status === 'active' ? 'Hoạt động' : 'Bị khóa quyền',
+          status_label: VEHICLE_STATUS[vehicle.status].label,
         })),
       });
     } catch {
@@ -98,7 +98,6 @@ export default function VehiclesPage() {
 
   // Dialog states
   const [isFormOpen, setIsFormOpen] = React.useState(false);
-  const [isCardOpen, setIsCardOpen] = React.useState(false);
   const [selectedVehicle, setSelectedVehicle] = React.useState<VehicleListItem | null>(null);
 
   const handleOpenCreate = () => {
@@ -109,11 +108,6 @@ export default function VehiclesPage() {
   const handleOpenEdit = (vehicle: VehicleListItem) => {
     setSelectedVehicle(vehicle);
     setIsFormOpen(true);
-  };
-
-  const handleOpenManageCard = (vehicle: VehicleListItem) => {
-    setSelectedVehicle(vehicle);
-    setIsCardOpen(true);
   };
 
   return (
@@ -180,8 +174,8 @@ export default function VehiclesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="active">Hoạt động</SelectItem>
-                <SelectItem value="banned">Bị khóa quyền</SelectItem>
+                <SelectItem value="active">{VEHICLE_STATUS.active.label}</SelectItem>
+                <SelectItem value="banned">{VEHICLE_STATUS.banned.label}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -195,7 +189,6 @@ export default function VehiclesPage() {
           canEdit={canEdit}
           canDelete={canDelete}
           onEdit={handleOpenEdit}
-          onManageCard={handleOpenManageCard}
         />
 
         {/* Pagination */}
@@ -218,9 +211,6 @@ export default function VehiclesPage() {
           catalogs={catalogs}
           vehicle={selectedVehicle}
         />
-
-        {/* Assign / Change NFC Card Modal */}
-        <VehicleCardDialog open={isCardOpen} onOpenChange={setIsCardOpen} vehicle={selectedVehicle} />
       </div>
     </>
   );

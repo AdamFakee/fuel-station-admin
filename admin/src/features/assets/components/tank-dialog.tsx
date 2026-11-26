@@ -50,7 +50,6 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
   } = useForm<TankInput>({
     resolver: zodResolver(tankSchema),
     defaultValues: {
-      code: '',
       name: '',
       branch_id: '',
       fuel_type_id: '',
@@ -65,7 +64,6 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
   React.useEffect(() => {
     if (tank) {
       reset({
-        code: tank.code,
         name: tank.name,
         branch_id: tank.branch_id,
         fuel_type_id: tank.fuel_type_id,
@@ -77,10 +75,10 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
       });
     } else {
       reset({
-        code: '',
         name: '',
-        branch_id: branches[0]?.id || '',
-        fuel_type_id: fuelTypes?.[0]?.id || '',
+        // Không chọn sẵn mục đầu: người dùng tự chọn để tránh khai báo nhầm
+        branch_id: '',
+        fuel_type_id: '',
         design_capacity_liters: 25000,
         max_usable_capacity_liters: 24000,
         low_stock_threshold_liters: 3000,
@@ -88,7 +86,7 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
         opening_stock_liters: 0,
       });
     }
-  }, [tank, branches, fuelTypes, reset]);
+  }, [tank, open, reset]);
 
   const onSubmit = async (data: TankInput) => {
     try {
@@ -112,7 +110,7 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Chỉnh sửa Thông số Bể Chứa' : 'Khai báo Bể Chứa Nhiên Liệu Mới'}</DialogTitle>
+          <DialogTitle>{isEdit ? `Chỉnh sửa bể chứa: ${tank?.code}` : 'Khai báo Bể Chứa Nhiên Liệu Mới'}</DialogTitle>
           <DialogDescription>
             {isEdit
               ? 'Cập nhật định mức dung tích, dung sai và ngưỡng cảnh báo tồn thấp'
@@ -122,18 +120,11 @@ export function TankDialog({ open, onOpenChange, tank }: TankDialogProps) {
 
         <form onSubmit={handleSubmit(onSubmit)} className="contents">
           <DialogBody className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="code">Mã bể chứa *</Label>
-                <Input id="code" placeholder="VD: BE-01, TK-DO01" disabled={isEdit} {...register('code')} />
-                {errors.code && <p className="text-xs text-destructive">{errors.code.message}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Tên bể chứa *</Label>
-                <Input id="name" placeholder="VD: Bể Dầu DO 01" {...register('name')} />
-                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-              </div>
+            {/* Mã bể do hệ thống tự sinh (giống trụ bơm): chỉ hiện trên tiêu đề khi sửa */}
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Tên bể chứa *</Label>
+              <Input id="name" placeholder="VD: Bể Dầu DO 01" {...register('name')} />
+              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

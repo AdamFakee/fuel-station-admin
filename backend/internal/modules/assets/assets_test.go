@@ -119,10 +119,8 @@ func TestFuelTypeAndTankLifecycle(t *testing.T) {
 	}
 
 	// 2. Create Tank with opening stock
-	tankCode := fmt.Sprintf("TK-%d", time.Now().UnixNano()%100000000)
 	tank, err := svc.CreateTank(ctx, assets.CreateTankRequest{
 		BranchID:            branch1ID,
-		Code:                tankCode,
 		Name:                "Bể dầu DO 01",
 		FuelTypeID:          ft.ID,
 		DesignCapacityML:    25000000, // 25,000 L
@@ -134,9 +132,10 @@ func TestFuelTypeAndTankLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTank failed: %v", err)
 	}
-	if tank.Code != tankCode {
-		t.Fatalf("expected tank code %s, got %s", tankCode, tank.Code)
+	if !strings.HasPrefix(tank.Code, "BE-") {
+		t.Fatalf("expected generated tank code BE-..., got %s", tank.Code)
 	}
+	tankCode := tank.Code
 	if tank.CurrentStockML != 15000000 {
 		t.Fatalf("expected opening stock 15000000 ml, got %d", tank.CurrentStockML)
 	}

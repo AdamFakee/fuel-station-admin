@@ -17,6 +17,7 @@ import { DriverDialogForm } from '@/features/master/components/driver-dialog-for
 import { DriverListItem } from '@/features/master/types';
 import { useImportDrivers } from '@/features/master/api/import-drivers';
 import { driverImportColumns, driverImportRowLabel } from '@/features/master/lib/driver-import-columns';
+import { DRIVER_STATUS } from '@/lib/status-labels';
 
 export default function DriversPage() {
   const { hasPermission } = useAuth();
@@ -69,11 +70,6 @@ export default function DriversPage() {
         allDrivers.push(...result.items);
         if (allDrivers.length >= result.total || result.items.length === 0) break;
       }
-      const statusLabels = {
-        active: 'Đang làm việc',
-        blocked: 'Tạm khóa',
-        inactive: 'Nghỉ việc',
-      } as const;
       await exportReportToExcel({
         filename: 'danh-sach-tai-xe',
         title: 'Danh sách tài xế',
@@ -91,7 +87,7 @@ export default function DriversPage() {
           phone: driver.phone ?? '',
           card_number: driver.card_number ?? '',
           face: driver.has_face ? 'Đã đăng ký' : '',
-          status_label: statusLabels[driver.status],
+          status_label: DRIVER_STATUS[driver.status].label,
         })),
       });
     } catch {
@@ -164,9 +160,9 @@ export default function DriversPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="active">Đang làm việc</SelectItem>
-                <SelectItem value="blocked">Tạm khóa</SelectItem>
-                <SelectItem value="inactive">Nghỉ việc</SelectItem>
+                <SelectItem value="active">{DRIVER_STATUS.active.label}</SelectItem>
+                <SelectItem value="blocked">{DRIVER_STATUS.blocked.label}</SelectItem>
+                <SelectItem value="inactive">{DRIVER_STATUS.inactive.label}</SelectItem>
               </SelectContent>
             </Select>
           </div>

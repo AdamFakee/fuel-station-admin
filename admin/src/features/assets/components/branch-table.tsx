@@ -31,6 +31,7 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { formatDateVN } from '@/lib/format';
 import { toast } from 'sonner';
 import { showApiError } from '@/lib/api-error';
+import { BRANCH_STATUS, statusStyle } from '@/lib/status-labels';
 
 export function BranchTable() {
   const [detail, setDetail] = React.useState<Branch | null>(null);
@@ -141,9 +142,7 @@ export function BranchTable() {
                   <TableCell className="text-left text-xs">{b.manager_name || '—'}</TableCell>
                   <TableCell className="text-right tabular-nums text-xs font-mono">{b.phone || '—'}</TableCell>
                   <TableCell className="text-center">
-                    <StatusBadge tone={b.status === 'active' ? 'success' : 'warning'}>
-                      {b.status === 'active' ? 'Hoạt động' : 'Tạm dừng'}
-                    </StatusBadge>
+                    <StatusBadge tone={statusStyle(BRANCH_STATUS, b.status).tone}>{statusStyle(BRANCH_STATUS, b.status).label}</StatusBadge>
                   </TableCell>
                   {showKeyColumn && (
                     <TableCell className="text-left">

@@ -38,6 +38,7 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useUpdateUserStatus } from '../api/update-user-status';
 import { useDeleteUser } from '../api/delete-user';
 import { UserListItem } from '../types';
+import { USER_STATUS, statusStyle } from '@/lib/status-labels';
 
 interface UserTableProps {
   users: UserListItem[];
@@ -134,9 +135,7 @@ export function UserTable({ users, isLoading, onEdit, onResetPassword, currentUs
                     </Badge>
                   </TableCell>
                   <TableCell className="text-left">
-                    <StatusBadge tone={isLocked ? 'danger' : 'success'}>
-                      {isLocked ? 'Bị khóa' : 'Hoạt động'}
-                    </StatusBadge>
+                    <StatusBadge tone={statusStyle(USER_STATUS, u.status).tone}>{statusStyle(USER_STATUS, u.status).label}</StatusBadge>
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                     {formatDateTimeVN(u.last_login_at)}

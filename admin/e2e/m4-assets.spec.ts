@@ -282,7 +282,7 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
     await expect(page.getByText('Vòi 1: Bể Dầu DO Số 1')).toBeVisible();
     await expect(page.getByText('COM7 (Serial: 1234)')).toBeVisible();
     await expect(page.getByText('192.168.1.150')).toBeVisible();
-    await expect(page.getByText('Sẵn sàng')).toBeVisible();
+    await expect(page.getByText('Hoạt động', { exact: true }).first()).toBeVisible();
 
     // Mở modal tạo mới trụ bơm
     const addPumpBtn = page.getByRole('button', { name: /Khai báo trụ mới/i });

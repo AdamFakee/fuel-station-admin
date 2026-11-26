@@ -49,7 +49,8 @@ export function IssueDialogForm({ open, onOpenChange, issue }: IssueDialogFormPr
   const { data: tankData } = useTanks({
     branch_id: branchId || undefined,
   });
-  const tanks = (tankData?.data || []).filter((t) => t.status === 'active');
+  // Chưa chọn trạm thì không liệt kê bể (tránh chọn nhầm bể của trạm khác)
+  const tanks = branchId ? (tankData?.data || []).filter((t) => t.status === 'active') : [];
 
   // Selected source tank
   const selectedSourceTank = tanks.find((t) => t.id === tankId);
@@ -71,7 +72,7 @@ export function IssueDialogForm({ open, onOpenChange, issue }: IssueDialogFormPr
         setVolumeLiters(issue.volume_liters.toString());
         setReason(issue.reason);
       } else {
-        setBranchId(branches[0]?.id || '');
+        setBranchId('');
         setKind('transfer');
         setTankId('');
         setToTankId('');
@@ -79,7 +80,7 @@ export function IssueDialogForm({ open, onOpenChange, issue }: IssueDialogFormPr
         setReason('');
       }
     }
-  }, [open, issue, branches]);
+  }, [open, issue]);
 
   // If source tank changes and destination tank doesn't match fuel type, reset destination tank
   React.useEffect(() => {

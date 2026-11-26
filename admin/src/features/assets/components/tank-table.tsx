@@ -38,6 +38,7 @@ import { formatNumberVN } from '@/lib/format';
 import { toast } from 'sonner';
 import Paginator from '@/components/paginator';
 import { showApiError } from '@/lib/api-error';
+import { TANK_STATUS, statusStyle } from '@/lib/status-labels';
 
 export function TankTable() {
   const [detail, setDetail] = React.useState<Tank | null>(null);
@@ -134,7 +135,7 @@ export function TankTable() {
           usable_capacity_l: tank.max_usable_capacity_ml / 1000,
           current_stock_l: tank.current_stock_ml / 1000,
           loss_tolerance_pct: tank.loss_tolerance_pct,
-          status_label: tank.status === 'active' ? 'Vận hành' : 'Ngừng',
+          status_label: statusStyle(TANK_STATUS, tank.status).label,
         })),
       });
     } catch {
@@ -155,10 +156,10 @@ export function TankTable() {
   };
 
   const handleDeactivate = async (tank: Tank) => {
-    if (confirm(`Bạn có chắc chắn muốn ngừng vận hành bể ${tank.name}?`)) {
+    if (confirm(`Bạn có chắc chắn muốn ngừng hoạt động bể ${tank.name}?`)) {
       try {
         await deleteMutation.mutateAsync(tank.id);
-        toast.success(`Đã ngừng vận hành bể ${tank.name}`);
+        toast.success(`Đã ngừng hoạt động bể ${tank.name}`);
       } catch (err: any) {
         showApiError(err, 'Có lỗi xảy ra');
       }
@@ -213,8 +214,8 @@ export function TankTable() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tất cả trạng thái</SelectItem>
-            <SelectItem value="active">Vận hành</SelectItem>
-            <SelectItem value="inactive">Ngừng</SelectItem>
+            <SelectItem value="active">{TANK_STATUS.active.label}</SelectItem>
+            <SelectItem value="inactive">{TANK_STATUS.inactive.label}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -268,9 +269,7 @@ export function TankTable() {
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-xs font-mono">{t.loss_tolerance_pct}%</TableCell>
                     <TableCell className="text-center">
-                      <StatusBadge tone={t.status === 'active' ? 'success' : 'danger'}>
-                        {t.status === 'active' ? 'Vận hành' : 'Ngừng'}
-                      </StatusBadge>
+                      <StatusBadge tone={statusStyle(TANK_STATUS, t.status).tone}>{statusStyle(TANK_STATUS, t.status).label}</StatusBadge>
                     </TableCell>
                     {showActions && (
                       <TableCell className={ACTION_CELL_CLASS}>
@@ -280,7 +279,7 @@ export function TankTable() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDeactivate(t)}
-                              title="Ngừng vận hành"
+                              title="Ngừng hoạt động"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
                             >
                               <NoSymbolIcon className="h-3.5 w-3.5" />

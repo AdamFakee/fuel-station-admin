@@ -298,6 +298,10 @@ test.describe('Module M10 - Nhập bể (Stock Receipts) & Kiểm soát Sức ch
     // Modal xuất hiện
     await expect(page.getByRole('heading', { name: 'Lập phiếu nhập bể' })).toBeVisible();
 
+    // Trạm xăng không được chọn sẵn
+    await page.locator('#branch_id').click();
+    await page.getByRole('option', { name: /Trạm Xăng Dầu Số 1/ }).click();
+
     // Điền thông tin chung
     await page.locator('#tanker_plate').fill('29B-123.45');
     await page.locator('#document_no').fill('HD-TEST-001');
@@ -305,6 +309,8 @@ test.describe('Module M10 - Nhập bể (Stock Receipts) & Kiểm soát Sức ch
     // Thêm dòng bể
     await page.getByRole('button', { name: 'Thêm dòng bể' }).click();
     await expect(page.getByText('Dòng #1')).toBeVisible();
+    await page.getByTestId('line-tank-select').click();
+    await page.getByRole('option', { name: /TK-DO-01/ }).click();
 
     // Nhập thể tích chứng từ và thực tế (5000 Lít)
     const docInputs = page.locator('input[type="number"]');
@@ -335,6 +341,10 @@ test.describe('Module M10 - Nhập bể (Stock Receipts) & Kiểm soát Sức ch
 
     await page.goto('/inventory/receipts');
     await page.getByRole('button', { name: 'Lập phiếu nhập' }).click();
+
+    // Trạm xăng không được chọn sẵn
+    await page.locator('#branch_id').click();
+    await page.getByRole('option', { name: /Trạm Xăng Dầu Số 1/ }).click();
 
     // Thêm dòng bể
     await page.getByRole('button', { name: 'Thêm dòng bể' }).click();

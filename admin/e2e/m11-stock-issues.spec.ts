@@ -259,6 +259,9 @@ test.describe('Module M11 - Xuất điều chỉnh (Stock Issues) E2E Tests', ()
     // Dialog mở ra
     await expect(page.getByRole('heading', { name: 'Lập phiếu xuất điều chỉnh' })).toBeVisible();
 
+    // Trạm xăng không được chọn sẵn
+    await pickOption(page, '#issue-branch', /Trạm Xăng Dầu Số 1/);
+
     // Chọn Bể xuất
     await pickOption(page, '#issue-tank', /Bể Dầu DO Số 1/);
 
@@ -321,6 +324,9 @@ test.describe('Module M11 - Xuất điều chỉnh (Stock Issues) E2E Tests', ()
 
     // Dropdown bể nhận phải biến mất
     await expect(page.locator('#issue-to-tank')).not.toBeVisible();
+
+    // Trạm xăng không được chọn sẵn
+    await pickOption(page, '#issue-branch', /Trạm Xăng Dầu Số 1/);
 
     // Chọn Bể xuất
     await pickOption(page, '#issue-tank', /Bể Xăng A95 Số 1/);

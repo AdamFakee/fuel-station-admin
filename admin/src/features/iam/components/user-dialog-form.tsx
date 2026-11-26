@@ -63,10 +63,10 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
       setFullName('');
       setEmail('');
       setPhone('');
-      setRoleId(roles[0]?.id || '');
+      setRoleId('');
       setError(null);
     }
-  }, [user, open, roles]);
+  }, [user, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,7 +210,7 @@ export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps
 
             <div className="space-y-1.5">
               <Label htmlFor="role_id">Vai trò hệ thống *</Label>
-              <Select value={roleId} onValueChange={setRoleId} disabled={isPending}>
+              <Select value={roleId} onValueChange={(next) => next && setRoleId(next)} disabled={isPending}>
                 <SelectTrigger id="role_id" className="w-full">
                   <SelectValue placeholder="Chọn vai trò" />
                 </SelectTrigger>

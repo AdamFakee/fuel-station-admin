@@ -130,10 +130,7 @@ export const branchSchema = z.object({
 export type BranchInput = z.infer<typeof branchSchema>;
 
 export const tankSchema = z.object({
-  code: z
-    .string()
-    .min(1, 'Mã bể không được để trống')
-    .regex(/^[A-Za-z0-9_-]{1,32}$/, 'Mã chỉ gồm chữ, số, gạch ngang (tối đa 32 ký tự)'),
+  // Mã bể do hệ thống sinh, form không có ô nhập
   name: z.string().min(1, 'Tên bể không được để trống'),
   branch_id: z.string().min(1, 'Vui lòng chọn trạm xăng'),
   fuel_type_id: z.string().min(1, 'Vui lòng chọn loại nhiên liệu'),

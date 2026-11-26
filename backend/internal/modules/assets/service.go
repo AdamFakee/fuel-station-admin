@@ -472,8 +472,8 @@ func (s *Service) CreateTank(ctx context.Context, req CreateTankRequest) (*Tank,
 		return nil, err
 	}
 
-	if strings.TrimSpace(req.Code) == "" || strings.TrimSpace(req.Name) == "" || req.BranchID == "" || req.FuelTypeID == "" {
-		return nil, fmt.Errorf("%w: code, name, branch_id and fuel_type_id are required", apperr.ErrInvalidInput)
+	if strings.TrimSpace(req.Name) == "" || req.BranchID == "" || req.FuelTypeID == "" {
+		return nil, fmt.Errorf("%w: name, branch_id and fuel_type_id are required", apperr.ErrInvalidInput)
 	}
 	if req.DesignCapacityML <= 0 {
 		return nil, fmt.Errorf("%w: design_capacity_ml must be > 0", apperr.ErrInvalidInput)
@@ -493,6 +493,11 @@ func (s *Service) CreateTank(ctx context.Context, req CreateTankRequest) (*Tank,
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	// Mã bể do hệ thống sinh (không nhận từ client), dạng BE-2026-0001.
+	if err := tx.QueryRow(ctx, `SELECT station.next_code($1, 'BE')`, tenantID).Scan(&req.Code); err != nil {
+		return nil, fmt.Errorf("generate tank code: %w", err)
+	}
 
 	var tk Tank
 	insertQuery := `

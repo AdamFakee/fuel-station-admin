@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { faceImageUrl } from '@/components/face-thumbnail';
 import { compressFaceImage } from '@/lib/compress-image';
 import { ArrowUpTrayIcon } from '@heroicons/react/24/outline';
@@ -34,11 +33,9 @@ interface DriverDialogFormProps {
 
 type Method = CredentialItem['method'];
 
-const METHOD_LABEL: Record<Method, string> = { card: 'thẻ NFC', face: 'ảnh khuôn mặt', fingerprint: 'vân tay' };
-
 /**
  * Thêm hoặc sửa tài xế: họ tên, số điện thoại, thẻ NFC, ảnh khuôn mặt và ghi chú trong cùng một hộp (vân tay đang ẩn).
- * Khi sửa có thể thay hoặc gỡ từng phương thức xác thực; đổi ảnh mới thì ảnh cũ bị xóa.
+ * Khi sửa có thể thay hoặc gỡ thẻ, ảnh. Mọi thay đổi, kể cả gỡ, chỉ có hiệu lực khi bấm "Lưu thay đổi"; trước đó đều hoàn tác được.
  */
 export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFormProps) {
   const isEdit = !!driver;
@@ -59,7 +56,7 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
   const [faceFile, setFaceFile] = React.useState<File | null>(null);
   const [facePreview, setFacePreview] = React.useState<string | null>(null);
   const [faceOriginalSize, setFaceOriginalSize] = React.useState(0);
-  const [revokeTarget, setRevokeTarget] = React.useState<{ method: Method; id: string } | null>(null);
+  const [removeFace, setRemoveFace] = React.useState(false);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const faceInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -73,6 +70,7 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
     setErrors({});
     setFaceFile(null);
     setFacePreview(null);
+    setRemoveFace(false);
   }, [driver, open]);
 
   // Ảnh lớn hơn 200 KB thì tự nén, không bắt người dùng đổi ảnh
@@ -84,6 +82,7 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
       const prepared = await compressFaceImage(file);
       setFaceFile(prepared);
       setFacePreview(URL.createObjectURL(prepared));
+      setRemoveFace(false);
       setErrors((prev) => ({ ...prev, face: '' }));
     } catch {
       setFaceFile(null);
@@ -98,21 +97,34 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
     if (faceInputRef.current) faceInputRef.current.value = '';
   };
 
+  const activeCard = active('card');
+  const activeFace = active('face');
+  const originalCard = driver?.card_number ?? '';
+  // Đang sửa mà ô thẻ để trống (bấm "Gỡ thẻ" hoặc tự xoá số) nghĩa là gỡ thẻ khi lưu
+  const willRemoveCard = isEdit && !!originalCard && !cardNumber.trim();
+  const willRemoveFace = removeFace && !faceFile;
+  const shownFaceUrl = facePreview ?? (willRemoveFace ? null : currentFaceUrl);
+
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!fullName.trim()) errs.fullName = 'Vui lòng nhập họ và tên';
     if (cardNumber.trim() && !/^[0-9]{1,32}$/.test(cardNumber.trim())) {
       errs.cardNumber = 'Số thẻ NFC phải là chuỗi chữ số thập phân';
     }
+    // Gỡ cần mã của bản ghi đang hiệu lực; chưa tải được thì không lưu, để không im lặng bỏ qua việc gỡ
+    if (willRemoveCard && !activeCard) errs.cardNumber = 'Chưa tải được thông tin thẻ đang dùng, vui lòng thử lại';
+    if (willRemoveFace && !activeFace) errs.face = 'Chưa tải được thông tin ảnh đang dùng, vui lòng thử lại';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  /** Các thay đổi về phương thức xác thực sau khi hồ sơ đã lưu: thẻ mới, ảnh mới. */
+  /** Các thay đổi về phương thức xác thực sau khi hồ sơ đã lưu: thẻ mới, ảnh mới, gỡ thẻ, gỡ ảnh. */
   const saveCredentials = (id: string, previousCard: string) => {
     const newCard = cardNumber.trim();
     if (newCard && newCard !== previousCard) assignCard.mutate({ id, cardNumber: newCard });
     if (faceFile) uploadFace.mutate({ id, file: faceFile });
+    if (willRemoveCard && activeCard) revokeCredential.mutate({ driverId: id, credId: activeCard.id });
+    if (willRemoveFace && activeFace) revokeCredential.mutate({ driverId: id, credId: activeFace.id });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -143,17 +155,7 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
     }
   };
 
-  const confirmRevoke = () => {
-    if (!driver || !revokeTarget) return;
-    revokeCredential.mutate(
-      { driverId: driver.id, credId: revokeTarget.id },
-      { onSettled: () => setRevokeTarget(null) }
-    );
-  };
-
   const isPending = createDriver.isPending || updateDriver.isPending;
-  const activeCard = active('card');
-  const activeFace = active('face');
 
   return (
     <>
@@ -206,16 +208,18 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
                 data-testid="input-driver-face"
               />
               <div className="flex items-center gap-3 rounded-md border border-input bg-white p-2">
-                {facePreview || currentFaceUrl ? (
+                {shownFaceUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={facePreview ?? currentFaceUrl ?? ''} alt="Ảnh khuôn mặt" className="h-14 w-14 shrink-0 rounded-md border object-cover" />
+                  <img src={shownFaceUrl} alt="Ảnh khuôn mặt" className="h-14 w-14 shrink-0 rounded-md border object-cover" />
                 ) : (
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground">
                     <ArrowUpTrayIcon className="h-5 w-5" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{faceFile ? faceFile.name : currentFaceUrl ? 'Ảnh đang dùng' : 'Chưa có ảnh'}</p>
+                  <p className={`truncate text-sm font-medium${willRemoveFace ? ' text-destructive' : ''}`}>
+                    {faceFile ? faceFile.name : willRemoveFace ? 'Sẽ gỡ ảnh khi lưu' : currentFaceUrl ? 'Ảnh đang dùng' : 'Chưa có ảnh'}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {faceFile
                       ? `${Math.round(faceFile.size / 1024)} KB${faceOriginalSize > faceFile.size ? ` (đã tự giảm từ ${Math.round(faceOriginalSize / 1024)} KB)` : ''}${currentFaceUrl ? '. Ảnh cũ sẽ bị xóa khi lưu.' : ''}`
@@ -223,15 +227,28 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
                   </p>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={() => faceInputRef.current?.click()}>
-                  {faceFile || currentFaceUrl ? 'Đổi ảnh' : 'Chọn ảnh'}
+                  {shownFaceUrl ? 'Đổi ảnh' : 'Chọn ảnh'}
                 </Button>
                 {faceFile ? (
                   <Button type="button" variant="ghost" size="sm" onClick={clearFace}>
                     Bỏ
                   </Button>
+                ) : willRemoveFace ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setRemoveFace(false)}>
+                    Hoàn tác
+                  </Button>
                 ) : (
                   activeFace && (
-                    <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setRevokeTarget({ method: 'face', id: activeFace.id })}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => {
+                        clearFace();
+                        setRemoveFace(true);
+                      }}
+                    >
                       Gỡ ảnh
                     </Button>
                   )
@@ -240,28 +257,31 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
               {errors.face && <p className="text-xs text-destructive">{errors.face}</p>}
             </div>
 
-            {/* Thẻ NFC: nhập số mới để thay thẻ cũ */}
+            {/* Thẻ NFC: nhập số mới để thay thẻ cũ, để trống để gỡ */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="driver-card">Số thẻ NFC</Label>
-                {activeCard && (
-                  <button
-                    type="button"
-                    className="text-xs text-destructive hover:underline"
-                    onClick={() => setRevokeTarget({ method: 'card', id: activeCard.id })}
-                  >
-                    Gỡ thẻ
-                  </button>
+              <Label htmlFor="driver-card">Số thẻ NFC</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="driver-card"
+                  placeholder="VD: 2001234567"
+                  value={cardNumber}
+                  onChange={(e) => setCardNumber(e.target.value)}
+                  className={errors.cardNumber ? 'border-destructive' : ''}
+                  data-testid="input-driver-card"
+                />
+                {willRemoveCard ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setCardNumber(originalCard)}>
+                    Hoàn tác
+                  </Button>
+                ) : (
+                  activeCard && (
+                    <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setCardNumber('')}>
+                      Gỡ thẻ
+                    </Button>
+                  )
                 )}
               </div>
-              <Input
-                id="driver-card"
-                placeholder="VD: 2001234567"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
-                className={errors.cardNumber ? 'border-destructive' : ''}
-                data-testid="input-driver-card"
-              />
+              {willRemoveCard && <p className="text-xs text-destructive">Sẽ gỡ thẻ {originalCard} khi lưu</p>}
               {errors.cardNumber && <p className="text-xs text-destructive">{errors.cardNumber}</p>}
             </div>
 
@@ -288,17 +308,6 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
           </form>
         </DialogContent>
       </Dialog>
-
-      <ConfirmDialog
-        open={revokeTarget !== null}
-        onOpenChange={(next) => !next && setRevokeTarget(null)}
-        level="destructive"
-        title={`Gỡ ${revokeTarget ? METHOD_LABEL[revokeTarget.method] : ''} của ${driver?.full_name ?? 'tài xế'}?`}
-        description="Tài xế sẽ không dùng được phương thức này để xác thực nữa, và máy chấm công sẽ được cập nhật theo."
-        confirmText="Gỡ"
-        loading={revokeCredential.isPending}
-        onConfirm={confirmRevoke}
-      />
     </>
   );
 }

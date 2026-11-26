@@ -47,7 +47,12 @@ export function OptionSelect({
   return (
     <Select
       value={value === '' ? (emptyLabel ? EMPTY_VALUE : '') : value}
-      onValueChange={(next) => onChange(next === EMPTY_VALUE ? '' : next)}
+      onValueChange={(next) => {
+        // Radix tự báo chuỗi rỗng khi giá trị đổi lúc ô chưa có lựa chọn tương ứng (vd. mở lại form): không phải người dùng chọn,
+        // chuyển tiếp thì form bị xoá giá trị và hiện lỗi sai. Chọn lại "rỗng" thật thì luôn đi qua EMPTY_VALUE.
+        if (next === '') return;
+        onChange(next === EMPTY_VALUE ? '' : next);
+      }}
       disabled={disabled}
       required={required}
     >

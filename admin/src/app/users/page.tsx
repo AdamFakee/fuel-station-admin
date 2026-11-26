@@ -15,6 +15,7 @@ import { UserTable } from '@/features/iam/components/user-table';
 import { UserDialogForm } from '@/features/iam/components/user-dialog-form';
 import { ResetPasswordDialog } from '@/features/iam/components/reset-password-dialog';
 import { UserListItem } from '@/features/iam/types';
+import { USER_STATUS } from '@/lib/status-labels';
 
 export default function UsersPage() {
   const { hasPermission } = useAuth();
@@ -123,8 +124,8 @@ export default function UsersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                <SelectItem value="active">Hoạt động</SelectItem>
-                <SelectItem value="locked">Bị khóa</SelectItem>
+                <SelectItem value="active">{USER_STATUS.active.label}</SelectItem>
+                <SelectItem value="locked">{USER_STATUS.locked.label}</SelectItem>
               </SelectContent>
             </Select>
           </div>

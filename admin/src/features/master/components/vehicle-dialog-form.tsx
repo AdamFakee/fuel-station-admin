@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/select';
 import { useCreateVehicle } from '../api/create-vehicle';
 import { useUpdateVehicle } from '../api/update-vehicle';
+import { useAssignVehicleCard } from '../api/assign-vehicle-card';
+import { useRevokeVehicleCard } from '../api/revoke-vehicle-card';
 import { CatalogsSummary, VehicleListItem } from '../types';
 
 interface VehicleDialogFormProps {
@@ -31,6 +33,10 @@ interface VehicleDialogFormProps {
   vehicle?: VehicleListItem | null;
 }
 
+/**
+ * Thêm hoặc sửa xe, gồm cả thẻ NFC. Giống form tài xế: mọi thay đổi, kể cả gỡ thẻ, chỉ có hiệu lực khi bấm "Lưu thay đổi";
+ * trước đó đều hoàn tác được.
+ */
 export function VehicleDialogForm({
   open,
   onOpenChange,
@@ -40,6 +46,8 @@ export function VehicleDialogForm({
   const isEdit = !!vehicle;
   const createVehicle = useCreateVehicle();
   const updateVehicle = useUpdateVehicle();
+  const assignCard = useAssignVehicleCard();
+  const revokeCard = useRevokeVehicleCard();
 
   const [code, setCode] = React.useState('');
   const [plate, setPlate] = React.useState('');
@@ -60,13 +68,17 @@ export function VehicleDialogForm({
     } else {
       setCode('');
       setPlate('');
-      setFuelTypeId(catalogs?.fuel_types?.[0]?.id || '');
+      setFuelTypeId('');
       setVehicleTypeId('none');
       setCardNumber('');
       setNote('');
     }
     setErrors({});
-  }, [vehicle, catalogs, open]);
+  }, [vehicle, open]);
+
+  const originalCard = vehicle?.card_number ?? '';
+  // Đang sửa mà ô thẻ để trống (bấm "Gỡ thẻ" hoặc tự xoá số) nghĩa là gỡ thẻ khi lưu
+  const willRemoveCard = isEdit && !!originalCard && !cardNumber.trim();
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -76,15 +88,21 @@ export function VehicleDialogForm({
     if (!fuelTypeId) {
       errs.fuelTypeId = 'Vui lòng chọn loại nhiên liệu';
     }
-    if (!isEdit) {
-      if (!cardNumber.trim()) {
-        errs.cardNumber = 'Vui lòng nhập số thẻ NFC';
-      } else if (!/^[0-9]{1,32}$/.test(cardNumber.trim())) {
-        errs.cardNumber = 'Số thẻ NFC phải là chuỗi chữ số thập phân';
-      }
+    // Xe mới bắt buộc có thẻ; khi sửa được để trống (gỡ thẻ)
+    if (!isEdit && !cardNumber.trim()) {
+      errs.cardNumber = 'Vui lòng nhập số thẻ NFC';
+    } else if (cardNumber.trim() && !/^[0-9]{1,32}$/.test(cardNumber.trim())) {
+      errs.cardNumber = 'Số thẻ NFC phải là chuỗi chữ số thập phân';
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
+  };
+
+  /** Thay đổi thẻ, gửi sau khi thông tin xe đã lưu. */
+  const saveCard = (id: string) => {
+    const newCard = cardNumber.trim();
+    if (willRemoveCard) revokeCard.mutate(id);
+    else if (newCard && newCard !== originalCard) assignCard.mutate({ id, cardNumber: newCard });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -105,7 +123,10 @@ export function VehicleDialogForm({
           },
         },
         {
-          onSuccess: () => onOpenChange(false),
+          onSuccess: () => {
+            saveCard(vehicle.id);
+            onOpenChange(false);
+          },
         }
       );
     } else {
@@ -133,7 +154,7 @@ export function VehicleDialogForm({
           <DialogTitle>{isEdit ? `Chỉnh sửa phương tiện: ${vehicle?.code}` : 'Khai báo phương tiện mới'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Cập nhật biển số, loại nhiên liệu và thông tin xe. Xe đổ được ở mọi trạm xăng.'
+              ? 'Cập nhật biển số, loại nhiên liệu, thẻ NFC và thông tin xe. Xe đổ được ở mọi trạm xăng.'
               : 'Thêm phương tiện mới vào hệ thống quản lý trạm. Mã xe do hệ thống tự sinh để đồng bộ xuống máy chấm công.'}
           </DialogDescription>
         </DialogHeader>
@@ -167,7 +188,8 @@ export function VehicleDialogForm({
             {/* Loại nhiên liệu */}
             <div className="space-y-1.5">
               <Label>Loại nhiên liệu <span className="text-destructive">*</span></Label>
-              <Select value={fuelTypeId} onValueChange={setFuelTypeId}>
+              {/* Bỏ qua chuỗi rỗng Radix tự báo khi mở lại form (xem OptionSelect) */}
+              <Select value={fuelTypeId} onValueChange={(next) => next && setFuelTypeId(next)}>
                 <SelectTrigger data-testid="select-vehicle-fuel">
                   <SelectValue placeholder="Chọn nhiên liệu" />
                 </SelectTrigger>
@@ -187,7 +209,7 @@ export function VehicleDialogForm({
             {/* Loại xe */}
             <div className="space-y-1.5">
               <Label>Loại phương tiện</Label>
-              <Select value={vehicleTypeId} onValueChange={setVehicleTypeId}>
+              <Select value={vehicleTypeId} onValueChange={(next) => next && setVehicleTypeId(next)}>
                 <SelectTrigger data-testid="select-vehicle-type">
                   <SelectValue placeholder="Chọn loại xe (tùy chọn)" />
                 </SelectTrigger>
@@ -203,22 +225,35 @@ export function VehicleDialogForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Thẻ NFC ban đầu (chỉ khi tạo mới) */}
-            {!isEdit && (
-              <div className="space-y-1.5">
-                <Label htmlFor="vehicle-card">Số thẻ NFC <span className="text-destructive">*</span></Label>
-                <Input
-                  id="vehicle-card"
-                  placeholder="VD: 1001234567"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
-                  className={errors.cardNumber ? 'border-destructive' : ''}
-                  data-testid="input-vehicle-card"
-                />
-                {errors.cardNumber && <p className="text-xs text-destructive">{errors.cardNumber}</p>}
-              </div>
-            )}
+          {/* Thẻ NFC: bắt buộc khi tạo; khi sửa nhập số mới để thay, để trống để gỡ */}
+          <div className="space-y-1.5">
+            <Label htmlFor="vehicle-card">
+              Số thẻ NFC {!isEdit && <span className="text-destructive">*</span>}
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="vehicle-card"
+                placeholder="VD: 1001234567"
+                value={cardNumber}
+                onChange={(e) => setCardNumber(e.target.value)}
+                className={errors.cardNumber ? 'border-destructive' : ''}
+                data-testid="input-vehicle-card"
+              />
+              {willRemoveCard ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setCardNumber(originalCard)}>
+                  Hoàn tác
+                </Button>
+              ) : (
+                isEdit &&
+                originalCard && (
+                  <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setCardNumber('')}>
+                    Gỡ thẻ
+                  </Button>
+                )
+              )}
+            </div>
+            {willRemoveCard && <p className="text-xs text-destructive">Sẽ gỡ thẻ {originalCard} khi lưu</p>}
+            {errors.cardNumber && <p className="text-xs text-destructive">{errors.cardNumber}</p>}
           </div>
 
           {/* Ghi chú */}

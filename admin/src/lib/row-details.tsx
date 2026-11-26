@@ -9,6 +9,7 @@ import type { DriverListItem, VehicleListItem } from '@/features/master/types';
 import type { AccessEventListItem } from '@/features/dispense/types';
 import type { EdgeStationStatus } from '@/features/sync-monitor/types';
 import type { StockLedgerLineItem, StockLedgerSummaryItem } from '@/features/reports/types';
+import { BRANCH_STATUS, DRIVER_STATUS, TANK_STATUS, USER_STATUS, VEHICLE_STATUS, pumpStatus, statusStyle, type StatusStyle } from '@/lib/status-labels';
 
 /**
  * Nội dung hộp thoại chi tiết cho từng loại dòng bảng. Chỉ đọc, gom một chỗ để mọi bảng hiển thị nhất quán.
@@ -17,9 +18,7 @@ import type { StockLedgerLineItem, StockLedgerSummaryItem } from '@/features/rep
 const liters = (ml: number | undefined | null) => (ml === undefined || ml === null ? '—' : `${formatNumberVN(ml / 1000)} L`);
 const dateTime = (value?: string | null) => (value ? formatDateTimeVN(value) : '—');
 
-const activeBadge = (active: boolean, on = 'Hoạt động', off = 'Ngừng hoạt động') => (
-  <StatusBadge tone={active ? 'success' : 'neutral'}>{active ? on : off}</StatusBadge>
-);
+const statusBadge = ({ tone, label }: StatusStyle) => <StatusBadge tone={tone}>{label}</StatusBadge>;
 
 const auditSection = (createdAt?: string, updatedAt?: string): DetailSection => ({
   title: 'Hệ thống',
@@ -35,7 +34,7 @@ export function branchDetail(b: Branch): DetailSection[] {
       title: 'Thông tin trạm xăng',
       fields: [
         { label: 'Mã trạm xăng', value: b.code },
-        { label: 'Trạng thái', value: activeBadge(b.status === 'active') },
+        { label: 'Trạng thái', value: statusBadge(statusStyle(BRANCH_STATUS, b.status)) },
         { label: 'Tên trạm xăng', value: b.name },
         { label: 'Người quản lý', value: b.manager_name },
         { label: 'Số điện thoại', value: b.phone },
@@ -52,7 +51,7 @@ export function tankDetail(t: Tank): DetailSection[] {
       title: 'Thông tin bể',
       fields: [
         { label: 'Mã bể', value: t.code },
-        { label: 'Trạng thái', value: activeBadge(t.status === 'active', 'Hoạt động', 'Ngừng vận hành') },
+        { label: 'Trạng thái', value: statusBadge(statusStyle(TANK_STATUS, t.status)) },
         { label: 'Tên bể', value: t.name },
         { label: 'Trạm xăng', value: t.branch_name },
         { label: 'Loại nhiên liệu', value: t.fuel_type_name },
@@ -79,7 +78,7 @@ export function pumpDetail(p: PumpDetail): DetailSection[] {
       title: 'Thông tin trụ bơm',
       fields: [
         { label: 'Mã trụ', value: p.code },
-        { label: 'Trạng thái', value: activeBadge(p.enabled, 'Hoạt động', 'Ngừng vận hành') },
+        { label: 'Trạng thái', value: statusBadge(pumpStatus(p.enabled)) },
         { label: 'Tên trụ', value: p.name },
         { label: 'Trạm xăng', value: p.branch_name },
         { label: 'Số trụ trên trạm', value: String(p.edge_pump_id) },
@@ -115,10 +114,7 @@ export function userDetail(u: UserListItem): DetailSection[] {
       title: 'Tài khoản',
       fields: [
         { label: 'Mã nhân viên', value: u.employee_code },
-        {
-          label: 'Trạng thái',
-          value: <StatusBadge tone={u.status === 'locked' ? 'danger' : 'success'}>{u.status === 'locked' ? 'Bị khóa' : 'Hoạt động'}</StatusBadge>,
-        },
+        { label: 'Trạng thái', value: statusBadge(statusStyle(USER_STATUS, u.status)) },
         { label: 'Họ và tên', value: u.full_name },
         { label: 'Email đăng nhập', value: u.email },
         { label: 'Số điện thoại', value: u.phone },
@@ -141,10 +137,7 @@ export function vehicleDetail(v: VehicleListItem): DetailSection[] {
       title: 'Phương tiện',
       fields: [
         { label: 'Mã xe', value: v.code },
-        {
-          label: 'Quyền đổ',
-          value: <StatusBadge tone={v.status === 'active' ? 'success' : 'danger'}>{v.status === 'active' ? 'Hoạt động' : 'Bị khóa'}</StatusBadge>,
-        },
+        { label: 'Trạng thái', value: statusBadge(statusStyle(VEHICLE_STATUS, v.status)) },
         { label: 'Biển số', value: v.plate },
         { label: 'Loại xe', value: v.vehicle_type_name },
         { label: 'Loại nhiên liệu', value: v.fuel_type_name },
@@ -156,20 +149,13 @@ export function vehicleDetail(v: VehicleListItem): DetailSection[] {
   ];
 }
 
-const DRIVER_STATUS: Record<string, { label: string; tone: 'success' | 'danger' | 'neutral' }> = {
-  active: { label: 'Hoạt động', tone: 'success' },
-  blocked: { label: 'Bị chặn', tone: 'danger' },
-  inactive: { label: 'Ngừng', tone: 'neutral' },
-};
-
 export function driverDetail(d: DriverListItem): DetailSection[] {
-  const status = DRIVER_STATUS[d.status] ?? { label: d.status, tone: 'neutral' as const };
   return [
     {
       title: 'Tài xế',
       fields: [
         { label: 'Mã tài xế', value: d.code },
-        { label: 'Trạng thái', value: <StatusBadge tone={status.tone}>{status.label}</StatusBadge> },
+        { label: 'Trạng thái', value: statusBadge(statusStyle(DRIVER_STATUS, d.status)) },
         { label: 'Họ và tên', value: d.full_name },
         { label: 'Số điện thoại', value: d.phone },
         { label: 'Hiệu lực', value: d.valid_from || d.valid_to ? `${d.valid_from ?? '…'} → ${d.valid_to ?? 'không thời hạn'}` : 'Không thời hạn' },
@@ -180,7 +166,8 @@ export function driverDetail(d: DriverListItem): DetailSection[] {
       title: 'Phương thức xác thực',
       fields: [
         { label: 'Thẻ NFC', value: d.card_number || 'Chưa có' },
-        { label: 'Khuôn mặt', value: d.has_face ? <FaceThumbnail fileId={d.face_file_id} size={96} /> : 'Chưa có' },      ],
+        { label: 'Khuôn mặt', value: d.has_face ? <FaceThumbnail fileId={d.face_file_id} size={96} /> : 'Chưa có' },
+      ],
     },
     auditSection(d.created_at, d.updated_at),
   ];

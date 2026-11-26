@@ -95,13 +95,13 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
     return tanks.filter((t) => t.branch_id === selectedBranchId);
   }, [tanks, selectedBranchId]);
 
-  // Đổi trạm xăng thì bể phải thuộc trạm xăng đó: bể đang chọn không hợp lệ thì chọn bể đầu tiên của trạm xăng (hoặc để trống nếu chưa có).
+  // Đổi trạm xăng thì bể phải thuộc trạm xăng đó: bể đang chọn không hợp lệ thì bỏ chọn, KHÔNG tự chọn bể khác thay người dùng.
   React.useEffect(() => {
-    if (isEdit || !selectedBranchId) return;
+    if (isEdit || !selectedTankId) return;
     if (!availableTanks.some((t) => t.id === selectedTankId)) {
-      setValue('tank_id', availableTanks[0]?.id ?? '');
+      setValue('tank_id', '');
     }
-  }, [isEdit, selectedBranchId, selectedTankId, availableTanks, setValue]);
+  }, [isEdit, selectedTankId, availableTanks, setValue]);
 
   React.useEffect(() => {
     if (pump) {
@@ -124,16 +124,10 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
         terminal_password: '',
       });
     } else {
-      // Tạo mới: form trống; trạm xăng và bể mặc định do hai effect bên trên/dưới điền khi dữ liệu về.
+      // Tạo mới: form trống, người dùng tự chọn trạm xăng và bể (chọn sẵn mục đầu dễ khai báo nhầm).
       reset(EMPTY_VALUES);
     }
   }, [pump, reset, open]);
-
-  // Tạo mới: chọn sẵn trạm xăng đầu tiên khi danh sách trạm xăng đã tải và form chưa chọn trạm xăng nào.
-  React.useEffect(() => {
-    if (isEdit || !open || selectedBranchId || branches.length === 0) return;
-    setValue('branch_id', branches[0].id);
-  }, [isEdit, open, selectedBranchId, branches, setValue]);
 
   const onSubmit = async (data: PumpInput) => {
     try {
@@ -190,23 +184,16 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="contents">
-          <DialogBody className="max-h-[65vh] space-y-4 overflow-y-auto py-2">
+          <DialogBody className="max-h-[65vh] space-y-4 overflow-y-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="border-b pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Trụ và vòi bơm
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {isEdit && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="code">Mã trụ bơm</Label>
-                  <Input id="code" disabled {...register('code')} />
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Tên trụ bơm *</Label>
-                <Input id="name" placeholder="VD: Trụ số 1" {...register('name')} />
-                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-              </div>
+            {/* Tạo và sửa dùng chung một bố cục; mã trụ (hệ thống tự sinh) chỉ hiện trên tiêu đề khi sửa */}
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Tên trụ bơm *</Label>
+              <Input id="name" placeholder="VD: Trụ số 1" {...register('name')} />
+              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -235,7 +222,8 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
                     ...(pump?.nozzles?.[0] && !availableTanks.some((t) => t.id === pump.nozzles?.[0]?.tank_id)
                       ? [{ value: pump.nozzles[0].tank_id, label: pump.nozzles[0].tank_name }]
                       : []),
-                    ...availableTanks.map((t) => ({ value: t.id, label: `${t.name} (${t.fuel_type_name})` })),
+                    // Chưa chọn trạm xăng thì chưa liệt kê bể (tránh chọn nhầm bể của trạm khác).
+                    ...(selectedBranchId ? availableTanks : []).map((t) => ({ value: t.id, label: `${t.name} (${t.fuel_type_name})` })),
                   ]}
                 />
                 {!isEdit && selectedBranchId && availableTanks.length === 0 && (
@@ -254,19 +242,13 @@ export function PumpDialog({ open, onOpenChange, pump }: PumpDialogProps) {
               Bộ số Montech (RS-485)
             </div>
 
+            {/* Tên bộ số không cho tự điền: tạo mới thì server đặt BS-<mã trụ>, khi sửa form gửi lại tên đang có */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="sensor_name">Tên bộ số</Label>
-                <Input id="sensor_name" placeholder="Để trống: tự đặt BS-<mã trụ>" {...register('sensor_name')} />
-              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="sensor_com_port">Cổng COM *</Label>
                 <Input id="sensor_com_port" placeholder="VD: COM7 (mỗi trụ một cổng riêng)" {...register('sensor_com_port')} />
                 {errors.sensor_com_port && <p className="text-xs text-destructive">{errors.sensor_com_port.message}</p>}
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="sensor_serial">Serial của bộ số</Label>
                 <Input id="sensor_serial" type="number" placeholder="1234" {...register('sensor_serial')} />

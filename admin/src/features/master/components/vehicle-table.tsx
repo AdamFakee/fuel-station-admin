@@ -29,7 +29,6 @@ import {
   PencilSquareIcon,
   LockClosedIcon,
   LockOpenIcon,
-  CreditCardIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { formatDateTimeVN } from '@/lib/format';
@@ -37,6 +36,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { VehicleListItem } from '../types';
 import { useUpdateVehicleStatus } from '../api/update-vehicle-status';
 import { useDeleteVehicle } from '../api/delete-vehicle';
+import { VEHICLE_STATUS, statusStyle } from '@/lib/status-labels';
 
 interface VehicleTableProps {
   vehicles: VehicleListItem[];
@@ -46,7 +46,6 @@ interface VehicleTableProps {
   canEdit?: boolean;
   canDelete?: boolean;
   onEdit: (vehicle: VehicleListItem) => void;
-  onManageCard: (vehicle: VehicleListItem) => void;
 }
 
 export function VehicleTable({
@@ -56,7 +55,6 @@ export function VehicleTable({
   canEdit = true,
   canDelete = true,
   onEdit,
-  onManageCard,
 }: VehicleTableProps) {
   const [detail, setDetail] = React.useState<VehicleListItem | null>(null);
   const updateStatus = useUpdateVehicleStatus();
@@ -125,9 +123,7 @@ export function VehicleTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge tone={v.status === 'active' ? 'success' : 'danger'}>
-                      {v.status === 'active' ? 'Hoạt động' : 'Bị khóa'}
-                    </StatusBadge>
+                    <StatusBadge tone={statusStyle(VEHICLE_STATUS, v.status).tone}>{statusStyle(VEHICLE_STATUS, v.status).label}</StatusBadge>
                   </TableCell>
                   <TableCell className={ACTION_CELL_CLASS}>
                     {(canEdit || canDelete) && (
@@ -149,10 +145,6 @@ export function VehicleTable({
                               <DropdownMenuItem onClick={() => onEdit(v)} data-testid={`edit-vehicle-${v.code}`}>
                                 <PencilSquareIcon className="mr-2 h-4 w-4" />
                                 Sửa thông tin
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => onManageCard(v)} data-testid={`card-vehicle-${v.code}`}>
-                                <CreditCardIcon className="mr-2 h-4 w-4" />
-                                Gán / Đổi thẻ NFC
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => setStatusConfirmTarget(v)}

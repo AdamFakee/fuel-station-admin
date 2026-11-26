@@ -5,7 +5,6 @@ import { tankKeys } from './get-tanks';
 
 export async function createTank(input: TankInput): Promise<Tank> {
   const payload = {
-    code: input.code,
     name: input.name,
     branch_id: input.branch_id,
     fuel_type_id: input.fuel_type_id,

@@ -36,6 +36,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DriverListItem } from '../types';
 import { useUpdateDriverStatus } from '../api/update-driver-status';
 import { useDeleteDriver } from '../api/delete-driver';
+import { DRIVER_STATUS, statusStyle } from '@/lib/status-labels';
 
 interface DriverTableProps {
   drivers: DriverListItem[];
@@ -76,16 +77,8 @@ export function DriverTable({
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <StatusBadge tone="success">Đang làm việc</StatusBadge>;
-      case 'blocked':
-        return <StatusBadge tone="danger">Tạm khóa</StatusBadge>;
-      case 'inactive':
-        return <StatusBadge tone="neutral">Nghỉ việc</StatusBadge>;
-      default:
-        return <StatusBadge tone="neutral">{status}</StatusBadge>;
-    }
+    const { tone, label } = statusStyle(DRIVER_STATUS, status);
+    return <StatusBadge tone={tone}>{label}</StatusBadge>;
   };
 
   return (
@@ -157,12 +150,12 @@ export function DriverTable({
                                 {d.status === 'active' ? (
                                   <>
                                     <LockClosedIcon className="mr-2 h-4 w-4 text-amber-500" />
-                                    <span className="text-amber-600">Tạm khóa tài xế</span>
+                                    <span className="text-amber-600">Khóa tài xế</span>
                                   </>
                                 ) : (
                                   <>
                                     <LockOpenIcon className="mr-2 h-4 w-4 text-emerald-500" />
-                                    <span className="text-emerald-600">Mở khóa hoạt động</span>
+                                    <span className="text-emerald-600">Mở khóa tài xế</span>
                                   </>
                                 )}
                               </DropdownMenuItem>
@@ -204,8 +197,8 @@ export function DriverTable({
         open={!!statusConfirmTarget}
         onOpenChange={(open) => !open && setStatusConfirmTarget(null)}
         level={statusConfirmTarget?.status === 'active' ? 'destructive' : 'info'}
-        title={statusConfirmTarget?.status === 'active' ? 'Tạm khóa tài xế' : 'Mở khóa hoạt động tài xế'}
-        description={`Bạn có chắc muốn ${statusConfirmTarget?.status === 'active' ? 'tạm khóa' : 'mở khóa'} tài xế ${statusConfirmTarget?.full_name} (Mã: ${statusConfirmTarget?.code})?`}
+        title={statusConfirmTarget?.status === 'active' ? 'Khóa tài xế' : 'Mở khóa tài xế'}
+        description={`Bạn có chắc muốn ${statusConfirmTarget?.status === 'active' ? 'khóa' : 'mở khóa'} tài xế ${statusConfirmTarget?.full_name} (Mã: ${statusConfirmTarget?.code})?`}
         confirmText={statusConfirmTarget?.status === 'active' ? 'Khóa tài xế' : 'Mở khóa'}
         loading={updateStatus.isPending}
         onConfirm={handleConfirmStatusChange}

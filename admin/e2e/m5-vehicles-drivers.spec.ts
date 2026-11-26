@@ -185,6 +185,9 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     expect(createPayload).toBeNull();
 
     await page.getByTestId('input-vehicle-card').fill('1009998888');
+    // Loại nhiên liệu không được chọn sẵn
+    await page.getByTestId('select-vehicle-fuel').click();
+    await page.getByRole('option').first().click();
     await page.getByTestId('submit-vehicle-btn').click();
 
     // Verify modal đóng và payload đúng
@@ -195,7 +198,7 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     expect(createPayload.card_number).toBe('1009998888');
   });
 
-  test('4. Modal gán / đổi thẻ NFC cho xe validate định dạng số thập phân', async ({ page }) => {
+  test('4. Form sửa xe có ô thẻ NFC và validate định dạng số thập phân', async ({ page }) => {
     await page.route('**/master/vehicles*', async (route) => {
       await route.fulfill({
         status: 200,
@@ -227,13 +230,13 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
 
     // Mở menu thao tác của XE001
     await page.getByTestId('vehicle-actions-XE001').click();
-    await page.getByTestId('card-vehicle-XE001').click();
+    await page.getByTestId('edit-vehicle-XE001').click();
 
-    await expect(page.getByText('Quản lý thẻ NFC xe: 29C-88888')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Chỉnh sửa phương tiện/ })).toBeVisible();
 
     // Nhập thẻ có ký tự chữ -> lỗi validate
-    await page.getByTestId('input-card-number').fill('CARD-ABC');
-    await page.getByTestId('submit-card-btn').click();
+    await page.getByTestId('input-vehicle-card').fill('CARD-ABC');
+    await page.getByTestId('submit-vehicle-btn').click();
     await expect(page.getByText('Số thẻ NFC phải là chuỗi chữ số thập phân')).toBeVisible();
   });
 
@@ -285,7 +288,7 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await expect(row.getByText('2001234567')).toBeVisible();
     // Vân tay đang ẩn: không còn cột này, kể cả khi tài xế đã có vân tay
     await expect(page.getByRole('columnheader', { name: 'Vân tay' })).toHaveCount(0);
-    await expect(row.getByText('Đang làm việc', { exact: true })).toBeVisible();
+    await expect(row.getByText('Hoạt động', { exact: true })).toBeVisible();
   });
 
   test('6. Form thêm tài xế bắt buộc nhập họ tên (mã tài xế do hệ thống tự sinh)', async ({ page }) => {

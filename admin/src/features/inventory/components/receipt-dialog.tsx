@@ -103,33 +103,32 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
           }))
         );
       } else {
-        const defaultBranchId = branches.length > 0 ? branches[0].id : '';
-        setBranchId(defaultBranchId);
+        // Không chọn sẵn trạm hay nhà cung cấp: người dùng tự chọn để tránh lập phiếu nhầm
+        setBranchId('');
         setReceivedAt(new Date().toISOString().slice(0, 16));
-        setSupplierId(suppliers.length > 0 ? suppliers[0].id : '');
+        setSupplierId('');
         setTankerPlate('');
         setDocumentNo('');
         setNote('');
         setLines([]);
       }
     }
-  }, [open, receipt, fullReceipt, branches, suppliers]);
+  }, [open, receipt, fullReceipt]);
 
   const createMutation = useCreateReceipt();
   const updateMutation = useUpdateReceipt();
 
   const handleAddLine = () => {
-    if (tanks.length === 0) {
+    // Chưa chọn trạm thì danh sách bể là của mọi trạm, nên phải chọn trạm trước
+    if (!branchId || tanks.length === 0) {
       toast.error('Vui lòng chọn trạm xăng có bể chứa trước khi thêm dòng nhập');
       return;
     }
-    const defaultTank = tanks[0];
     setLines((prev) => [
       ...prev,
       {
-        tank_id: defaultTank.id,
-        fuel_type_id: defaultTank.fuel_type_id,
-        fuel_type_name: defaultTank.fuel_type_name,
+        tank_id: '',
+        fuel_type_id: '',
         document_volume_liters: 0,
         actual_volume_liters: 0,
       },
@@ -311,7 +310,11 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
                   id="branch_id"
                   className="mt-1.5"
                   value={branchId}
-                  onChange={setBranchId}
+                  onChange={(next) => {
+                    // Đổi trạm thì các dòng bể đã thêm thuộc trạm cũ: bỏ đi
+                    if (next !== branchId) setLines([]);
+                    setBranchId(next);
+                  }}
                   disabled={isEditing}
                   required
                   emptyLabel="Chọn trạm"
@@ -437,6 +440,7 @@ export function ReceiptDialog({ open, onOpenChange, receipt }: ReceiptDialogProp
                               value={line.tank_id}
                               onChange={(next) => handleTankChange(idx, next)}
                               required
+                              placeholder="Chọn bể chứa"
                               options={tanks.map((t) => ({ value: t.id, label: `${t.name} (${t.code}) - ${t.fuel_type_name}` }))}
                             />
                           </div>
