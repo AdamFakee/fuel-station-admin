@@ -180,9 +180,7 @@ export function driverDetail(d: DriverListItem): DetailSection[] {
       title: 'Phương thức xác thực',
       fields: [
         { label: 'Thẻ NFC', value: d.card_number || 'Chưa có' },
-        { label: 'Khuôn mặt', value: d.has_face ? <FaceThumbnail fileId={d.face_file_id} size={96} /> : 'Chưa có' },
-        { label: 'Vân tay', value: d.has_fingerprint ? 'Đã đăng ký' : 'Chưa có' },
-      ],
+        { label: 'Khuôn mặt', value: d.has_face ? <FaceThumbnail fileId={d.face_file_id} size={96} /> : 'Chưa có' },      ],
     },
     auditSection(d.created_at, d.updated_at),
   ];

@@ -203,9 +203,7 @@ export default function DispenseSessionsPage() {
                     <SelectContent>
                       <SelectItem value="all">Tất cả</SelectItem>
                       <SelectItem value="card">Thẻ NFC</SelectItem>
-                      <SelectItem value="face">Khuôn mặt</SelectItem>
-                      <SelectItem value="fingerprint">Vân tay</SelectItem>
-                    </SelectContent>
+                      <SelectItem value="face">Khuôn mặt</SelectItem>                    </SelectContent>
                   </Select>
                 </>
               )}

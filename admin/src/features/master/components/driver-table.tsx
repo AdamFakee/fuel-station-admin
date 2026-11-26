@@ -16,7 +16,6 @@ import {
   ACTION_HEAD_CLASS,
   ACTION_CELL_CLASS,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -31,7 +30,6 @@ import {
   LockClosedIcon,
   LockOpenIcon,
   TrashIcon,
-  FingerPrintIcon,
 } from '@heroicons/react/24/outline';
 import { FaceThumbnail } from '@/components/face-thumbnail';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -101,16 +99,15 @@ export function DriverTable({
               <TableHead className="w-[120px]">Số điện thoại</TableHead>
               <TableHead>Thẻ NFC</TableHead>
               <TableHead className="w-[120px]">Khuôn mặt</TableHead>
-              <TableHead className="w-[120px]">Vân tay</TableHead>
               <TableHead className="w-[130px]">Trạng thái</TableHead>
               <TableHead className={`${ACTION_HEAD_CLASS} w-[70px]`}>Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableEmptyRow colSpan={8} loading title="Đang tải danh sách tài xế..." />
+              <TableEmptyRow colSpan={7} loading title="Đang tải danh sách tài xế..." />
             ) : drivers.length === 0 ? (
-              <TableEmptyRow colSpan={8} title="Không tìm thấy tài xế nào phù hợp." />
+              <TableEmptyRow colSpan={7} title="Không tìm thấy tài xế nào phù hợp." />
             ) : (
               drivers.map((d) => (
                 <TableRow key={d.id} data-testid={`driver-row-${d.code}`} onClick={rowClick(() => setDetail(d))}>
@@ -127,19 +124,6 @@ export function DriverTable({
                   <TableCell>
                     {d.has_face ? (
                       <FaceThumbnail fileId={d.face_file_id} size={36} />
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground italic">Chưa có</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {d.has_fingerprint ? (
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950/30"
-                      >
-                        <FingerPrintIcon className="mr-1 h-3 w-3" />
-                        Đã đăng ký
-                      </Badge>
                     ) : (
                       <span className="text-[11px] text-muted-foreground italic">Chưa có</span>
                     )}

@@ -283,8 +283,8 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await expect(page.getByText('0911223344')).toBeVisible();
     const row = page.getByTestId('driver-row-TX001');
     await expect(row.getByText('2001234567')).toBeVisible();
-    // Khuôn mặt và vân tay là hai cột riêng, mỗi cột báo "Đã đăng ký"
-    await expect(row.getByText('Đã đăng ký')).toHaveCount(2);
+    // Vân tay đang ẩn: không còn cột này, kể cả khi tài xế đã có vân tay
+    await expect(page.getByRole('columnheader', { name: 'Vân tay' })).toHaveCount(0);
     await expect(row.getByText('Đang làm việc', { exact: true })).toBeVisible();
   });
 
@@ -307,7 +307,7 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await expect(page.getByText('Vui lòng nhập họ và tên')).toBeVisible();
   });
 
-  test('7. Form sửa tài xế gộp thẻ NFC, ảnh khuôn mặt và vân tay', async ({ page }) => {
+  test('7. Form sửa tài xế gộp thẻ NFC và ảnh khuôn mặt (vân tay đang ẩn)', async ({ page }) => {
     await page.route('**/master/drivers*', async (route) => {
       await route.fulfill({
         status: 200,
@@ -370,11 +370,11 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
     await page.getByTestId('driver-actions-TX001').click();
     await page.getByTestId('edit-driver-TX001').click();
 
-    // Thẻ, ảnh khuôn mặt và vân tay nằm ngay trong form sửa tài xế
+    // Thẻ và ảnh khuôn mặt nằm ngay trong form sửa tài xế
     await expect(page.getByRole('heading', { name: /Cập nhật hồ sơ tài xế/ })).toBeVisible();
     await expect(page.getByLabel('Số thẻ NFC')).toHaveValue('2001234567');
     await expect(page.getByText('Ảnh khuôn mặt', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Mã mẫu vân tay')).toBeVisible();
+    await expect(page.getByLabel('Mã mẫu vân tay')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Gỡ thẻ' })).toBeVisible();
   });
 

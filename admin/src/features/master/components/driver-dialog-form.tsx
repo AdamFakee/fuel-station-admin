@@ -22,7 +22,6 @@ import { useUpdateDriver } from '../api/update-driver';
 import { useDriver } from '../api/get-driver';
 import { useUploadDriverFace } from '../api/upload-driver-face';
 import { useAssignDriverCard } from '../api/assign-driver-card';
-import { useRegisterDriverFingerprint } from '../api/register-driver-fingerprint';
 import { useRevokeDriverCredential } from '../api/revoke-driver-credential';
 import { CatalogsSummary, CredentialItem, DriverListItem } from '../types';
 
@@ -38,7 +37,7 @@ type Method = CredentialItem['method'];
 const METHOD_LABEL: Record<Method, string> = { card: 'thẻ NFC', face: 'ảnh khuôn mặt', fingerprint: 'vân tay' };
 
 /**
- * Thêm hoặc sửa tài xế: họ tên, số điện thoại, thẻ NFC, ảnh khuôn mặt, vân tay và ghi chú trong cùng một hộp.
+ * Thêm hoặc sửa tài xế: họ tên, số điện thoại, thẻ NFC, ảnh khuôn mặt và ghi chú trong cùng một hộp (vân tay đang ẩn).
  * Khi sửa có thể thay hoặc gỡ từng phương thức xác thực; đổi ảnh mới thì ảnh cũ bị xóa.
  */
 export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFormProps) {
@@ -47,7 +46,6 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
   const updateDriver = useUpdateDriver();
   const uploadFace = useUploadDriverFace();
   const assignCard = useAssignDriverCard();
-  const registerFingerprint = useRegisterDriverFingerprint();
   const revokeCredential = useRevokeDriverCredential();
 
   // Các phương thức xác thực đang hiệu lực của tài xế (cần id để gỡ)
@@ -57,7 +55,6 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
   const [fullName, setFullName] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [cardNumber, setCardNumber] = React.useState('');
-  const [fingerprint, setFingerprint] = React.useState('');
   const [note, setNote] = React.useState('');
   const [faceFile, setFaceFile] = React.useState<File | null>(null);
   const [facePreview, setFacePreview] = React.useState<string | null>(null);
@@ -72,7 +69,6 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
     setFullName(driver?.full_name ?? '');
     setPhone(driver?.phone ?? '');
     setCardNumber(driver?.card_number ?? '');
-    setFingerprint('');
     setNote(driver?.note ?? '');
     setErrors({});
     setFaceFile(null);
@@ -112,12 +108,11 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
     return Object.keys(errs).length === 0;
   };
 
-  /** Các thay đổi về phương thức xác thực sau khi hồ sơ đã lưu: thẻ mới, ảnh mới, vân tay mới. */
+  /** Các thay đổi về phương thức xác thực sau khi hồ sơ đã lưu: thẻ mới, ảnh mới. */
   const saveCredentials = (id: string, previousCard: string) => {
     const newCard = cardNumber.trim();
     if (newCard && newCard !== previousCard) assignCard.mutate({ id, cardNumber: newCard });
     if (faceFile) uploadFace.mutate({ id, file: faceFile });
-    if (fingerprint.trim()) registerFingerprint.mutate({ id, biometricTemplateId: fingerprint.trim() });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -135,7 +130,7 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
         }
       );
     } else {
-      // Thẻ đi kèm lúc tạo; ảnh và vân tay gửi sau khi có tài xế
+      // Thẻ đi kèm lúc tạo; ảnh gửi sau khi có tài xế
       createDriver.mutate(
         { full_name: fullName.trim(), phone: phone.trim() || undefined, card_number: cardNumber.trim() || undefined, note: note.trim() || undefined },
         {
@@ -159,7 +154,6 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
   const isPending = createDriver.isPending || updateDriver.isPending;
   const activeCard = active('card');
   const activeFace = active('face');
-  const activeFingerprint = active('fingerprint');
 
   return (
     <>
@@ -168,7 +162,7 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
           <DialogHeader>
             <DialogTitle>{isEdit ? `Cập nhật hồ sơ tài xế: ${driver?.code}` : 'Thêm tài xế mới'}</DialogTitle>
             <DialogDescription className="sr-only">
-              {isEdit ? 'Chỉnh sửa họ tên, số điện thoại, thẻ NFC, ảnh khuôn mặt, vân tay và ghi chú của tài xế.' : 'Nhập thông tin tài xế mới.'}
+              {isEdit ? 'Chỉnh sửa họ tên, số điện thoại, thẻ NFC, ảnh khuôn mặt và ghi chú của tài xế.' : 'Nhập thông tin tài xế mới.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -269,29 +263,6 @@ export function DriverDialogForm({ open, onOpenChange, driver }: DriverDialogFor
                 data-testid="input-driver-card"
               />
               {errors.cardNumber && <p className="text-xs text-destructive">{errors.cardNumber}</p>}
-            </div>
-
-            {/* Vân tay: mã mẫu sinh trắc học */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="driver-fingerprint">Mã mẫu vân tay</Label>
-                {activeFingerprint && (
-                  <button
-                    type="button"
-                    className="text-xs text-destructive hover:underline"
-                    onClick={() => setRevokeTarget({ method: 'fingerprint', id: activeFingerprint.id })}
-                  >
-                    Gỡ vân tay
-                  </button>
-                )}
-              </div>
-              <Input
-                id="driver-fingerprint"
-                placeholder={activeFingerprint ? 'Đã đăng ký, nhập mã mới để thay' : 'Để trống nếu chưa có'}
-                value={fingerprint}
-                onChange={(e) => setFingerprint(e.target.value)}
-                data-testid="input-driver-fingerprint"
-              />
             </div>
 
             <div className="space-y-1.5">

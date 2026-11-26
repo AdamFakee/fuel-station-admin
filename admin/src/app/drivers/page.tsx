@@ -83,7 +83,6 @@ export default function DriversPage() {
           { header: 'Số điện thoại', key: 'phone', width: 16 },
           { header: 'Thẻ NFC', key: 'card_number', width: 16 },
           { header: 'Khuôn mặt', key: 'face', width: 12 },
-          { header: 'Vân tay', key: 'fingerprint', width: 12 },
           { header: 'Trạng thái', key: 'status_label', width: 16 },
         ],
         data: allDrivers.map((driver) => ({
@@ -92,7 +91,6 @@ export default function DriversPage() {
           phone: driver.phone ?? '',
           card_number: driver.card_number ?? '',
           face: driver.has_face ? 'Đã đăng ký' : '',
-          fingerprint: driver.has_fingerprint ? 'Đã đăng ký' : '',
           status_label: statusLabels[driver.status],
         })),
       });
