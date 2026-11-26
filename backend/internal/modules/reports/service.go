@@ -431,10 +431,10 @@ func (s *Service) GetVehicleConsumptionReport(ctx context.Context, q VehicleCons
 		  LEFT JOIN station.vehicle_type vt ON vt.id = v.vehicle_type_id AND vt.tenant_id = v.tenant_id
 		  LEFT JOIN station.dispense_session ds ON ds.vehicle_id = v.id AND ds.tenant_id = v.tenant_id
 		       AND ds.status = 'completed'
+		       AND ($2::UUID IS NULL OR ds.branch_id = $2)
 		       AND ($3::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) >= $3)
 		       AND ($4::TIMESTAMPTZ IS NULL OR COALESCE(ds.finished_at, ds.started_at, ds.received_at) <= $4)
 		 WHERE v.tenant_id = $1
-		   AND ($2::UUID IS NULL OR EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $2))
 		   AND ($5::UUID IS NULL OR v.id = $5)
 		 GROUP BY v.id, v.code, v.plate, vt.name
 		 ORDER BY total_dispensed_ml DESC, v.plate ASC

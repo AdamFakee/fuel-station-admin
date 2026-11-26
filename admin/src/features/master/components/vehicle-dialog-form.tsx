@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { BranchMultiSelect } from './branch-multi-select';
 import { useCreateVehicle } from '../api/create-vehicle';
 import { useUpdateVehicle } from '../api/update-vehicle';
 import { CatalogsSummary, VehicleListItem } from '../types';
@@ -44,7 +43,6 @@ export function VehicleDialogForm({
 
   const [code, setCode] = React.useState('');
   const [plate, setPlate] = React.useState('');
-  const [selectedBranches, setSelectedBranches] = React.useState<string[]>([]);
   const [fuelTypeId, setFuelTypeId] = React.useState('');
   const [vehicleTypeId, setVehicleTypeId] = React.useState('');
   const [cardNumber, setCardNumber] = React.useState('');
@@ -55,7 +53,6 @@ export function VehicleDialogForm({
     if (vehicle) {
       setCode(vehicle.code);
       setPlate(vehicle.plate);
-      setSelectedBranches(vehicle.branch_ids || []);
       setFuelTypeId(vehicle.fuel_type_id);
       setVehicleTypeId(vehicle.vehicle_type_id || 'none');
       setCardNumber(vehicle.card_number || '');
@@ -63,7 +60,6 @@ export function VehicleDialogForm({
     } else {
       setCode('');
       setPlate('');
-      setSelectedBranches([]);
       setFuelTypeId(catalogs?.fuel_types?.[0]?.id || '');
       setVehicleTypeId('none');
       setCardNumber('');
@@ -102,7 +98,6 @@ export function VehicleDialogForm({
         {
           id: vehicle.id,
           data: {
-            branch_ids: selectedBranches,
             plate: plate.trim().toUpperCase(),
             vehicle_type_id: vTypeId,
             fuel_type_id: fuelTypeId,
@@ -117,7 +112,6 @@ export function VehicleDialogForm({
       createVehicle.mutate(
         {
           plate: plate.trim().toUpperCase(),
-          branch_ids: selectedBranches,
           vehicle_type_id: vTypeId,
           fuel_type_id: fuelTypeId,
           card_number: cardNumber.trim(),
@@ -139,7 +133,7 @@ export function VehicleDialogForm({
           <DialogTitle>{isEdit ? `Chỉnh sửa phương tiện: ${vehicle?.code}` : 'Khai báo phương tiện mới'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Cập nhật biển số, loại nhiên liệu và các trạm xăng được phép đổ.'
+              ? 'Cập nhật biển số, loại nhiên liệu và thông tin xe. Xe đổ được ở mọi trạm xăng.'
               : 'Thêm phương tiện mới vào hệ thống quản lý trạm. Mã xe do hệ thống tự sinh để đồng bộ xuống máy chấm công.'}
           </DialogDescription>
         </DialogHeader>
@@ -187,19 +181,6 @@ export function VehicleDialogForm({
               </Select>
               {errors.fuelTypeId && <p className="text-xs text-destructive">{errors.fuelTypeId}</p>}
             </div>
-          </div>
-
-          {/* Trạm xăng được phép đổ */}
-          <div className="space-y-1.5">
-            <Label>Trạm xăng được phép đổ</Label>
-            <BranchMultiSelect
-              branches={catalogs?.branches ?? []}
-              selectedIds={selectedBranches}
-              onChange={setSelectedBranches}
-            />
-            {selectedBranches.length === 0 && (
-              <p className="text-xs text-amber-600">Chưa chọn trạm xăng nào: xe sẽ không đổ được ở đâu cho tới khi được cho phép.</p>
-            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -122,14 +122,13 @@ Cửa hàng ─┬─ Trụ ─┬─ Bộ số Montech (1, cổng COM riêng, s
           │       └─ Máy chấm công Hikvision (1)
           └─ Mini PC chạy Edge Agent (1 cho cả cửa hàng)
 
-Xe ─── nhiều-nhiều ─── Cửa hàng được phép đổ   (bảng vehicle_branch; không có dòng nào = không đổ được ở đâu)
-Tài xế: dữ liệu cấp công ty, lái được mọi xe (quyền theo cửa hàng suy ra từ XE)
+Xe, Tài xế: dữ liệu cấp công ty; xe đổ được ở MỌI cửa hàng, tài xế lái được mọi xe
+            (đã bỏ tính năng "xe được phép đổ ở những cửa hàng nào": migration 000024 xóa bảng vehicle_branch)
 ```
 
-- **Migration `000011_vehicle_store_scope`:** thêm `vehicle_branch`; bỏ `vehicle.branch_id`, `driver.branch_id`, `driver.position` (không còn nhân viên vận hành, bảo vệ);
+- **Migration `000011_vehicle_store_scope`:** (đã thêm `vehicle_branch`, sau đó bị `000024_drop_vehicle_branch` gỡ hẳn); bỏ `vehicle.branch_id`, `driver.branch_id`, `driver.position` (không còn nhân viên vận hành, bảo vệ);
   `pump_sensor` thêm `branch_id` và `name`, cổng COM duy nhất trong một cửa hàng, serial không cần duy nhất; một lần bơm nhận diện theo (trụ, số thứ tự) thay vì (serial, số thứ tự).
-  Đổi danh sách cửa hàng của xe tự tăng `version` của xe và ghi nhật ký đồng bộ.
-- **Đồng bộ xuống trạm (phương án b):** API Edge đẩy MỌI xe của công ty kèm cờ `allowed_here`, để Edge Agent từ chối với lý do riêng (xe đổ nhầm cửa hàng) và ghi vết, thay vì coi là thẻ lạ.
+- **Đồng bộ xuống trạm:** API Edge đẩy MỌI xe của công ty xuống mọi trạm; không còn cờ `allowed_here` (xe không bị từ chối vì "đổ nhầm cửa hàng").
 - **Migration `000012_simplify_vehicle`:** bỏ tuyến đường, đội nhóm phương tiện và dung tích bình chứa của xe; định mức chỉ còn áp theo xe (các quy tắc định mức theo nhóm hoặc tuyến bị xóa); số thẻ NFC bắt buộc khi tạo xe (kiểm tra ở API); báo cáo tiêu hao theo xe bỏ cột nhóm, tuyến.
-- **Giao diện:** form trụ gồm 3 phần (trụ và vòi, bộ số, máy chấm công), bỏ màn Thiết bị riêng (`/devices` chuyển về `/pumps`); form xe có ô chọn nhiều cửa hàng; màn tài xế bỏ vị trí và chi nhánh.
-- **Còn lại phía Edge Agent (repo `fuel-station`, chưa làm):** đọc cờ `allowed_here` và từ chối `NotAllowedHere`; nhận diện bộ số bằng (cổng COM, serial) thay vì chỉ serial; khóa lần bơm theo (trụ, số thứ tự).
+- **Giao diện:** form trụ gồm 3 phần (trụ và vòi, bộ số, máy chấm công), bỏ màn Thiết bị riêng (`/devices` chuyển về `/pumps`); form xe không còn ô chọn cửa hàng; màn tài xế bỏ vị trí và chi nhánh.
+- **Còn lại phía Edge Agent (repo `fuel-station`, chưa làm):** bỏ xử lý cờ `allowed_here` / từ chối `NotAllowedHere` (API không còn gửi cờ); nhận diện bộ số bằng (cổng COM, serial) thay vì chỉ serial; khóa lần bơm theo (trụ, số thứ tự).

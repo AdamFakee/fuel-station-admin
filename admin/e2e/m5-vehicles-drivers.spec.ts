@@ -103,7 +103,6 @@ test.describe('Module M5 - Vehicles & Drivers E2E Tests', () => {
 
     // Thanh lọc
     await expect(page.getByTestId('input-search-vehicles')).toBeVisible();
-    await expect(page.getByTestId('filter-branch')).toBeVisible();
     await expect(page.getByTestId('filter-fuel')).toBeVisible();
     await expect(page.getByTestId('filter-status')).toBeVisible();
 

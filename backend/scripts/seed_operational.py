@@ -202,10 +202,11 @@ def main():
 
     # ---- Xe + tài xế + định mức
     vehicles = []
+    # `shorts` chỉ để mô phỏng xe hay đổ ở trạm nào khi sinh giao dịch; xe là dữ liệu cấp công ty, không gửi lên API.
     for plate, vtype, fuel, shorts, note, quota_l in VEHICLES:
         v = admin.call('POST', '/master/vehicles', {
             'plate': plate, 'vehicle_type_id': vtype_id[vtype], 'fuel_type_id': fuel_id[fuel],
-            'branch_ids': [branch_by_short[s]['id'] for s in shorts], 'note': note, 'card_number': card_number('xe' + plate),
+            'note': note, 'card_number': card_number('xe' + plate),
         })
         vehicles.append({'id': v['id'], 'code': v['code'], 'plate': plate, 'fuel': fuel, 'shorts': shorts, 'quota_l': quota_l,
                          'card': card_number('xe' + plate)})

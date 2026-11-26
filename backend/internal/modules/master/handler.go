@@ -87,11 +87,6 @@ func (h *Handler) ListVehicles(w http.ResponseWriter, r *http.Request) {
 		Status:   r.URL.Query().Get("status"),
 	}
 
-	if bStr := r.URL.Query().Get("branch_id"); bStr != "" {
-		if bID, err := uuid.Parse(bStr); err == nil {
-			q.BranchID = &bID
-		}
-	}
 	if vtStr := r.URL.Query().Get("vehicle_type_id"); vtStr != "" {
 		if vtID, err := uuid.Parse(vtStr); err == nil {
 			q.VehicleTypeID = &vtID

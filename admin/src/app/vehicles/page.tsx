@@ -27,7 +27,6 @@ export default function VehiclesPage() {
   // Search & Filters state
   const [search, setSearch] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
-  const [branchId, setBranchId] = React.useState<string>('all');
   const [status, setStatus] = React.useState<string>('all');
   const [fuelTypeId, setFuelTypeId] = React.useState<string>('all');
   const [page, setPage] = React.useState(1);
@@ -45,7 +44,6 @@ export default function VehiclesPage() {
     page,
     page_size: pageSize,
     q: debouncedSearch || undefined,
-    branch_id: branchId !== 'all' ? branchId : undefined,
     status: status !== 'all' ? status : undefined,
     fuel_type_id: fuelTypeId !== 'all' ? fuelTypeId : undefined,
   });
@@ -58,8 +56,7 @@ export default function VehiclesPage() {
     try {
       const filters = {
         q: debouncedSearch || undefined,
-        branch_id: branchId !== 'all' ? branchId : undefined,
-        status: status !== 'all' ? status : undefined,
+            status: status !== 'all' ? status : undefined,
         fuel_type_id: fuelTypeId !== 'all' ? fuelTypeId : undefined,
       };
       const allVehicles: VehicleListItem[] = [];
@@ -81,7 +78,6 @@ export default function VehiclesPage() {
           { header: 'Loại xe', key: 'vehicle_type_name', width: 22 },
           { header: 'Nhiên liệu', key: 'fuel_type_name', width: 20 },
           { header: 'Thẻ NFC', key: 'card_number', width: 16 },
-          { header: 'Trạm xăng được phép', key: 'branches', width: 40 },
           { header: 'Trạng thái', key: 'status_label', width: 16 },
         ],
         data: allVehicles.map((vehicle) => ({
@@ -90,7 +86,6 @@ export default function VehiclesPage() {
           vehicle_type_name: vehicle.vehicle_type_name ?? '',
           fuel_type_name: vehicle.fuel_type_name,
           card_number: vehicle.card_number ?? '',
-          branches: (vehicle.branch_names ?? []).join(', '),
           status_label: vehicle.status === 'active' ? 'Hoạt động' : 'Bị khóa quyền',
         })),
       });
@@ -151,27 +146,6 @@ export default function VehiclesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Trạm xăng */}
-            <Select
-              value={branchId}
-              onValueChange={(val) => {
-                setBranchId(val);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[200px]" data-testid="filter-branch">
-                <SelectValue placeholder="Tất cả trạm xăng" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả trạm xăng</SelectItem>
-                {catalogs?.branches?.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             {/* Loại nhiên liệu */}
             <Select
               value={fuelTypeId}

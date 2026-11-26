@@ -149,7 +149,6 @@ export function vehicleDetail(v: VehicleListItem): DetailSection[] {
         { label: 'Loại xe', value: v.vehicle_type_name },
         { label: 'Loại nhiên liệu', value: v.fuel_type_name },
         { label: 'Thẻ NFC', value: v.card_number },
-        { label: 'Trạm xăng được đổ', value: v.branch_names?.join(', '), wide: true },
         { label: 'Ghi chú', value: v.note, wide: true },
       ],
     },

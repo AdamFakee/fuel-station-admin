@@ -168,12 +168,6 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 		argIdx++
 	}
 
-	if q.BranchID != nil {
-		whereClauses = append(whereClauses, fmt.Sprintf("EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $%d)", argIdx))
-		args = append(args, *q.BranchID)
-		argIdx++
-	}
-
 	if q.Status != "" {
 		whereClauses = append(whereClauses, fmt.Sprintf("v.status = $%d", argIdx))
 		args = append(args, q.Status)
@@ -226,7 +220,6 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 	defer rows.Close()
 
 	items := make([]VehicleListItem, 0)
-	vehicleIDs := make([]uuid.UUID, 0)
 
 	for rows.Next() {
 		var item VehicleListItem
@@ -241,130 +234,10 @@ func (s *Service) ListVehicles(ctx context.Context, q VehicleListQuery) ([]Vehic
 		if err != nil {
 			return nil, 0, fmt.Errorf("scan vehicle: %w", err)
 		}
-		item.BranchIDs = make([]uuid.UUID, 0)
-		item.BranchNames = make([]string, 0)
 		items = append(items, item)
-		vehicleIDs = append(vehicleIDs, item.ID)
-	}
-
-	// Trạm xăng được phép của các xe trả về
-	if len(vehicleIDs) > 0 {
-		branchMap, err := s.loadVehicleBranches(ctx, tenantID, vehicleIDs)
-		if err != nil {
-			return nil, 0, err
-		}
-		for i := range items {
-			if refs, ok := branchMap[items[i].ID]; ok {
-				for _, ref := range refs {
-					items[i].BranchIDs = append(items[i].BranchIDs, ref.ID)
-					items[i].BranchNames = append(items[i].BranchNames, ref.Name)
-				}
-			}
-		}
 	}
 
 	return items, total, nil
-}
-
-// branchRef là một trạm xăng (id và tên) trong danh sách được phép của xe.
-type branchRef struct {
-	ID   uuid.UUID
-	Name string
-}
-
-// loadVehicleBranches trả về, với mỗi xe, các trạm xăng được phép đổ (sắp theo tên).
-func (s *Service) loadVehicleBranches(ctx context.Context, tenantID uuid.UUID, vehicleIDs []uuid.UUID) (map[uuid.UUID][]branchRef, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT vb.vehicle_id, b.id, b.name
-		FROM station.vehicle_branch vb
-		JOIN station.branch b ON b.tenant_id = vb.tenant_id AND b.id = vb.branch_id
-		WHERE vb.tenant_id = $1 AND vb.vehicle_id = ANY($2)
-		ORDER BY b.name ASC
-	`, tenantID, vehicleIDs)
-	if err != nil {
-		return nil, fmt.Errorf("load vehicle branches: %w", err)
-	}
-	defer rows.Close()
-
-	out := make(map[uuid.UUID][]branchRef)
-	for rows.Next() {
-		var vehicleID uuid.UUID
-		var ref branchRef
-		if err := rows.Scan(&vehicleID, &ref.ID, &ref.Name); err != nil {
-			return nil, fmt.Errorf("scan vehicle branch: %w", err)
-		}
-		out[vehicleID] = append(out[vehicleID], ref)
-	}
-	return out, rows.Err()
-}
-
-// normalizeBranchIDs bỏ trùng, và kiểm tra mọi trạm xăng đều thuộc công ty hiện tại.
-func normalizeBranchIDs(ctx context.Context, q interface {
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}, tenantID uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error) {
-	seen := make(map[uuid.UUID]struct{}, len(ids))
-	unique := make([]uuid.UUID, 0, len(ids))
-	for _, id := range ids {
-		if id == uuid.Nil {
-			return nil, fmt.Errorf("%w: invalid branch id", apperr.ErrInvalidInput)
-		}
-		if _, dup := seen[id]; dup {
-			continue
-		}
-		seen[id] = struct{}{}
-		unique = append(unique, id)
-	}
-	if len(unique) == 0 {
-		return unique, nil
-	}
-	var found int
-	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM station.branch WHERE tenant_id = $1 AND id = ANY($2)`, tenantID, unique).Scan(&found); err != nil {
-		return nil, fmt.Errorf("check branches: %w", err)
-	}
-	if found != len(unique) {
-		return nil, fmt.Errorf("%w: one or more branches do not exist", apperr.ErrInvalidInput)
-	}
-	return unique, nil
-}
-
-// syncVehicleBranches đưa danh sách trạm xăng được phép của xe về đúng `want`, chỉ thêm hoặc xóa phần chênh lệch.
-// (Mỗi thêm hoặc xóa làm tăng version của xe để Edge Agent đồng bộ lại, nên không xóa rồi chèn lại toàn bộ.)
-func syncVehicleBranches(ctx context.Context, tx pgx.Tx, tenantID, vehicleID uuid.UUID, want []uuid.UUID) error {
-	rows, err := tx.Query(ctx, `SELECT branch_id FROM station.vehicle_branch WHERE tenant_id = $1 AND vehicle_id = $2`, tenantID, vehicleID)
-	if err != nil {
-		return fmt.Errorf("read vehicle branches: %w", err)
-	}
-	have := make(map[uuid.UUID]struct{})
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return fmt.Errorf("scan vehicle branch: %w", err)
-		}
-		have[id] = struct{}{}
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("read vehicle branches: %w", err)
-	}
-
-	wanted := make(map[uuid.UUID]struct{}, len(want))
-	for _, id := range want {
-		wanted[id] = struct{}{}
-		if _, ok := have[id]; !ok {
-			if _, err := tx.Exec(ctx, `INSERT INTO station.vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES ($1, $2, $3)`, tenantID, vehicleID, id); err != nil {
-				return fmt.Errorf("add vehicle branch: %w", err)
-			}
-		}
-	}
-	for id := range have {
-		if _, ok := wanted[id]; !ok {
-			if _, err := tx.Exec(ctx, `DELETE FROM station.vehicle_branch WHERE tenant_id = $1 AND vehicle_id = $2 AND branch_id = $3`, tenantID, vehicleID, id); err != nil {
-				return fmt.Errorf("remove vehicle branch: %w", err)
-			}
-		}
-	}
-	return nil
 }
 
 func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail, error) {
@@ -416,16 +289,6 @@ func (s *Service) GetVehicle(ctx context.Context, id uuid.UUID) (*VehicleDetail,
 		d.CardCredential = &cred
 	}
 
-	// Trạm xăng được phép
-	d.BranchIDs = make([]uuid.UUID, 0)
-	d.BranchNames = make([]string, 0)
-	if branchMap, err := s.loadVehicleBranches(ctx, tenantID, []uuid.UUID{id}); err == nil {
-		for _, ref := range branchMap[id] {
-			d.BranchIDs = append(d.BranchIDs, ref.ID)
-			d.BranchNames = append(d.BranchNames, ref.Name)
-		}
-	}
-
 	return &d, nil
 }
 
@@ -457,11 +320,6 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
-
-	branchIDs, err := normalizeBranchIDs(ctx, tx, tenantID, req.BranchIDs)
-	if err != nil {
-		return nil, err
-	}
 
 	// Mã xe do hệ thống sinh (không nhận từ client). Dùng làm employeeNo trên máy chấm công nên chỉ gồm chữ và số:
 	// kind 'XE' + năm + số thứ tự, ví dụ XE20260001.
@@ -507,10 +365,6 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 		return nil, fmt.Errorf("insert vehicle: %w", err)
 	}
 
-	if err := syncVehicleBranches(ctx, tx, tenantID, vehicleID, branchIDs); err != nil {
-		return nil, err
-	}
-
 	// Thẻ NFC (bắt buộc)
 	{
 		credID := uuid.New()
@@ -535,7 +389,6 @@ func (s *Service) CreateVehicle(ctx context.Context, req CreateVehicleRequest) (
 		NewData: map[string]any{
 			"code":         req.Code,
 			"plate":        req.Plate,
-			"branch_ids":   branchIDs,
 			"fuel_type_id": req.FuelTypeID,
 			"card_number":  req.CardNumber,
 		},
@@ -567,11 +420,6 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
-
-	branchIDs, err := normalizeBranchIDs(ctx, tx, tenantID, req.BranchIDs)
-	if err != nil {
-		return nil, err
-	}
 
 	var currentCode string
 	var currentPlate string
@@ -613,10 +461,6 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 		return nil, fmt.Errorf("update vehicle: %w", err)
 	}
 
-	if err := syncVehicleBranches(ctx, tx, tenantID, id, branchIDs); err != nil {
-		return nil, err
-	}
-
 	// Audit Log
 	_ = audit.Record(ctx, tx, audit.Entry{
 		Action:      audit.ActionUpdate,
@@ -628,7 +472,6 @@ func (s *Service) UpdateVehicle(ctx context.Context, id uuid.UUID, req UpdateVeh
 		OldData:     map[string]any{"plate": currentPlate},
 		NewData: map[string]any{
 			"plate":        req.Plate,
-			"branch_ids":   branchIDs,
 			"fuel_type_id": req.FuelTypeID,
 		},
 	})

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"fuel-station-backend/internal/modules/master"
-	"fuel-station-backend/internal/shared/apperr"
 	"fuel-station-backend/internal/shared/authz"
 	"fuel-station-backend/internal/shared/middleware"
 	"github.com/google/uuid"
@@ -20,8 +19,6 @@ const (
 	scopeTestDBURL = "postgres://postgres:postgres@localhost:5432/fuel_station_db?sslmode=disable"
 	scopeTenantID  = "11111111-1111-1111-1111-111111111111"
 	scopeAdminID   = "33333333-3333-3333-3333-333333333331"
-	scopeBranchA   = "22222222-2222-2222-2222-222222222221"
-	scopeBranchB   = "22222222-2222-2222-2222-222222222222"
 )
 
 func scopeSetup(t *testing.T) (*master.Service, *pgxpool.Pool, context.Context, uuid.UUID) {
@@ -49,97 +46,34 @@ func scopeSetup(t *testing.T) (*master.Service, *pgxpool.Pool, context.Context, 
 	return master.NewService(pool, nil), pool, ctx, fuelTypeID
 }
 
-func branchSet(ids []uuid.UUID) map[string]bool {
-	out := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		out[id.String()] = true
-	}
-	return out
-}
-
-// Xe nhiều-nhiều trạm xăng được phép: tạo, đổi, lọc theo trạm xăng; không chọn thì không được đổ ở đâu.
-func TestVehicleAllowedStoresLifecycle(t *testing.T) {
+// Xe là dữ liệu cấp công ty (đổ được ở mọi trạm xăng): tạo và sửa không cần, cũng không trả về, danh sách trạm xăng.
+func TestVehicleIsCompanyLevel(t *testing.T) {
 	svc, pool, ctx, fuelTypeID := scopeSetup(t)
 	defer pool.Close()
 
-	a, b := uuid.MustParse(scopeBranchA), uuid.MustParse(scopeBranchB)
 	suffix := time.Now().UnixNano() % 1000000
-
-	// 1. Tạo xe chỉ được phép ở A
 	created, err := svc.CreateVehicle(ctx, master.CreateVehicleRequest{
 		Plate: fmt.Sprintf("99Z-%06d", suffix), FuelTypeID: fuelTypeID,
-		BranchIDs:  []uuid.UUID{a, a}, // trùng thì được gộp
 		CardNumber: fmt.Sprintf("%010d", 3000000000+suffix%1000000),
 	})
 	if err != nil {
 		t.Fatalf("CreateVehicle failed: %v", err)
 	}
 	defer func() { _ = svc.DeleteVehicle(ctx, created.ID) }()
-	code := created.Code // mã do hệ thống sinh
-	if code == "" {
+	if created.Code == "" {
 		t.Fatal("expected a generated vehicle code")
 	}
-	if got := branchSet(created.BranchIDs); len(got) != 1 || !got[a.String()] {
-		t.Fatalf("expected only store A, got %v", created.BranchIDs)
-	}
 
-	// 2. Lọc theo trạm xăng: thấy ở A, không thấy ở B
-	inA, _, err := svc.ListVehicles(ctx, master.VehicleListQuery{Search: code, BranchID: &a, PageSize: 20})
-	if err != nil || len(inA) != 1 {
-		t.Fatalf("expected the vehicle in store A, got %d (err %v)", len(inA), err)
-	}
-	inB, _, err := svc.ListVehicles(ctx, master.VehicleListQuery{Search: code, BranchID: &b, PageSize: 20})
-	if err != nil || len(inB) != 0 {
-		t.Fatalf("expected the vehicle NOT in store B, got %d (err %v)", len(inB), err)
-	}
-
-	// 3. Sửa sang A và B: phiên bản của xe tăng để Edge Agent kéo lại
 	versionBefore := created.Version
 	updated, err := svc.UpdateVehicle(ctx, created.ID, master.UpdateVehicleRequest{
-		Plate: created.Plate, FuelTypeID: fuelTypeID, BranchIDs: []uuid.UUID{a, b},
+		Plate: created.Plate, FuelTypeID: fuelTypeID, Note: "đổi ghi chú",
 	})
 	if err != nil {
 		t.Fatalf("UpdateVehicle failed: %v", err)
 	}
-	if got := branchSet(updated.BranchIDs); len(got) != 2 || !got[a.String()] || !got[b.String()] {
-		t.Fatalf("expected stores A and B, got %v", updated.BranchIDs)
-	}
 	if updated.Version <= versionBefore {
 		t.Fatalf("expected the vehicle version to increase (was %d, now %d)", versionBefore, updated.Version)
 	}
-
-	// 4. Bỏ hết trạm xăng: xe không được đổ ở đâu cả
-	cleared, err := svc.UpdateVehicle(ctx, created.ID, master.UpdateVehicleRequest{
-		Plate: created.Plate, FuelTypeID: fuelTypeID, BranchIDs: nil,
-	})
-	if err != nil {
-		t.Fatalf("UpdateVehicle (clear) failed: %v", err)
-	}
-	if len(cleared.BranchIDs) != 0 {
-		t.Fatalf("expected no allowed stores, got %v", cleared.BranchIDs)
-	}
-
-	// 5. Trạm xăng không tồn tại bị từ chối
-	_, err = svc.UpdateVehicle(ctx, created.ID, master.UpdateVehicleRequest{
-		Plate: created.Plate, FuelTypeID: fuelTypeID, BranchIDs: []uuid.UUID{uuid.New()},
-	})
-	if err == nil || !isInvalidInput(err) {
-		t.Fatalf("expected ErrInvalidInput for an unknown store, got %v", err)
-	}
-}
-
-func isInvalidInput(err error) bool {
-	for e := err; e != nil; {
-		if e == apperr.ErrInvalidInput {
-			return true
-		}
-		u, ok := e.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		e = u.Unwrap()
-	}
-	return false
 }
 
 // Tài xế là dữ liệu cấp công ty: tạo không cần trạm xăng hay vị trí.

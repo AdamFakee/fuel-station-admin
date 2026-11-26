@@ -38,9 +38,6 @@ export interface VehicleListItem {
   status: 'active' | 'banned';
   note?: string;
   card_number?: string;
-  /** Trạm xăng được phép đổ. Rỗng: xe chưa đổ được ở trạm xăng nào. */
-  branch_ids: string[];
-  branch_names: string[];
   version: number;
   created_at: string;
   updated_at: string;
@@ -63,7 +60,6 @@ export interface VehicleDetail extends VehicleListItem {
 }
 
 export interface CreateVehicleInput {
-  branch_ids: string[];
   plate: string;
   vehicle_type_id?: string;
   fuel_type_id: string;
@@ -73,7 +69,6 @@ export interface CreateVehicleInput {
 }
 
 export interface UpdateVehicleInput {
-  branch_ids: string[];
   plate: string;
   vehicle_type_id?: string;
   fuel_type_id: string;
@@ -84,7 +79,6 @@ export interface VehicleListParams {
   page?: number;
   page_size?: number;
   q?: string;
-  branch_id?: string;
   status?: string;
   vehicle_type_id?: string;
   fuel_type_id?: string;

@@ -16,7 +16,6 @@ import {
   ACTION_HEAD_CLASS,
   ACTION_CELL_CLASS,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -93,16 +92,15 @@ export function VehicleTable({
               <TableHead className="w-[140px]">Biển số</TableHead>
               <TableHead>Loại xe & Nhiên liệu</TableHead>
               <TableHead>Thẻ NFC</TableHead>
-              <TableHead>Trạm xăng được phép</TableHead>
               <TableHead className="w-[120px]">Trạng thái</TableHead>
               <TableHead className={`${ACTION_HEAD_CLASS} w-[70px]`}>Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableEmptyRow colSpan={8} loading title="Đang tải danh sách phương tiện..." />
+              <TableEmptyRow colSpan={7} loading title="Đang tải danh sách phương tiện..." />
             ) : vehicles.length === 0 ? (
-              <TableEmptyRow colSpan={8} title="Không tìm thấy phương tiện nào phù hợp." />
+              <TableEmptyRow colSpan={7} title="Không tìm thấy phương tiện nào phù hợp." />
             ) : (
               vehicles.map((v, index) => (
                 <TableRow key={v.id} data-testid={`vehicle-row-${v.code}`} onClick={rowClick(() => setDetail(v))}>
@@ -124,23 +122,6 @@ export function VehicleTable({
                       <span className="font-mono text-sm text-foreground">{v.card_number}</span>
                     ) : (
                       <span className="text-xs text-muted-foreground italic">Chưa gán thẻ</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {v.branch_names && v.branch_names.length > 0 ? (
-                      <div className="flex flex-col items-start gap-1" title={v.branch_names.join(', ')}>
-                        {/* Tối đa hai dòng: tên trạm đầu, rồi "+N trạm" ở dòng dưới nếu còn trạm khác (vừa bằng chiều cao dòng có 2 dòng chữ). Rê chuột xem đủ danh sách */}
-                        <Badge variant="secondary" className="max-w-full text-xs font-normal">
-                          <span className="truncate">{v.branch_names[0]}</span>
-                        </Badge>
-                        {v.branch_names.length > 1 && (
-                          <Badge variant="outline" className="shrink-0 text-xs font-medium">
-                            +{v.branch_names.length - 1} trạm
-                          </Badge>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-amber-600">Chưa được phép ở trạm xăng nào</span>
                     )}
                   </TableCell>
                   <TableCell>

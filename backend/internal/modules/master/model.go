@@ -45,12 +45,9 @@ type VehicleListItem struct {
 	Status          string     `json:"status"` // 'active' | 'banned'
 	Note            string     `json:"note,omitempty"`
 	CardNumber      string     `json:"card_number,omitempty"`
-	// Trạm xăng mà xe được phép đổ. Rỗng nghĩa là xe chưa được đổ ở trạm xăng nào.
-	BranchIDs   []uuid.UUID `json:"branch_ids"`
-	BranchNames []string    `json:"branch_names"`
-	Version     int64       `json:"version"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	Version         int64      `json:"version"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 type VehicleDetail struct {
@@ -59,22 +56,19 @@ type VehicleDetail struct {
 }
 
 type CreateVehicleRequest struct {
-	// Trạm xăng được phép đổ (tùy chọn; không chọn thì xe chưa đổ được ở đâu).
-	BranchIDs     []uuid.UUID `json:"branch_ids"`
-	Code          string      `json:"code"`
-	Plate         string      `json:"plate"`
-	VehicleTypeID *uuid.UUID  `json:"vehicle_type_id"`
-	FuelTypeID    uuid.UUID   `json:"fuel_type_id"`
-	Note          string      `json:"note"`
-	CardNumber    string      `json:"card_number"`
+	Code          string     `json:"code"`
+	Plate         string     `json:"plate"`
+	VehicleTypeID *uuid.UUID `json:"vehicle_type_id"`
+	FuelTypeID    uuid.UUID  `json:"fuel_type_id"`
+	Note          string     `json:"note"`
+	CardNumber    string     `json:"card_number"`
 }
 
 type UpdateVehicleRequest struct {
-	BranchIDs     []uuid.UUID `json:"branch_ids"`
-	Plate         string      `json:"plate"`
-	VehicleTypeID *uuid.UUID  `json:"vehicle_type_id"`
-	FuelTypeID    uuid.UUID   `json:"fuel_type_id"`
-	Note          string      `json:"note"`
+	Plate         string     `json:"plate"`
+	VehicleTypeID *uuid.UUID `json:"vehicle_type_id"`
+	FuelTypeID    uuid.UUID  `json:"fuel_type_id"`
+	Note          string     `json:"note"`
 }
 
 type UpdateVehicleStatusRequest struct {
@@ -89,7 +83,6 @@ type VehicleListQuery struct {
 	Page          int
 	PageSize      int
 	Search        string
-	BranchID      *uuid.UUID
 	Status        string
 	VehicleTypeID *uuid.UUID
 	FuelTypeID    *uuid.UUID

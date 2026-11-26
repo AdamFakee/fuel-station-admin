@@ -254,21 +254,17 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["edge_pump_id"] = edgePumpID
 
 	case "vehicle":
-		// Đẩy MỌI xe của công ty kèm cờ `allowed_here` (xe có được đổ ở trạm xăng của trạm này không). Edge Agent dựa vào cờ để từ chối
-		// với lý do riêng, thay vì coi xe đổ nhầm trạm xăng là "thẻ lạ".
+		// Xe là dữ liệu cấp công ty: đẩy MỌI xe của công ty xuống mọi trạm (xe đổ được ở mọi trạm xăng).
 		query := `
-			SELECT v.id, v.code, v.plate, v.fuel_type_id, v.status, v.version,
-			       EXISTS (SELECT 1 FROM station.vehicle_branch vb WHERE vb.tenant_id = v.tenant_id AND vb.vehicle_id = v.id AND vb.branch_id = $3)
+			SELECT v.id, v.code, v.plate, v.fuel_type_id, v.status, v.version
 			FROM station.vehicle v
 			WHERE v.tenant_id = $1 AND v.id = $2 AND v.deleted_at IS NULL`
 		var id, code, plate, fuelTypeID, status string
 		var version int64
-		var allowedHere bool
-		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &code, &plate, &fuelTypeID, &status, &version, &allowedHere)
+		err := r.pool.QueryRow(ctx, query, tenantID, entityID).Scan(&id, &code, &plate, &fuelTypeID, &status, &version)
 		if err != nil {
 			return nil, err
 		}
-		data["allowed_here"] = allowedHere
 		data["id"] = id
 		data["code"] = code
 		data["plate"] = plate

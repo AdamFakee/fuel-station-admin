@@ -90,7 +90,6 @@ DECLARE t1 UUID := (SELECT v FROM ids WHERE k = 't1'); b1 UUID := (SELECT v FROM
 BEGIN
     INSERT INTO vehicle (tenant_id, code, plate, fuel_type_id) VALUES (t1, 'VEH0001', '51A-123.45', f1) RETURNING id INTO v1;
     INSERT INTO vehicle (tenant_id, code, plate, fuel_type_id) VALUES (t1, 'VEH0002', '51A-678.90', f1) RETURNING id INTO v2;
-    INSERT INTO vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES (t1, v1, b1);
     INSERT INTO driver (tenant_id, code, full_name) VALUES (t1, 'DRV0001', 'Bùi Đình Tuấn') RETURNING id INTO d1;
     INSERT INTO credential (tenant_id, vehicle_id, method, external_id) VALUES (t1, v1, 'card', '3862658937');
     INSERT INTO credential (tenant_id, driver_id, method, external_id) VALUES (t1, d1, 'face', 'DRV0001');
@@ -262,37 +261,7 @@ SELECT pg_temp.expect_error(format(
     (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'b1'), (SELECT v FROM ids WHERE k = 'tk1')),
     '23514', 'tồn cuối sổ sách = tồn đầu + nhập - xuất');
 
--- ---- 14. Phạm vi cửa hàng theo xe ----
-DO $$
-DECLARE t1 UUID := (SELECT v FROM ids WHERE k = 't1'); b1 UUID := (SELECT v FROM ids WHERE k = 'b1'); v1 UUID := (SELECT v FROM ids WHERE k = 'v1');
-        v2 UUID := (SELECT v FROM ids WHERE k = 'v2'); b_new UUID; ver_before BIGINT; ver_after BIGINT; n BIGINT;
-BEGIN
-    -- xe không có dòng nào trong vehicle_branch thì không được đổ ở cửa hàng nào
-    ASSERT (SELECT count(*) FROM vehicle_branch WHERE vehicle_id = v2) = 0, 'xe mới chưa được phép ở cửa hàng nào';
-
-    -- thêm cửa hàng được phép: version của xe tăng và có dòng nhật ký đồng bộ mới
-    INSERT INTO branch (tenant_id, code, name) VALUES (t1, 'TRAM9', 'Trạm 9') RETURNING id INTO b_new;
-    SELECT version INTO ver_before FROM vehicle WHERE id = v1;
-    SELECT count(*) INTO n FROM sync_change_log WHERE entity_type = 'vehicle' AND entity_id = v1;
-    INSERT INTO vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES (t1, v1, b_new);
-    SELECT version INTO ver_after FROM vehicle WHERE id = v1;
-    ASSERT ver_after = ver_before + 1, 'thêm cửa hàng được phép phải tăng version của xe';
-    ASSERT (SELECT count(*) FROM sync_change_log WHERE entity_type = 'vehicle' AND entity_id = v1) = n + 1, 'phải ghi nhật ký đồng bộ';
-
-    -- bỏ cửa hàng: cũng tăng version
-    DELETE FROM vehicle_branch WHERE vehicle_id = v1 AND branch_id = b_new;
-    ASSERT (SELECT version FROM vehicle WHERE id = v1) = ver_after + 1, 'gỡ cửa hàng được phép phải tăng version của xe';
-    RAISE NOTICE 'OK   xe nhiều-nhiều cửa hàng được phép, đổi là đồng bộ lại';
-END;
-$$;
-SELECT pg_temp.expect_error(format(
-    $q$INSERT INTO vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES (%L, %L, %L)$q$,
-    (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'v1'), (SELECT v FROM ids WHERE k = 'b1')),
-    '23505', 'một xe không được phép trùng một cửa hàng hai lần');
-SELECT pg_temp.expect_error(format(
-    $q$INSERT INTO vehicle_branch (tenant_id, vehicle_id, branch_id) VALUES (%L, %L, %L)$q$,
-    (SELECT v FROM ids WHERE k = 't1'), (SELECT v FROM ids WHERE k = 'v2'), (SELECT v FROM ids WHERE k = 'b2')),
-    '23503', 'xe không gắn được cửa hàng của công ty khác');
+-- ---- 14. (Phạm vi cửa hàng theo xe đã bỏ: xe là dữ liệu cấp công ty, đổ được ở mọi trạm) ----
 
 -- ---- 15. Mỗi trụ một cổng COM, serial được trùng ----
 DO $$
