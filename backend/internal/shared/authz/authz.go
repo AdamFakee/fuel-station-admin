@@ -14,6 +14,33 @@ type contextKey struct{}
 // Permission type alias
 type Permission string
 
+// RoleSuperAdmin là vai trò "Quản trị hệ thống", tài khoản của bên triển khai.
+const RoleSuperAdmin = "ADMIN"
+
+// superAdminOnly là các quyền chỉ vai trò Quản trị hệ thống được giữ: dựng trạm xăng, bể chứa, trụ bơm, thiết bị và khóa API của trạm.
+// Người dùng phía khách không rành kỹ thuật, cấu hình sai là trạm không bơm được. Xe, tài xế và kho không nằm trong danh sách này.
+var superAdminOnly = map[Permission]struct{}{
+	"org.branch:create":   {},
+	"org.branch:update":   {},
+	"org.branch:delete":   {},
+	"asset.tank:create":   {},
+	"asset.tank:update":   {},
+	"asset.tank:delete":   {},
+	"asset.pump:create":   {},
+	"asset.pump:update":   {},
+	"asset.pump:delete":   {},
+	"asset.device:create": {},
+	"asset.device:update": {},
+	"asset.device:delete": {},
+	"sync.monitor:update": {},
+}
+
+// IsSuperAdminOnly cho biết quyền này có phải chỉ Quản trị hệ thống mới được giữ không.
+func IsSuperAdminOnly(perm Permission) bool {
+	_, ok := superAdminOnly[perm]
+	return ok
+}
+
 // Principal represents the authenticated actor context, multi-tenant scope, and role permissions.
 type Principal struct {
 	UserID   string
@@ -26,6 +53,10 @@ type Principal struct {
 func NewPrincipal(userID, tenantID, roleCode string, perms []Permission) Principal {
 	m := make(map[Permission]struct{}, len(perms))
 	for _, p := range perms {
+		// Dù bảng quyền trong DB có ghi, vai trò khác vẫn không dùng được các quyền dành riêng cho Quản trị hệ thống.
+		if roleCode != RoleSuperAdmin && IsSuperAdminOnly(p) {
+			continue
+		}
 		m[p] = struct{}{}
 	}
 	return Principal{

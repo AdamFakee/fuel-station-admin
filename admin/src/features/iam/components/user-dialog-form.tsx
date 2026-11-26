@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRoles } from '../api/get-roles';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useCreateUser } from '../api/create-user';
 import { useUpdateUser } from '../api/update-user';
 import { UserDetail, UserListItem } from '../types';
@@ -36,7 +37,10 @@ interface UserDialogFormProps {
 export function UserDialogForm({ open, onOpenChange, user }: UserDialogFormProps) {
   const isEdit = Boolean(user);
 
-  const { data: roles = [] } = useRoles();
+  const { data: allRoles = [] } = useRoles();
+  const { user: currentUser } = useAuth();
+  // Chỉ Quản trị hệ thống mới gán được vai trò Quản trị hệ thống (backend cũng chặn)
+  const roles = allRoles.filter((r) => r.code !== 'ADMIN' || currentUser?.role === 'ADMIN');
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
 

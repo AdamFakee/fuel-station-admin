@@ -82,6 +82,8 @@ export interface PermissionItem {
   module: string;
   action: 'view' | 'create' | 'update' | 'delete' | 'approve' | 'export';
   description: string;
+  /** Chỉ vai trò Quản trị hệ thống được giữ. */
+  super_admin_only?: boolean;
 }
 
 export interface UserListParams {

@@ -93,6 +93,8 @@ type PermissionItem struct {
 	Module      string `json:"module"`
 	Action      string `json:"action"`
 	Description string `json:"description"`
+	// Chỉ vai trò Quản trị hệ thống được giữ: ma trận quyền khóa ô này.
+	SuperAdminOnly bool `json:"super_admin_only"`
 }
 
 type BranchOption struct {

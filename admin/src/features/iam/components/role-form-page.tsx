@@ -111,8 +111,11 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
     setSelectedPerms((prev) => (prev.includes(permCode) ? prev.filter((c) => c !== permCode) : [...prev, permCode]));
   };
 
+  // Quyền dành riêng cho Quản trị hệ thống không cấp được cho vai trò nào ở đây
+  const grantableCodes = (perms: PermissionItem[]) => perms.filter((p) => !p.super_admin_only).map((p) => p.code);
+
   const toggleModuleAll = (modulePerms: PermissionItem[]) => {
-    const moduleCodes = modulePerms.map((p) => p.code);
+    const moduleCodes = grantableCodes(modulePerms);
     const allSelected = moduleCodes.every((c) => selectedPerms.includes(c));
     setSelectedPerms((prev) =>
       allSelected ? prev.filter((c) => !moduleCodes.includes(c)) : Array.from(new Set([...prev, ...moduleCodes])),
@@ -275,7 +278,7 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setSelectedPerms(allPermissions.map((p) => p.code))}
+                onClick={() => setSelectedPerms(grantableCodes(allPermissions))}
               >
                 Chọn tất cả
               </Button>
@@ -287,7 +290,10 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {Object.entries(permissionsByModule).map(([moduleName, perms]) => {
                 const selectedCount = perms.filter((p) => selectedPerms.includes(p.code)).length;
-                const isAllChecked = selectedCount === perms.length;
+                const grantable = grantableCodes(perms);
+                const isAllChecked = isLocked
+                  ? selectedCount === perms.length
+                  : grantable.length > 0 && grantable.every((c) => selectedPerms.includes(c));
 
                 return (
                   <div key={moduleName} className="rounded-xl border bg-card shadow-xs">
@@ -308,6 +314,7 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
                             <Checkbox
                               checked={selectedPerms.includes(p.code)}
                               onCheckedChange={() => togglePermission(p.code)}
+                              disabled={p.super_admin_only}
                               className="mt-0.5"
                             />
                             <div className="min-w-0 flex-1">
@@ -318,6 +325,11 @@ export function RoleFormPage({ roleId }: RoleFormPageProps) {
                                   {ACTION_LABELS[p.action] || p.action}
                                 </span>
                                 <span className="text-sm">{p.description}</span>
+                                {p.super_admin_only && (
+                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                                    Chỉ Quản trị hệ thống
+                                  </span>
+                                )}
                               </div>
                               <span className="font-mono text-[11px] text-muted-foreground">{p.code}</span>
                             </div>

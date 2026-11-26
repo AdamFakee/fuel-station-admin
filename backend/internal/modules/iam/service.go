@@ -54,10 +54,20 @@ func getTenantAndActor(ctx context.Context) (tenantID, actorUserID uuid.UUID, ac
 	return tID, uID, p.RoleCode, nil
 }
 
-// roleAdmin là vai trò cao nhất ("Quản trị hệ thống"). Ai có quyền quản lý tài khoản cũng thấy và gán được,
-// nhưng chỉ người cùng vai trò mới sửa/khóa/xóa/đổi mật khẩu được tài khoản đang giữ vai trò này; vai trò này
-// là mặc định của hệ thống nên không ai sửa được ma trận quyền.
-const roleAdmin = "ADMIN"
+// roleAdmin là vai trò cao nhất ("Quản trị hệ thống"). Chỉ người cùng vai trò mới gán được vai trò này cho một tài khoản, và mới
+// sửa/khóa/xóa/đổi mật khẩu được tài khoản đang giữ nó; nếu không, người quản lý tài khoản có thể tự tạo một Admin để vượt quyền.
+// Vai trò này là mặc định của hệ thống nên không ai sửa được ma trận quyền.
+const roleAdmin = authz.RoleSuperAdmin
+
+// ensureGrantable chặn việc cấp quyền dành riêng cho Quản trị hệ thống cho một vai trò khác.
+func ensureGrantable(permissionCodes []string) error {
+	for _, code := range permissionCodes {
+		if authz.IsSuperAdminOnly(authz.Permission(strings.TrimSpace(code))) {
+			return fmt.Errorf("%w: quyền '%s' chỉ dành cho vai trò Quản trị hệ thống", apperr.ErrForbidden, strings.TrimSpace(code))
+		}
+	}
+	return nil
+}
 
 // isTopRole: các vai trò quản trị phải luôn còn ít nhất một tài khoản hoạt động.
 func isTopRole(code string) bool { return code == "MANAGER" || code == roleAdmin }
@@ -75,8 +85,8 @@ func actorIsAdmin(ctx context.Context) bool {
 	return ok && p.RoleCode == roleAdmin
 }
 
-// ensureCanTouchRole chặn người không phải Quản trị hệ thống sửa, khóa, xóa hay đổi mật khẩu
-// tài khoản đang giữ vai trò Quản trị hệ thống.
+// ensureCanTouchRole chặn người không phải Quản trị hệ thống gán vai trò Quản trị hệ thống, hoặc sửa, khóa, xóa, đổi mật khẩu
+// tài khoản đang giữ vai trò đó.
 func ensureCanTouchRole(ctx context.Context, roleCode string) error {
 	if roleCode == roleAdmin && !actorIsAdmin(ctx) {
 		return fmt.Errorf("%w: chỉ tài khoản Quản trị hệ thống mới được thao tác với tài khoản Quản trị hệ thống", apperr.ErrForbidden)
@@ -272,10 +282,13 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*UserD
 	}
 
 	// Verify role exists in tenant
-	var roleExists bool
-	err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM station.role WHERE tenant_id = $1 AND id = $2)`, tenantID, roleUUID).Scan(&roleExists)
-	if err != nil || !roleExists {
+	var newRoleCode string
+	err = s.pool.QueryRow(ctx, `SELECT code FROM station.role WHERE tenant_id = $1 AND id = $2`, tenantID, roleUUID).Scan(&newRoleCode)
+	if err != nil {
 		return nil, fmt.Errorf("%w: vai trò không tồn tại trong hệ thống", apperr.ErrNotFound)
+	}
+	if err := ensureCanTouchRole(ctx, newRoleCode); err != nil {
+		return nil, err
 	}
 
 	// Email là tài khoản đăng nhập nên phải duy nhất.
@@ -402,6 +415,15 @@ func (s *Service) UpdateUser(ctx context.Context, idStr string, req UpdateUserRe
 
 	if err := ensureCanTouchRole(ctx, oldRoleCode); err != nil {
 		return nil, err
+	}
+	if newRoleUUID != oldRoleID {
+		var newRoleCode string
+		if err := s.pool.QueryRow(ctx, `SELECT code FROM station.role WHERE tenant_id = $1 AND id = $2`, tenantID, newRoleUUID).Scan(&newRoleCode); err != nil {
+			return nil, fmt.Errorf("%w: vai trò không tồn tại trong hệ thống", apperr.ErrNotFound)
+		}
+		if err := ensureCanTouchRole(ctx, newRoleCode); err != nil {
+			return nil, err
+		}
 	}
 	// SAFETY RULE: Prevent self-demotion from a top role
 	if userUUID == actorUserID && isTopRole(oldRoleCode) && oldRoleID != newRoleUUID {
@@ -889,6 +911,10 @@ func (s *Service) CreateRole(ctx context.Context, req CreateRoleRequest) (*RoleD
 		return nil, fmt.Errorf("%w: tên vai trò không được để trống", apperr.ErrInvalidInput)
 	}
 
+	if err := ensureGrantable(req.PermissionCodes); err != nil {
+		return nil, err
+	}
+
 	// Check code duplicate in tenant
 	var dupCode bool
 	_ = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM station.role WHERE tenant_id = $1 AND code = $2)`, tenantID, req.Code).Scan(&dupCode)
@@ -986,6 +1012,10 @@ func (s *Service) UpdateRole(ctx context.Context, idStr string, req UpdateRoleRe
 
 	if oldCode == roleAdmin {
 		return nil, fmt.Errorf("%w: vai trò Quản trị hệ thống là mặc định của hệ thống, không chỉnh sửa được", apperr.ErrForbidden)
+	}
+
+	if err := ensureGrantable(req.PermissionCodes); err != nil {
+		return nil, err
 	}
 
 	// SAFETY RULE: If this is the current actor's role, actor cannot strip crucial management permissions
@@ -1155,6 +1185,7 @@ func (s *Service) ListPermissions(ctx context.Context) ([]PermissionItem, error)
 		if err := rows.Scan(&p.Code, &p.Module, &p.Action, &p.Description); err != nil {
 			return nil, err
 		}
+		p.SuperAdminOnly = authz.IsSuperAdminOnly(authz.Permission(p.Code))
 		perms = append(perms, p)
 	}
 	return perms, nil

@@ -36,7 +36,7 @@ func setupTest(t *testing.T) (*assets.Service, *pgxpool.Pool, context.Context) {
 	principal := authz.NewPrincipal(
 		adminUserID,
 		defaultTenantID,
-		"MANAGER",
+		authz.RoleSuperAdmin,
 		[]authz.Permission{
 			"org.branch:view", "org.branch:create", "org.branch:update", "org.branch:delete",
 			"asset.tank:view", "asset.tank:create", "asset.tank:update", "asset.tank:delete",
