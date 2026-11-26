@@ -1,5 +1,6 @@
 'use client';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DetailDialog } from '@/components/detail-dialog';
 import { rowClick } from '@/lib/row-click';
 import { pumpDetail } from '@/lib/row-details';
@@ -21,7 +22,8 @@ import { Input } from '@/components/ui/input';
 import {
   PlusIcon,
   PencilSquareIcon,
-  NoSymbolIcon,
+  PauseCircleIcon,
+  PlayCircleIcon,
   MagnifyingGlassIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
@@ -31,6 +33,7 @@ import { PumpDetail } from '../types';
 import { getPumps, usePumps } from '../api/get-pumps';
 import Paginator from '@/components/paginator';
 import { useDeletePump } from '../api/delete-pump';
+import { useUpdatePump } from '../api/update-pump';
 import { useBranches } from '../api/get-branches';
 import { PumpDialog } from './pump-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -53,6 +56,8 @@ export function PumpTable() {
   const [isExporting, setIsExporting] = React.useState(false);
   const [selectedPump, setSelectedPump] = React.useState<PumpDetail | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [deactivateTarget, setDeactivateTarget] = React.useState<PumpDetail | null>(null);
+  const [reactivateTarget, setReactivateTarget] = React.useState<PumpDetail | null>(null);
 
   React.useEffect(() => {
     setPage(1);
@@ -67,6 +72,7 @@ export function PumpTable() {
     enabled: statusFilter === 'all' ? undefined : statusFilter === 'enabled',
   });
   const deleteMutation = useDeletePump();
+  const updateMutation = useUpdatePump();
 
   const pumps = data?.data || [];
   const branches = branchData?.data || [];
@@ -131,14 +137,29 @@ export function PumpTable() {
     setDialogOpen(true);
   };
 
-  const handleDeactivate = async (pump: PumpDetail) => {
-    if (confirm(`Bạn có chắc chắn muốn ngừng hoạt động trụ bơm ${pump.name}?`)) {
-      try {
-        await deleteMutation.mutateAsync(pump.id);
-        toast.success(`Đã ngừng hoạt động trụ bơm ${pump.name}`);
-      } catch (err: any) {
-        showApiError(err, 'Có lỗi xảy ra');
-      }
+  const handleDeactivate = async () => {
+    if (!deactivateTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deactivateTarget.id);
+      toast.success(`Đã ngừng hoạt động trụ bơm ${deactivateTarget.name}`);
+      setDeactivateTarget(null);
+    } catch (err: any) {
+      showApiError(err, 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleReactivate = async () => {
+    const target = reactivateTarget;
+    if (!target) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: target.id,
+        input: { name: target.name, note: target.note, enabled: true },
+      });
+      toast.success(`Đã kích hoạt lại trụ bơm ${target.name}`);
+      setReactivateTarget(null);
+    } catch (err: any) {
+      showApiError(err, 'Có lỗi xảy ra');
     }
   };
 
@@ -259,11 +280,22 @@ export function PumpTable() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDeactivate(p)}
+                              onClick={() => setDeactivateTarget(p)}
                               title="Ngừng hoạt động"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              className="h-7 w-7 text-amber-600 hover:text-amber-700"
                             >
-                              <NoSymbolIcon className="h-3.5 w-3.5" />
+                              <PauseCircleIcon className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canUpdate && !p.enabled && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setReactivateTarget(p)}
+                              title="Kích hoạt lại"
+                              className="h-7 w-7 text-green-600 hover:text-green-700"
+                            >
+                              <PlayCircleIcon className="h-4 w-4" />
                             </Button>
                           )}
                           {canUpdate && (
@@ -306,6 +338,28 @@ export function PumpTable() {
       />
 
       <PumpDialog open={dialogOpen} onOpenChange={setDialogOpen} pump={selectedPump} />
+
+      <ConfirmDialog
+        open={deactivateTarget !== null}
+        onOpenChange={(open) => !open && setDeactivateTarget(null)}
+        level="destructive"
+        title="Ngừng hoạt động trụ bơm"
+        description={`Bạn có chắc chắn muốn ngừng hoạt động trụ bơm ${deactivateTarget?.name ?? ''}?`}
+        confirmText="Ngừng hoạt động"
+        loading={deleteMutation.isPending}
+        onConfirm={handleDeactivate}
+      />
+
+      <ConfirmDialog
+        open={reactivateTarget !== null}
+        onOpenChange={(open) => !open && setReactivateTarget(null)}
+        level="info"
+        title="Kích hoạt lại trụ bơm"
+        description={`Bạn có chắc chắn muốn kích hoạt lại trụ bơm ${reactivateTarget?.name ?? ''}?`}
+        confirmText="Kích hoạt lại"
+        loading={updateMutation.isPending}
+        onConfirm={handleReactivate}
+      />
     </div>
   );
 }

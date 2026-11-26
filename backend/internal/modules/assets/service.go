@@ -99,7 +99,7 @@ func (s *Service) ListBranches(ctx context.Context, q BranchListQuery) ([]Branch
 		SELECT id, tenant_id, code, name, address, manager_name, phone, status, created_at, updated_at
 		FROM station.branch
 		WHERE %s
-		ORDER BY created_at DESC
+		ORDER BY created_at DESC, id DESC
 		LIMIT $%d OFFSET $%d
 	`, whereClause, argIdx, argIdx+1)
 	args = append(args, q.PageSize, offset)
@@ -196,6 +196,15 @@ func (s *Service) CreateBranch(ctx context.Context, req CreateBranchRequest) (*B
 	return &b, nil
 }
 
+// validateStatusChange kiểm tra trạng thái gửi kèm khi cập nhật. Để trống nghĩa là giữ nguyên trạng thái hiện tại:
+// sửa thông tin của một mục đã ngừng không được tự bật nó lại.
+func validateStatusChange(status string) error {
+	if status != "" && status != "active" && status != "inactive" {
+		return fmt.Errorf("%w: status must be active or inactive", apperr.ErrInvalidInput)
+	}
+	return nil
+}
+
 func (s *Service) UpdateBranch(ctx context.Context, id string, req UpdateBranchRequest) (*Branch, error) {
 	tenantID, err := getTenant(ctx)
 	if err != nil {
@@ -205,14 +214,14 @@ func (s *Service) UpdateBranch(ctx context.Context, id string, req UpdateBranchR
 	if strings.TrimSpace(req.Name) == "" {
 		return nil, fmt.Errorf("%w: name is required", apperr.ErrInvalidInput)
 	}
-	if req.Status != "active" && req.Status != "inactive" {
-		req.Status = "active"
+	if err := validateStatusChange(req.Status); err != nil {
+		return nil, err
 	}
 
 	var b Branch
 	query := `
 		UPDATE station.branch
-		SET name = $3, address = $4, manager_name = $5, phone = $6, status = $7, updated_at = now()
+		SET name = $3, address = $4, manager_name = $5, phone = $6, status = COALESCE(NULLIF($7::text, ''), status), updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
 		RETURNING id, tenant_id, code, name, address, manager_name, phone, status, created_at, updated_at
 	`
@@ -396,7 +405,7 @@ func (s *Service) ListTanks(ctx context.Context, q TankListQuery) ([]Tank, int, 
 		JOIN station.branch b ON b.id = t.branch_id AND b.tenant_id = t.tenant_id
 		JOIN station.fuel_type ft ON ft.id = t.fuel_type_id AND ft.tenant_id = t.tenant_id
 		WHERE %s
-		ORDER BY t.created_at DESC
+		ORDER BY t.created_at DESC, t.id DESC
 		LIMIT $%d OFFSET $%d
 	`, whereClause, argIdx, argIdx+1)
 	args = append(args, q.PageSize, offset)
@@ -573,12 +582,15 @@ func (s *Service) UpdateTank(ctx context.Context, id string, req UpdateTankReque
 	if strings.TrimSpace(req.Name) == "" {
 		return nil, fmt.Errorf("%w: name is required", apperr.ErrInvalidInput)
 	}
+	if err := validateStatusChange(req.Status); err != nil {
+		return nil, err
+	}
 
 	query := `
 		UPDATE station.tank
 		SET name = $3, fuel_type_id = $4, design_capacity_ml = $5,
 		    max_usable_capacity_ml = $6, low_stock_threshold_ml = $7,
-		    loss_tolerance_pct = $8, status = $9, updated_at = now()
+		    loss_tolerance_pct = $8, status = COALESCE(NULLIF($9::text, ''), status), updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
 		RETURNING id, tenant_id, branch_id, code, name, fuel_type_id,
 		          design_capacity_ml, max_usable_capacity_ml, low_stock_threshold_ml, loss_tolerance_pct,
@@ -700,7 +712,7 @@ func (s *Service) ListPumps(ctx context.Context, q PumpListQuery) ([]PumpDetail,
 		FROM station.pump p
 		JOIN station.branch b ON b.id = p.branch_id AND b.tenant_id = p.tenant_id
 		WHERE %s
-		ORDER BY p.edge_pump_id ASC
+		ORDER BY p.created_at DESC, p.id DESC
 		LIMIT $%d OFFSET $%d
 	`, whereClause, argIdx, argIdx+1)
 	args = append(args, q.PageSize, offset)

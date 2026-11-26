@@ -1,5 +1,6 @@
 'use client';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DetailDialog } from '@/components/detail-dialog';
 import { rowClick } from '@/lib/row-click';
 import { tankDetail } from '@/lib/row-details';
@@ -22,7 +23,8 @@ import { Input } from '@/components/ui/input';
 import {
   PlusIcon,
   PencilSquareIcon,
-  NoSymbolIcon,
+  PauseCircleIcon,
+  PlayCircleIcon,
   MagnifyingGlassIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
@@ -31,6 +33,7 @@ import { exportReportToExcel } from '@/features/reports/lib/export-excel';
 import { Tank } from '../types';
 import { getTanks, useTanks } from '../api/get-tanks';
 import { useDeleteTank } from '../api/delete-tank';
+import { useUpdateTank } from '../api/update-tank';
 import { useBranches } from '../api/get-branches';
 import { TankDialog } from './tank-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -55,6 +58,8 @@ export function TankTable() {
   const [isExporting, setIsExporting] = React.useState(false);
   const [selectedTank, setSelectedTank] = React.useState<Tank | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [deactivateTarget, setDeactivateTarget] = React.useState<Tank | null>(null);
+  const [reactivateTarget, setReactivateTarget] = React.useState<Tank | null>(null);
 
   React.useEffect(() => {
     setPage(1);
@@ -69,6 +74,7 @@ export function TankTable() {
     status: statusFilter !== 'all' ? statusFilter : undefined,
   });
   const deleteMutation = useDeleteTank();
+  const updateMutation = useUpdateTank();
 
   const tanks = data?.data || [];
   const branches = branchData?.data || [];
@@ -155,14 +161,38 @@ export function TankTable() {
     setDialogOpen(true);
   };
 
-  const handleDeactivate = async (tank: Tank) => {
-    if (confirm(`Bạn có chắc chắn muốn ngừng hoạt động bể ${tank.name}?`)) {
-      try {
-        await deleteMutation.mutateAsync(tank.id);
-        toast.success(`Đã ngừng hoạt động bể ${tank.name}`);
-      } catch (err: any) {
-        showApiError(err, 'Có lỗi xảy ra');
-      }
+  const handleDeactivate = async () => {
+    if (!deactivateTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deactivateTarget.id);
+      toast.success(`Đã ngừng hoạt động bể ${deactivateTarget.name}`);
+      setDeactivateTarget(null);
+    } catch (err: any) {
+      showApiError(err, 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleReactivate = async () => {
+    const target = reactivateTarget;
+    if (!target) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: target.id,
+        // API cập nhật ghi đè cả bản ghi nên gửi lại đủ thông tin hiện tại
+        input: {
+          name: target.name,
+          fuel_type_id: target.fuel_type_id,
+          design_capacity_liters: target.design_capacity_ml / 1000,
+          max_usable_capacity_liters: target.max_usable_capacity_ml / 1000,
+          low_stock_threshold_liters: target.low_stock_threshold_ml / 1000,
+          loss_tolerance_pct: target.loss_tolerance_pct,
+          status: 'active',
+        },
+      });
+      toast.success(`Đã kích hoạt lại bể ${target.name}`);
+      setReactivateTarget(null);
+    } catch (err: any) {
+      showApiError(err, 'Có lỗi xảy ra');
     }
   };
 
@@ -278,11 +308,22 @@ export function TankTable() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDeactivate(t)}
+                              onClick={() => setDeactivateTarget(t)}
                               title="Ngừng hoạt động"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              className="h-7 w-7 text-amber-600 hover:text-amber-700"
                             >
-                              <NoSymbolIcon className="h-3.5 w-3.5" />
+                              <PauseCircleIcon className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canUpdate && t.status === 'inactive' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setReactivateTarget(t)}
+                              title="Kích hoạt lại"
+                              className="h-7 w-7 text-green-600 hover:text-green-700"
+                            >
+                              <PlayCircleIcon className="h-4 w-4" />
                             </Button>
                           )}
                           {canUpdate && (
@@ -325,6 +366,28 @@ export function TankTable() {
       />
 
       <TankDialog open={dialogOpen} onOpenChange={setDialogOpen} tank={selectedTank} />
+
+      <ConfirmDialog
+        open={deactivateTarget !== null}
+        onOpenChange={(open) => !open && setDeactivateTarget(null)}
+        level="destructive"
+        title="Ngừng hoạt động bể chứa"
+        description={`Bạn có chắc chắn muốn ngừng hoạt động bể ${deactivateTarget?.name ?? ''}?`}
+        confirmText="Ngừng hoạt động"
+        loading={deleteMutation.isPending}
+        onConfirm={handleDeactivate}
+      />
+
+      <ConfirmDialog
+        open={reactivateTarget !== null}
+        onOpenChange={(open) => !open && setReactivateTarget(null)}
+        level="info"
+        title="Kích hoạt lại bể chứa"
+        description={`Bạn có chắc chắn muốn kích hoạt lại bể ${reactivateTarget?.name ?? ''}?`}
+        confirmText="Kích hoạt lại"
+        loading={updateMutation.isPending}
+        onConfirm={handleReactivate}
+      />
     </div>
   );
 }

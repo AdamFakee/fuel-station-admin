@@ -13,7 +13,8 @@ export async function updateTank({
   const payload: any = {
     name: input.name,
     fuel_type_id: input.fuel_type_id,
-    status: input.status || 'active',
+    // Không gửi thì backend giữ nguyên trạng thái; chỉ nút "Kích hoạt lại" mới gửi
+    status: input.status,
   };
   if (input.design_capacity_liters) payload.design_capacity_ml = Math.round(input.design_capacity_liters * 1000);
   if (input.max_usable_capacity_liters) payload.max_usable_capacity_ml = Math.round(input.max_usable_capacity_liters * 1000);
