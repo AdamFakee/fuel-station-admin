@@ -24,6 +24,7 @@ import {
   PencilSquareIcon,
   PauseCircleIcon,
   PlayCircleIcon,
+  ArrowPathIcon,
   MagnifyingGlassIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
@@ -34,6 +35,7 @@ import { getPumps, usePumps } from '../api/get-pumps';
 import Paginator from '@/components/paginator';
 import { useDeletePump } from '../api/delete-pump';
 import { useUpdatePump } from '../api/update-pump';
+import { useResyncTerminal } from '../api/resync-terminal';
 import { useBranches } from '../api/get-branches';
 import { PumpDialog } from './pump-dialog';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -47,7 +49,8 @@ export function PumpTable() {
   const canCreate = hasPermission('asset.pump:create');
   const canUpdate = hasPermission('asset.pump:update');
   const canDelete = hasPermission('asset.pump:delete');
-  const showActions = canUpdate || canDelete;
+  const canResync = hasPermission('asset.device:update');
+  const showActions = canUpdate || canDelete || canResync;
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(15);
   const [search, setSearch] = React.useState('');
@@ -58,6 +61,7 @@ export function PumpTable() {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [deactivateTarget, setDeactivateTarget] = React.useState<PumpDetail | null>(null);
   const [reactivateTarget, setReactivateTarget] = React.useState<PumpDetail | null>(null);
+  const [resyncTarget, setResyncTarget] = React.useState<PumpDetail | null>(null);
 
   React.useEffect(() => {
     setPage(1);
@@ -73,6 +77,7 @@ export function PumpTable() {
   });
   const deleteMutation = useDeletePump();
   const updateMutation = useUpdatePump();
+  const resyncMutation = useResyncTerminal();
 
   const pumps = data?.data || [];
   const branches = branchData?.data || [];
@@ -158,6 +163,17 @@ export function PumpTable() {
       });
       toast.success(`Đã kích hoạt lại trụ bơm ${target.name}`);
       setReactivateTarget(null);
+    } catch (err: any) {
+      showApiError(err, 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleResync = async () => {
+    if (!resyncTarget) return;
+    try {
+      await resyncMutation.mutateAsync(resyncTarget.id);
+      toast.success(`Đã gửi yêu cầu đẩy lại dữ liệu cho trụ ${resyncTarget.name}. Trạm thực hiện ở lần đồng bộ kế tiếp.`);
+      setResyncTarget(null);
     } catch (err: any) {
       showApiError(err, 'Có lỗi xảy ra');
     }
@@ -276,6 +292,17 @@ export function PumpTable() {
                     {showActions && (
                       <TableCell className={ACTION_CELL_CLASS}>
                         <div className="flex justify-end gap-1">
+                          {canResync && p.enabled && p.terminal && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setResyncTarget(p)}
+                              title="Đẩy lại dữ liệu máy chấm công"
+                              className="h-7 w-7 text-blue-600 hover:text-blue-700"
+                            >
+                              <ArrowPathIcon className="h-4 w-4" />
+                            </Button>
+                          )}
                           {canDelete && p.enabled && (
                             <Button
                               variant="ghost"
@@ -348,6 +375,17 @@ export function PumpTable() {
         confirmText="Ngừng hoạt động"
         loading={deleteMutation.isPending}
         onConfirm={handleDeactivate}
+      />
+
+      <ConfirmDialog
+        open={resyncTarget !== null}
+        onOpenChange={(open) => !open && setResyncTarget(null)}
+        level="info"
+        title="Đẩy lại dữ liệu máy chấm công"
+        description={`Trạm sẽ gửi lại toàn bộ tài xế và xe xuống máy chấm công ${resyncTarget?.terminal?.host ?? ''} của trụ ${resyncTarget?.name ?? ''}. Dùng khi thay máy, máy bị xóa dữ liệu hoặc thiếu người. Người không có trong hệ thống vẫn nằm lại trên máy. Hãy kiểm tra đúng mật khẩu máy trước khi bấm: bấm nhiều lần khi sai mật khẩu có thể làm máy bị khóa.`}
+        confirmText="Đẩy lại"
+        loading={resyncMutation.isPending}
+        onConfirm={handleResync}
       />
 
       <ConfirmDialog

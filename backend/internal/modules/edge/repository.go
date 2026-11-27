@@ -223,7 +223,7 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 
 	case "access_terminal":
 		query := `
-			SELECT t.id, t.pump_id, t.terminal_code, t.host, t.port, t.https, t.username, t.version, t.password_enc, p.edge_pump_id
+			SELECT t.id, t.pump_id, t.terminal_code, t.host, t.port, t.https, t.username, t.version, t.password_enc, p.edge_pump_id, t.resync_seq
 			FROM station.access_terminal t
 			JOIN station.pump p ON p.id = t.pump_id AND p.tenant_id = t.tenant_id
 			WHERE t.tenant_id = $1 AND t.id = $2 AND p.branch_id = $3
@@ -231,9 +231,9 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		var id, pumpID, terminalCode, host, username string
 		var port int
 		var https bool
-		var version, edgePumpID int64
+		var version, edgePumpID, resyncSeq int64
 		var passwordEnc []byte
-		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &pumpID, &terminalCode, &host, &port, &https, &username, &version, &passwordEnc, &edgePumpID)
+		err := r.pool.QueryRow(ctx, query, tenantID, entityID, branchID).Scan(&id, &pumpID, &terminalCode, &host, &port, &https, &username, &version, &passwordEnc, &edgePumpID, &resyncSeq)
 		if err != nil {
 			return nil, err
 		}
@@ -251,6 +251,7 @@ func (r *postgresRepository) loadEntityData(ctx context.Context, tenantID, branc
 		data["https"] = https
 		data["username"] = username
 		data["version"] = version
+		data["resync_seq"] = resyncSeq
 		data["edge_pump_id"] = edgePumpID
 
 	case "vehicle":

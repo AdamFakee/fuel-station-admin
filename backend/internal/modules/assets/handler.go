@@ -52,6 +52,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 		protected.With(authz.RequirePermission("asset.device:view", h.log)).Get("/assets/devices", h.ListDevices)
 		protected.With(authz.RequirePermission("asset.device:update", h.log)).Put("/assets/devices/sensors/{pumpId}", h.UpdateSensor)
 		protected.With(authz.RequirePermission("asset.device:update", h.log)).Put("/assets/devices/terminals/{pumpId}", h.UpdateTerminal)
+		protected.With(authz.RequirePermission("asset.device:update", h.log)).Post("/assets/devices/terminals/{pumpId}/resync", h.ResyncTerminal)
 	})
 }
 
@@ -372,4 +373,12 @@ func (h *Handler) UpdateTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.JSON(w, http.StatusOK, terminal)
+}
+
+func (h *Handler) ResyncTerminal(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.ResyncTerminal(r.Context(), chi.URLParam(r, "pumpId")); err != nil {
+		httpx.Error(w, r, h.log, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

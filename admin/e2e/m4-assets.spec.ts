@@ -322,6 +322,27 @@ test.describe('Module M4 - Tổ chức, Bể chứa, Trụ bơm & Thiết bị n
     await page.getByRole('button', { name: 'Hủy' }).click();
   });
 
+  test('4b. Trụ bơm: nút đẩy lại dữ liệu máy chấm công phải xác nhận rồi mới gửi yêu cầu cho đúng trụ', async ({ page }) => {
+    const requests: string[] = [];
+    await page.route('**/assets/devices/terminals/*/resync', async (route) => {
+      requests.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
+      await route.fulfill({ status: 204 });
+    });
+    await page.goto('/pumps');
+
+    await page.getByTitle('Đẩy lại dữ liệu máy chấm công').click();
+    await expect(page.getByRole('heading', { name: 'Đẩy lại dữ liệu máy chấm công' })).toBeVisible();
+    await expect(page.getByText(/192\.168\.1\.150 của trụ Trụ bơm Dầu DO 01/)).toBeVisible();
+    expect(requests).toHaveLength(0);
+
+    await page.getByRole('button', { name: 'Đẩy lại', exact: true }).click();
+
+    await expect(page.getByText(/Đã gửi yêu cầu đẩy lại dữ liệu/)).toBeVisible();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toContain('POST ');
+    expect(requests[0]).toContain('/assets/devices/terminals/p-01/resync');
+  });
+
   test('5. RBAC Ma trận M4: Kế toán & IT chỉ xem (View-only), ẩn hoàn toàn các nút thao tác tạo/sửa/xóa', async ({ page }) => {
     // Mock user profile Kế toán (ACCOUNTANT)
     await page.route('**/auth/me', async (route) => {

@@ -1253,6 +1253,47 @@ func (s *Service) UpdateTerminal(ctx context.Context, pumpID string, req UpdateT
 	return &at, nil
 }
 
+// ResyncTerminal yêu cầu trạm đẩy lại TOÀN BỘ người xuống máy chấm công của một trụ (máy mới thay, bị xóa sạch hoặc thiếu người).
+// Server không gọi được máy trong mạng của trạm: chỉ tăng resync_seq, trạm nhận ở lần đồng bộ kế tiếp và tự đẩy.
+func (s *Service) ResyncTerminal(ctx context.Context, pumpID string) error {
+	tenantID, err := getTenant(ctx)
+	if err != nil {
+		return err
+	}
+
+	var terminalID, terminalCode string
+	var seq int64
+	err = s.pool.QueryRow(ctx, `
+		UPDATE station.access_terminal t
+		SET resync_seq = t.resync_seq + 1, updated_at = now()
+		FROM station.pump p
+		WHERE p.id = t.pump_id AND p.tenant_id = t.tenant_id AND p.enabled
+		  AND t.tenant_id = $1 AND t.pump_id = $2
+		RETURNING t.id, t.terminal_code, t.resync_seq
+	`, tenantID, pumpID).Scan(&terminalID, &terminalCode, &seq)
+	if errors.Is(err, pgx.ErrNoRows) {
+		var enabled bool
+		lookup := s.pool.QueryRow(ctx, `SELECT enabled FROM station.pump WHERE tenant_id = $1 AND id = $2`, tenantID, pumpID).Scan(&enabled)
+		if lookup == nil && !enabled {
+			return fmt.Errorf("%w: trụ đang ngừng hoạt động, kích hoạt lại trước khi đẩy dữ liệu", apperr.ErrConflict)
+		}
+		return apperr.ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("resync terminal: %w", err)
+	}
+
+	parsedID, _ := uuid.Parse(terminalID)
+	_ = audit.Record(ctx, s.pool, audit.Entry{
+		Action:     audit.ActionUpdate,
+		EntityType: "access_terminal",
+		EntityID:   &parsedID,
+		EntityCode: terminalCode,
+		NewData:    map[string]any{"resync_seq": seq},
+	})
+	return nil
+}
+
 // rowQuerier là phần chung của pool và transaction để dùng lại cùng một hàm kiểm tra.
 type rowQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
